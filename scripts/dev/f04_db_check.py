@@ -1,5 +1,7 @@
 # CHANGE 2026-10-12 F04-DEVDB-02: new file (no previous version). Dev self-check, not the QA suite, never touches Supabase.
-"""Apply 0001…0010 to a scratch LOCAL PostgreSQL database, run qa.f01/f02/f03, then exercise the F04 functions.
+# CHANGE 2026-10-12 F04-DEVDB-03: what changed from the F04-DEVDB-02 version: also applies 0011_qa_f04_harness.sql
+#   (twice, idempotency) and runs qa.f04_run() next to qa.f01/f02/f03; the run fails on any failing row of any harness.
+"""Apply 0001…0011 to a scratch LOCAL PostgreSQL database, run qa.f01/f02/f03/f04, then exercise the F04 functions.
 
 usage:  python3 scripts/dev/f04_db_check.py "<psql connection args>"
         e.g. sudo -u postgres python3 scripts/dev/f04_db_check.py ""
@@ -20,7 +22,7 @@ SHIM = ROOT / "scripts" / "dev" / "supabase_local_shim.sql"
 DB = "pt_f04_dev"
 ORDER = ["0001_core.sql", "0002_qa_f01_harness.sql", "0003_qa_f01_fix_case12.sql", "0004_qa_search_path.sql",
          "0006_f02.sql", "0007_qa_f02_harness.sql", "0008_f03.sql", "0009_qa_f03_harness.sql", "0010_f04.sql",
-         "0010_f04.sql"]
+         "0010_f04.sql", "0011_qa_f04_harness.sql", "0011_qa_f04_harness.sql"]
 
 SCENARIOS = r"""
 create temp table r(id serial, name text, pass boolean, detail text);
@@ -63,7 +65,7 @@ begin
   insert into r(name,pass,detail) values ('18 empty days', jsonb_array_length(days)=18 and days->0->>'date'='03/04/2027' and days->17->>'date'='20/04/2027' and (days->17->>'day')::int=18, (days->0)::text);
   insert into r(name,pass,detail) values ('day object shape', days->0 = '{"day":1,"date":"03/04/2027","region":"","title":"","activities":"","hotel":"","cost":0,"notes":"","lat":35.6762,"lng":139.6503,"zoom":5,"waypoints":[],"country":"JP"}'::jsonb, (days->0)::text);
   select count(*) into n from public.trip_kv where trip_id=t and updated_by=u1;
-  insert into r(name,pass,detail) values ('trip_kv updated_by', n=1, n::text);
+  insert into r(name,pass,detail) values ('trip_kv updated_by (trip + tripname, F04-DB-02)', n=2, n::text);
   select count(*) into n from public.manager_invites where email='dana@example.com' and used_at is not null and trip_id=t;
   insert into r(name,pass,detail) values ('invite used + trip_id', n=1, n::text);
 
@@ -186,13 +188,15 @@ def main():
         ok &= r.returncode == 0
     if not ok:
         return 1
-    for run in ("f01", "f02", "f03"):
+    for run in ("f01", "f02", "f03", "f04"):
         r = psql(conn, DB, "-A", "-t", "-F", "\t", "-c", (("select id, pass, scenario from qa.%s_run() order by id") if run == "f01"
-                    else "select id, pass, name from qa.%s_run() order by id") % run)
+                    else "select id, pass, name, detail from qa.%s_run() order by id") % run)
         rows = [ln.split("\t") for ln in r.stdout.strip().splitlines() if ln.strip()]
         fails = [x for x in rows if len(x) > 1 and x[1] != "t"]
         print("qa.%s_run(): %d/%d pass%s" % (run, len(rows) - len(fails), len(rows), "" if not r.returncode else " ERROR " + r.stderr[-300:]))
-        ok &= not fails and not r.returncode
+        for x in fails:
+            print("    FAIL %s %s :: %s" % (x[0], x[2] if len(x) > 2 else "", (x[3] if len(x) > 3 else "")[:300]))
+        ok &= not fails and not r.returncode and bool(rows)
     r = psql(conn, DB, "-A", "-t", "-F", "\t", input_sql="begin;\n" + SCENARIOS + "\nrollback;\n")
     if r.returncode:
         print("F04 scenarios ERROR", r.stderr[-2000:])
