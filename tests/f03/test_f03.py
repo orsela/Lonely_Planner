@@ -1,5 +1,8 @@
-"""Plan_Travel F03 QA · Playwright black-box suite · version 1.0.0
+"""Plan_Travel F03 QA · Playwright black-box suite · version 1.0.1
 CHANGE 2026-10-05 F03-QA: first version (no previous version).
+CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.0.1. test_ac16_off_more_panel_identical_to_alpha2 now ignores the F04 row
+  #ptJoinRow ("קישור הצטרפות לקבוצה") when the served app has WIZARD_FEATURE='on' (architect's decision, F04 dev notes §7:
+  the row is spec'd F04 behaviour, independent of ADMIN_FEATURE). Nothing else changed.
 
 Black-box acceptance tests for docs/F03_spec.md §5 (super-admin invites a manager), written from the spec and the
 approved mockup artboards F03_* only. The F03 implementation (app/index.html changes, supabase/functions/,
@@ -1662,6 +1665,11 @@ def test_ac16_off_more_panel_identical_to_alpha2(env):
     n = env.new_device("OFF")
     assert n.goto(APP_PATH) == "app"
     f02.ensure_user(n.page)
+    # CHANGE 2026-10-12 F04-QA-03: with the F04 flag on, the F04 manager row #ptJoinRow is expected in '#more' (F04 spec
+    # §1.9) and is not part of the alpha.2 comparison: open '#more', then hide that one row before reading the text.
+    if re.search(r"""const\s+WIZARD_FEATURE\s*=\s*(['"])on\1""", app_html()):
+        open_more(n.page)
+        n.page.evaluate("()=>{const r=document.getElementById('ptJoinRow');if(r)r.style.display='none'}")
     got = more_text(n.page)
     assert got == ref, "#more differs from alpha.2 with ADMIN_FEATURE='off':\nalpha.2: %r\noff:     %r" % (ref, got)
 
