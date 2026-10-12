@@ -22,7 +22,7 @@ if('serviceWorker' in navigator){
 <!-- CHANGE 2026-10-04 F02-VER-02: title version v2.15.2 -> v3.0.0-alpha.2 (Plan_Travel F02: same app on the plan-travel backend). -->
 <!-- CHANGE 2026-10-05 F03-VER-02: title version v3.0.0-alpha.2 -> v3.0.0-alpha.3 (Plan_Travel F03: super-admin invites a manager). -->
 <!-- CHANGE 2026-10-12 F04-VER-02: title version v3.0.0-alpha.3.4 -> v3.0.0-alpha.4 (Plan_Travel F04: an invited manager sets up a trip in three steps). -->
-<title>Vietnam Travel Planner — ויאטנם 2026 · v3.0.0-alpha.4 (Plan_Travel)</title>
+<title>Vietnam Travel Planner — ויאטנם 2026 · v3.0.0-alpha.4.1 (Plan_Travel)</title>
 <!-- CHANGE 2026-09-30 PERF-01 (v2.11.2): xlsx.full.min.js (~900KB) is no longer loaded here on every start; ensureXLSX() in the main script loads it only when Excel backup/import is used. -->
 <script>
 /* CHANGE 2026-10-04 F02-FLAG-01: F02 flags — top-level consts in their own classic script, placed before the F02 gate
@@ -825,6 +825,10 @@ select.pt-in{-webkit-appearance:auto;appearance:auto}
 .pt-fs-head span{font-size:11.5px;font-weight:700;color:var(--muted)}
 .pt-fs-row{display:flex;gap:8px;align-items:center;font-size:13px}
 .pt-fs-row.pt-done{color:var(--muted)}
+/* CHANGE 2026-10-12 F04-HOME-04: tappable open rows */
+.pt-fs-row.pt-fs-tap{min-height:44px;cursor:pointer;border-radius:10px}
+.pt-fs-row.pt-fs-tap:active{background:var(--line,#eee)}
+.pt-fs-go{margin-inline-start:auto;color:var(--muted);font-size:18px;line-height:1}
 .pt-fs-row.pt-done span:last-child{text-decoration:line-through}
 .pt-fs-o{width:18px;height:18px;border:2px solid #c9ccc4;border-radius:50%;flex-shrink:0;box-sizing:border-box}
 .pt-fs-btns{display:flex;gap:8px}
@@ -1641,13 +1645,15 @@ function paintFirstSteps(){
   const anchor=panel.querySelector('.hv2-map-hero')||(panel.querySelector('.topbar')&&panel.querySelector('.topbar').nextSibling)||panel.firstChild;
   panel.insertBefore(card,anchor);
  }
- const row=(id,ok,label)=>'<div class="pt-fs-row'+(ok?' pt-done':'')+'" id="'+id+'" data-done="'+ok+'">'+(ok?ICON.check18:'<span class="pt-fs-o" aria-hidden="true"></span>')+'<span>'+label+'</span></div>';
+ /* CHANGE 2026-10-12 F04-HOME-04: open rows 2–3 are tappable (role=button, ≥44px, ‹): row 2 = WhatsApp share, row 3 =
+    day 1 + the existing "הוספת נקודת עניין" modal. Was: plain text rows (alpha.4). Done rows stay plain. Or, 2026-10-12. */
+ const row=(id,ok,label)=>'<div class="pt-fs-row'+(ok?' pt-done':' pt-fs-tap')+'" id="'+id+'" data-done="'+ok+'"'+(ok?'':' role="button" tabindex="0"')+'>'+(ok?ICON.check18:'<span class="pt-fs-o" aria-hidden="true"></span>')+'<span>'+label+'</span>'+(ok?'':'<span class="pt-fs-go" aria-hidden="true">‹</span>')+'</div>';
  const key=n+'|'+st.shared+'|'+st.wp;
  if(card.dataset.key===key)return;
  card.dataset.key=key;
  card.innerHTML='<div class="pt-fs-head"><b id="ptFsTitle">צעדים ראשונים</b><span id="ptFsCount">'+n+' מתוך 3</span></div>'+
   row('ptFs1',true,'הקמת הטיול')+row('ptFs2',st.shared,'שליחת קישור לקבוצה')+row('ptFs3',st.wp,'הוספת היעד הראשון ליום 1')+
-  '<div class="pt-fs-btns"><a class="pt-btn" id="ptFsWa" href="#" target="_blank" rel="noopener noreferrer">שליחה בווטסאפ</a><button type="button" class="pt-btn pt-out" id="ptFsRoute">למסלול</button></div>';
+  '<div class="pt-fs-btns"><a class="pt-btn" id="ptFsWa" href="#" target="_blank" rel="noopener noreferrer">שליחה בווטסאפ</a><button type="button" class="pt-btn pt-out" id="ptFsRoute">הוספת נקודה</button></div>';
  const wa=$('ptFsWa');
  const setHref=u=>{if(u&&wa.isConnected)wa.href=waUrl(fsName||'',u)};
  if(joinCache.url&&joinCache.trip===tripId())setHref(joinCache.url);else joinUrl().then(setHref);
@@ -1655,7 +1661,13 @@ function paintFirstSteps(){
   if(!joinCache.url||joinCache.trip!==tripId()){e.preventDefault();toast(online()?'טוענים את הקישור… נסו שוב בעוד רגע.':TX.offline);joinUrl().then(setHref);return}
   markShared(tripId());setTimeout(paintFirstSteps,300);
  });
- $('ptFsRoute').onclick=()=>{try{switchPanel('route')}catch{}};
+ /* CHANGE 2026-10-12 F04-HOME-04: "למסלול" → "הוספת נקודה" (same id): day 1 + the add-point modal, returning home after
+    save/close — the same calls as the HOME-MIN "⋯" action "הוספת נקודת עניין". Was: switchPanel('route') only. */
+ const addPoint=()=>{try{heGoDay(0);$('newWaypoint').click();heBackHome()}catch{try{switchPanel('route')}catch{}}};
+ $('ptFsRoute').onclick=addPoint;
+ const tap=(el,fn)=>{if(!el||el.dataset.done==='true')return;el.onclick=fn;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn()}}};
+ tap($('ptFs2'),()=>wa.click());
+ tap($('ptFs3'),addPoint);
 }
 /* F04-HOME-03: an empty day (no title, no waypoints) shows "עוד לא נוספו נקודות" where the day title would be */
 function markEmptyDay(){
@@ -1769,7 +1781,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.4'; /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.4.1'; /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -6341,7 +6353,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.4'; /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.4.1'; /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;

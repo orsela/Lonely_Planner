@@ -185,3 +185,11 @@ DOM at a time; `#ptWzTitle` (h1), `#ptWzErr` (one-line error, `role=alert`), `#p
 - §6.6 resolved — **F04-INV-02**: the `/invite/` installed-app note now says `"כניסה עם הזמנה"`, matching the gate button.
 - QA note (★ in §5): `test_ac16_off_more_panel_identical_to_alpha2` should exclude `#ptJoinRow` when the wizard flag is on
   (the row is spec'd F04 behaviour, independent of `ADMIN_FEATURE`).
+
+## 8. alpha.4.1 (2026-10-12, after Or's phone test)
+
+- **F04-HOME-04**: "צעדים ראשונים" open rows are tappable (row 2 → WhatsApp share, row 3 → day 1 + "הוספת נקודת עניין"
+  modal via `heGoDay(0)` + `#newWaypoint` click + `heBackHome()`, the HOME-MIN ⋯ action's calls); button `#ptFsRoute` is now
+  "הוספת נקודה" (same action). Versions alpha.4 → alpha.4.1 (F04-VER-04). New CSS `.pt-fs-tap`, `.pt-fs-go`.
+- Found on the phone, deferred to F05 (Or): a new trip still uses the device-wide "מי אני" name (`KEYS.user`), so a point was
+  attributed to a family name instead of the member's display name.

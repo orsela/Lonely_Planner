@@ -64,3 +64,31 @@ None in the product.
 2. **Two sources for the trip name.** `trips.name` and trip_kv `tripname` are both written at create. The spec doesn't say whether renaming in הגדרות מסע should also update `trips.name`, which F09 trip lists will read. Proposal: decide this in F06/F09.
 3. **/invite/ ignores the flag.** The /invite/ page changes even with WIZARD_FEATURE='off', because it is outside the app. With 'off', its button opens the app, which then shows the F03 landing with "בקרוב". Is that acceptable as the rollback state?
 4. **Where criterion 11 is tested.** The browser test checks the fake's `tripname` and the client display. The real DB write is covered by `qa.f04_run()` row 20 (trimmed name), which so far has only run on local Postgres.
+
+## alpha.4.1 (2026-10-12) — first-steps card (F04-HOME-04, F04-VER-04)
+CHANGE 2026-10-12 F04-QA-04: new section. Contract: spec §1.8 (button "הוספת נקודה" `#ptFsRoute`, tappable open rows) and dev notes §8. Suite tests/f04/test_f04.py 1.1.0 → 1.2.0.
+
+Suite changes:
+- Version pin is now 3.0.0-alpha.4.1.
+- TXT "למסלול" → "הוספת נקודה". In `test_c13_enter_trip_home`, the route-tab check is replaced: the button must open `#waypointModal` with "הוספת נקודת עניין · יום 1", and closing it must return to home.
+- The `c20` home card anchor uses the new button text.
+- New tests:
+  - `test_c13_fs_row3_opens_add_point[tap|enter|space]`
+  - `test_c13_fs_row3_without_device_user`: the legacy "מי אני" modal is accepted here (deferred to F05)
+  - `test_c13_fs_row2_tap_marks_shared`: wa.me with the join URL, `pt:<trip>:firststeps` {shared:true}, row done, count 1 → 2 מתוך 3
+  - `test_c13_fs_rows_tappable_only_when_open[none_done|shared_done]`: role=button, tabindex=0, "‹" and ≥44px only on open rows; fits in 390px
+
+| Suite | Result |
+|---|---|
+| F04 browser suite 1.2.0 | 92/92 (85 + 7 new) |
+| F03 regression, WIZARD_FEATURE=on / off | 47 passed, 1 skipped, 11 deselected / 55 passed, 1 skipped, 3 deselected |
+| F03 deselected tests run on their own, on / off | 11 / 3 failed: the same expected set as alpha.4 (version pins alpha.3.4, "בקרוב" /invite/ button, F03 in-app landing replaced by the code screen) |
+| F02 regression, WIZARD_FEATURE=on / off | 37 passed, 1 skipped, 2 deselected each; the 2 deselected (version pins) fail as expected |
+| Deno: F04 function tests · create-trip · invite-manager | 28/28 · 9/9 · 21/21 |
+| DB | no DB change in alpha.4.1; not re-run (alpha.4 result above) |
+
+Defects: none.
+Out of scope, noted from dev notes §8: a new trip still uses the device-wide "מי אני" name, deferred to F05.
+Phone (add to the checklist):
+- [ ] On the "צעדים ראשונים" card, tapping "הוספת היעד הראשון ליום 1" or "הוספת נקודה" opens "הוספת נקודת עניין · יום 1", and closing it returns home.
+- [ ] Tapping "שליחת קישור לקבוצה" opens WhatsApp, and the row turns ✓.

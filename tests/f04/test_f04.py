@@ -1,4 +1,4 @@
-"""Plan_Travel F04 QA · Playwright black-box suite · version 1.1.0
+"""Plan_Travel F04 QA · Playwright black-box suite · version 1.2.0
 CHANGE 2026-10-12 F04-QA: first version (no previous version).
 CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.1.0, follows the two spec changes approved by Or after the first run:
   - F04-DB-02: the fake create-trip (F04Backend.create_trip_from_invite) now also writes trip_kv `tripname` = the trimmed
@@ -6,6 +6,13 @@ CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.1.0, follows the two spec changes appro
     #tripName and ניהול → הגדרות מסע show the entered name, never the fallback "מסע של חלומות".
   - F04-INV-02: TXT["inv_note"] is the new /invite/ note ('…ולבחור "כניסה עם הזמנה".'); test_c16_invite_page_button_opens_app
     also asserts the old wording "קיבלתי הזמנה לנהל טיול" is gone (criterion 16).
+CHANGE 2026-10-12 F04-QA-04: 1.1.0 → 1.2.0, follows alpha.4.1 (spec §1.8 F04-HOME-04, dev notes §8):
+  - VERSION pin 3.0.0-alpha.4 → 3.0.0-alpha.4.1 (APP_VERSION / PT_VERSION / <title>, test_c21_static).
+  - TXT["to_route"] "למסלול" → "הוספת נקודה" (#ptFsRoute); test_c13_enter_trip_home now expects day 1 + the
+    "הוספת נקודת עניין" modal (#waypointModal.open, title "· יום 1") and home after closing it, instead of the route tab;
+    test_c20_layout_390_rtl_touch[home] anchors the card on the new button text.
+  - New: test_c13_fs_row3_opens_add_point[tap|enter|space], test_c13_fs_row3_without_device_user,
+    test_c13_fs_row2_tap_marks_shared, test_c13_fs_rows_tappable_only_when_open (role/tabindex/‹/≥44px at 390px).
 
 Black-box acceptance tests for docs/F04_spec.md §5 (criteria 1–16, 19, 20 from the browser side, plus the static part
 of 21), written from the spec and the approved mockup artboards F04_* only. NOT read: app/index.html, invite/index.html,
@@ -72,7 +79,7 @@ PT_URL, PT_KEY = f02.PT_URL, f02.PT_KEY
 IM_URL = PT_URL + "/functions/v1/invite-manager"
 CT_URL = PT_URL + "/functions/v1/create-trip"
 JOIN_BASE = "https://orsela.github.io/Plan_Travel/join/"
-VERSION = "3.0.0-alpha.4"
+VERSION = "3.0.0-alpha.4.1"  # CHANGE 2026-10-12 F04-QA-04: was 3.0.0-alpha.4
 ALPHA3_REF = os.environ.get("ALPHA3_REF", "e591edc")
 PROTECTED = f02.PROTECTED
 VIEWPORT = f02.VIEWPORT
@@ -167,7 +174,8 @@ TXT = {
     # home (§1.8) and "עוד" (§1.9)
     "first_steps": "צעדים ראשונים",
     "fs_items": ["הקמת הטיול", "שליחת קישור לקבוצה", "הוספת היעד הראשון ליום 1"],
-    "to_route": "למסלול",
+    "to_route": "הוספת נקודה",  # CHANGE 2026-10-12 F04-QA-04: button #ptFsRoute, was "למסלול"
+    "wp_modal": "הוספת נקודת עניין",  # CHANGE 2026-10-12 F04-QA-04: existing add-point modal (#waypointModal)
     "empty_day": "עוד לא נוספו נקודות",
     "no_days": "אין ימים בטיול",
     "more_row": "קישור הצטרפות לקבוצה",
@@ -2379,6 +2387,139 @@ def test_c11_tripname_shown_home_and_settings(env, layout):
     assert not P, "\n".join(P)
 
 
+# CHANGE 2026-10-12 F04-QA-04: helpers + tests for the tappable first-steps rows (alpha.4.1, F04-HOME-04)
+WP_OPEN_JS = "()=>{const m=document.getElementById('waypointModal');return !!m&&m.classList.contains('open')}"
+USER_OPEN_JS = "()=>!!document.querySelector('#userModal.open')"
+FS_ROWS_JS = """()=>[1,2,3].map(i=>{const e=document.getElementById('ptFs'+i);if(!e)return null;
+  const r=e.getBoundingClientRect();return {i,done:e.getAttribute('data-done'),role:e.getAttribute('role'),
+  tab:e.getAttribute('tabindex'),w:r.width,h:r.height,t:e.innerText}})"""
+
+
+def home_active(page):
+    return page.evaluate("""()=>['homeV2','home'].some(id=>{const h=document.getElementById(id);
+      return !!h&&h.classList.contains('active')&&getComputedStyle(h).display!=='none'})""")
+
+
+def add_point_problems(dev, label, allow_user_modal=False):
+    """After the trigger: #waypointModal is open with 'הוספת נקודת עניין · יום 1'; closing it returns to home.
+    With allow_user_modal, the legacy 'מי אני' #userModal is an accepted immediate result (out of scope, F05)."""
+    page = dev.page
+    P = []
+    end = time.time() + 5
+    while time.time() < end and not page.evaluate(WP_OPEN_JS) and not page.evaluate(USER_OPEN_JS):
+        page.wait_for_timeout(150)
+    if not page.evaluate(WP_OPEN_JS):
+        if allow_user_modal and page.evaluate(USER_OPEN_JS):
+            return P
+        return ["%s: #waypointModal not open (userModal open=%s)" % (label, page.evaluate(USER_OPEN_JS))]
+    title = norm(page.evaluate("()=>document.getElementById('waypointModal').innerText"))
+    if not re.search(re.escape(TXT["wp_modal"]) + r"\s*·\s*יום 1\b", title):
+        P.append("%s: modal is not for day 1: %r" % (label, title[:120]))
+    f02.close_modal(page, "waypointModal")
+    page.wait_for_timeout(700)
+    if not home_active(page):
+        P.append("%s: did not return to home after closing the modal" % label)
+    return P
+
+
+@pytest.mark.parametrize("how", ["tap", "enter", "space"])
+def test_c13_fs_row3_opens_add_point(env, how):
+    """§1.8 alpha.4.1: the open row 'הוספת היעד הראשון ליום 1' (#ptFs3) = 'הוספת נקודה': day 1 + #waypointModal open,
+    home after close; keyboard Enter / Space activate it too. Device user is set (boot → ensure_user)."""
+    tid, code, dev = boot_trip(env, role="manager", n_days=3)
+    page = dev.page
+    assert wait_has(page, TXT["first_steps"], 6), "first-steps card missing"
+    if how == "tap":
+        page.locator("#ptFs3").click()
+    else:
+        page.locator("#ptFs3").focus()
+        page.keyboard.press("Enter" if how == "enter" else " ")
+    P = add_point_problems(dev, "row 3 (%s)" % how)
+    if page_errors(dev):
+        P.append("page errors: %r" % page_errors(dev)[:3])
+    assert not P, "\n".join(P)
+
+
+def test_c13_fs_row3_without_device_user(env):
+    """Coordinator note: without a device user the legacy 'מי אני' modal may come first (deferred to F05) — accepted;
+    otherwise the add-point modal must open for day 1."""
+    tid, code, dev = boot_trip(env, role="manager", n_days=3)
+    page = dev.page
+    page.evaluate("()=>{for(const k of Object.keys(localStorage))if(/user/i.test(k)&&!/supabase|sb-/.test(k))localStorage.removeItem(k)}")
+    page.reload(wait_until="domcontentloaded")
+    wait_home_any(page)
+    if page.evaluate(USER_OPEN_JS):
+        f02.close_modal(page, "userModal")
+    assert wait_has(page, TXT["first_steps"], 6), "first-steps card missing"
+    page.locator("#ptFs3").click()
+    P = add_point_problems(dev, "row 3 without user", allow_user_modal=True)
+    assert not P, "\n".join(P)
+
+
+def test_c13_fs_row2_tap_marks_shared(env):
+    """§1.8 alpha.4.1: tapping the open row 'שליחת קישור לקבוצה' (#ptFs2) = the WhatsApp share: wa.me with the join URL,
+    pt:<trip>:firststeps {shared:true}, the row becomes done and the count goes 1 → 2 מתוך 3."""
+    tid, code, dev = boot_trip(env, role="manager", n_days=3)
+    page = dev.page
+    assert wait_has(page, TXT["first_steps"], 6), "first-steps card missing"
+    P = []
+    if not re.search(r"1\s*מתוך\s*3", btext(page)):
+        P.append("count is not '1 מתוך 3' before")
+    page.evaluate(WA_GUARD_JS)
+    page.evaluate("()=>{window.__qaOpened=[]}")
+    n = len(env_net(dev))
+    page.locator("#ptFs2").click()
+    page.wait_for_timeout(700)
+    opened = page.evaluate("()=>window.__qaOpened||[]") + [r["url"] for r in env_net(dev)[n:]]
+    wa = [u for u in opened if "wa.me" in u]
+    if not wa:
+        P.append("row 2 did not open WhatsApp (opened %r)" % opened[:3])
+    elif JOIN_BASE + "#code=" + code not in wa_text(wa[0]):
+        P.append("row 2 WhatsApp text lacks the join URL: %r" % wa[0])
+    raw = dev.ls().get("pt:%s:firststeps" % tid)
+    if not raw or not json.loads(raw).get("shared"):
+        P.append("row 2 did not record {shared:true}: %r" % raw)
+    rows = page.evaluate(FS_ROWS_JS)
+    if not rows[1] or rows[1]["done"] != "true" or rows[1]["role"] == "button":
+        P.append("row 2 not shown as done after sharing: %r" % rows[1])
+    if not re.search(r"2\s*מתוך\s*3", btext(page)):
+        P.append("count did not update to '2 מתוך 3' (%r)" % page.evaluate("()=>{const e=document.getElementById('ptFsCount');return e&&e.innerText}"))
+    assert not P, "\n".join(P)
+
+
+@pytest.mark.parametrize("state", ["none_done", "shared_done"])
+def test_c13_fs_rows_tappable_only_when_open(env, state):
+    """§1.8 alpha.4.1: open rows have role=button, tabindex=0, the '‹' marker and are ≥44px tall (and fit 390px); done
+    rows (row 1 always; row 2 after sharing) have no role=button, no tabindex, no '‹'."""
+    pre = {"pt:{tid}:firststeps": '{"shared":true}'} if state == "shared_done" else None
+    tid, code, dev = boot_trip(env, role="manager", n_days=3, pre_ls=pre)
+    page = dev.page
+    assert wait_has(page, TXT["first_steps"], 6), "first-steps card missing"
+    rows = page.evaluate(FS_ROWS_JS)
+    P = []
+    want_open = {3} if state == "shared_done" else {2, 3}
+    for r in rows:
+        if not r:
+            P.append("row missing")
+            continue
+        if r["i"] in want_open:
+            if r["done"] == "true":
+                P.append("row %d should be open: %r" % (r["i"], r))
+            if r["role"] != "button" or r["tab"] != "0":
+                P.append("open row %d: role=%r tabindex=%r" % (r["i"], r["role"], r["tab"]))
+            if "‹" not in r["t"]:
+                P.append("open row %d lacks '‹'" % r["i"])
+            if r["h"] < 44 - 0.5 or r["w"] > VIEWPORT["width"]:
+                P.append("open row %d size %dx%d (need ≥44 tall, ≤390 wide)" % (r["i"], r["w"], r["h"]))
+        else:
+            if r["done"] != "true":
+                P.append("row %d should be done: %r" % (r["i"], r))
+            if r["role"] == "button" or r["tab"] is not None or "‹" in r["t"]:
+                P.append("done row %d is still tappable-looking: %r" % (r["i"], r))
+    P += layout_problems(page, "#ptFirstSteps", "first-steps " + state)
+    assert not P, "\n".join(P)
+
+
 def test_c13_enter_trip_home(env):
     """C13 + §1.8: 'כניסה לטיול' opens the new trip (not the Vietnam seed) with all global elements, trip name + dates in
     the header, the 'צעדים ראשונים' card (manager) with 'הקמת הטיול' done, buttons 'שליחה בווטסאפ' / 'למסלול', empty days
@@ -2412,12 +2553,11 @@ def test_c13_enter_trip_home(env):
     raw = dev.ls().get("pt:%s:firststeps" % tid)
     if not raw or not json.loads(raw).get("shared"):
         P.append("WhatsApp on Done did not record pt:<trip>:firststeps {shared:true}: %r" % raw)
-    click_text(page, TXT["to_route"])
-    page.wait_for_timeout(600)
-    if not page.evaluate("()=>{const r=document.getElementById('route');return !!r&&r.classList.contains('active')}"):
-        P.append("'למסלול' did not open the route tab")
+    # CHANGE 2026-10-12 F04-QA-04: "הוספת נקודה" opens day 1 + the add-point modal and returns home (was: route tab)
+    click_text(page, TXT["to_route"], exact=True)
+    P += add_point_problems(dev, "'%s'" % TXT["to_route"])
     if any(s in btext(page) for s in SEED_MARKERS):
-        P.append("seed on the route tab")
+        P.append("seed after the add-point flow")
     if page_errors(dev):
         P.append("page errors: %r" % page_errors(dev)[:3])
     assert not P, "\n".join(P)
