@@ -32,7 +32,7 @@ Error bodies `{"error":"<code>", …}`.
 
 | id | RPC answer | expected |
 |---|---|---|
-| CT-20 | `{trip_id, join_code, created:true}` | RPC `create_trip_from_invite(p_user=uid, p_email=email, p_payload)`; every payload field forwarded unchanged; 200 keys exactly `trip_id, join_code, join_url, created`; `join_url = https://orsela.github.io/Plan_Travel/join/#code=<code>` (JOIN_URL unset); no email in the body |
+| CT-20 | `{trip_id, join_code, created:true}` | RPC `create_trip_from_invite(p_user=uid, p_email=email, p_payload)`; every payload field forwarded unchanged; 200 keys exactly `trip_id, join_code, join_url, created`; `join_url = https://orsela.github.io/Lonely_Planner/join/#code=<code>` (JOIN_URL unset; F04-QA-05, was /Plan_Travel/); no email in the body |
 | CT-21 | same with `created:false` (idempotent retry) | 200, same trip/code, `created:false`, same join_url |
 | CT-22 | error `invite_invalid` | 409 `invite_invalid`, no trip data |
 | CT-23 | error `invalid_payload`, `details` = each field (name … center) | 400 `{error:'invalid_payload', field:<details>}` |
@@ -62,12 +62,20 @@ Error bodies `{"error":"<code>", …}`.
 
 | id | case | expected |
 |---|---|---|
-| IM-00 | exports | `FN_VERSION` 3.0.0-alpha.4.x; `DEFAULT_APP_URL` = `https://orsela.github.io/Plan_Travel/app/` |
+| IM-00 | exports | `FN_VERSION` 3.0.0-alpha.4.x; `DEFAULT_APP_URL` = `https://orsela.github.io/Lonely_Planner/app/` (CHANGE 2026-10-12 F04-QA-05: was /Plan_Travel/app/) |
 | IM-01 | `resolveAppUrl` on `ttps://…`, `http://…`, `""`, `"  "`, `not a url`, `https://` | default, `fallback:true`; `https://example.org/qa/app/` kept, `fallback:false`; `undefined` → default |
-| IM-02 | `makeHandler` with APP_URL `ttps://…` / `""` / `not a url`, two creates | both emails link to `https://orsela.github.io/Plan_Travel/…#invite=<43>`; no `ttps://` and no empty/relative href in the mail; `app_url_invalid_fallback` logged exactly once; the bad value never logged |
+| IM-02 | `makeHandler` with APP_URL `ttps://…` / `""` / `not a url`, two creates | both emails link to `https://orsela.github.io/Lonely_Planner/invite/#invite=<43>` (F04-QA-05); no `ttps://` and no empty/relative href in the mail; `app_url_invalid_fallback` logged exactly once; the bad value never logged |
 | IM-03 | valid APP_URL | link built from it; no warning |
 | IM-10 | `check` valid token | keys exactly `valid, draft_name, inviter_name, expires_at, email`; `email` = the invite address; no hash |
 | IM-11 | `check` expired / revoked / used / unknown / malformed / `""` / number / missing | every body byte-identical `{"valid":false}` (shape unchanged), status 200, no `@` |
 
 Not covered here (needs the deployed function / real DB): the real `auth.getUser(jwt)` wiring and the real RPC shapes —
 checked by the DB harness (`qa.f04_run()`) and the phone checklist (`tests/f04/MANUAL.md`).
+
+## alpha.4.2 name + address (CHANGE 2026-10-12 F04-QA-05, spec §8/§8.1)
+
+| id | input | expected |
+|---|---|---|
+| NAME-01 | invite-manager create, default APP_URL | subject `הוזמנת לנהל טיול ב-Lonely Planner`; `FROM_NAME` = `Lonely Planner`; HTML and text contain `Lonely Planner`; no `Plan_Travel` / `Vietnam Travel Planner` / `ויאטנם 2026` anywhere in the message |
+| NAME-02 | invite-manager, APP_URL unset | `DEFAULT_APP_URL` `https://orsela.github.io/Lonely_Planner/app/`; link `https://orsela.github.io/Lonely_Planner/invite/#invite=<43>`; FN_VERSION 3.0.0-alpha.4.1 |
+| NAME-03 | create-trip create, JOIN_URL unset | `join_url` = `https://orsela.github.io/Lonely_Planner/join/#code=<CODE>`; FN_VERSION 3.0.0-alpha.4.1 |

@@ -1,8 +1,10 @@
-"""Plan_Travel F03 QA · Playwright black-box suite · version 1.0.1
+"""Plan_Travel F03 QA · Playwright black-box suite · version 1.0.2
 CHANGE 2026-10-05 F03-QA: first version (no previous version).
 CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.0.1. test_ac16_off_more_panel_identical_to_alpha2 now ignores the F04 row
   #ptJoinRow ("קישור הצטרפות לקבוצה") when the served app has WIZARD_FEATURE='on' (architect's decision, F04 dev notes §7:
   the row is spec'd F04 behaviour, independent of ADMIN_FEATURE). Nothing else changed.
+CHANGE 2026-10-12 F04-QA-05: 1.0.1 → 1.0.2: F04 alpha.4.2 (F04 spec §8/§8.1): PROD_APP_URL → /Lonely_Planner/app/ and the
+  fake invite-manager email subject → "הוזמנת לנהל טיול ב-Lonely Planner". The local app path comes from f02.APP_PATH.
 
 Black-box acceptance tests for docs/F03_spec.md §5 (super-admin invites a manager), written from the spec and the
 approved mockup artboards F03_* only. The F03 implementation (app/index.html changes, supabase/functions/,
@@ -63,7 +65,7 @@ ALPHA2_PATH = "/Alpha2/"
 ALPHA2_REF = os.environ.get("ALPHA2_REF", "9b8151b")
 PT_URL, PT_KEY = f02.PT_URL, f02.PT_KEY
 FN_URL = PT_URL + "/functions/v1/invite-manager"
-PROD_APP_URL = "https://orsela.github.io/Plan_Travel/app/"
+PROD_APP_URL = "https://orsela.github.io/Lonely_Planner/app/"  # CHANGE 2026-10-12 F04-QA-05: was /Plan_Travel/app/
 VERSION = "3.0.0-alpha.3.4"
 PROTECTED = f02.PROTECTED
 VIEWPORT = f02.VIEWPORT
@@ -365,7 +367,7 @@ class F03Backend(f02.FakeBackend):
     def _send(self, row, token):
         if self.email_fail:
             return False
-        self.emails.append({"to": row["email"], "subject": "הוזמנת לנהל טיול ב-Plan_Travel",
+        self.emails.append({"to": row["email"], "subject": "הוזמנת לנהל טיול ב-Lonely Planner",  # CHANGE 2026-10-12 F04-QA-05
                             "link": PROD_APP_URL + "#invite=" + token, "token": token, "invite_id": row["id"]})
         return True
 

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Plan_Travel F04 QA runner · version 1.1.0
+# Plan_Travel F04 QA runner · version 1.2.0
 # CHANGE 2026-10-12 F04-QA: first version (no previous version); built from tests/f03/run.sh 1.0.0.
 # CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.1.0: the invite-manager Deno run gets --allow-net=127.0.0.1 (its F03-MAIL-04
 #   test opens a local fake SMTP listener on 127.0.0.1:0; loopback only, no external network). Nothing else changed.
+# CHANGE 2026-10-12 F04-QA-05: 1.1.0 → 1.2.0: F02 test_ac15_static[manifest_visible_fields_unchanged] is deselected in
+#   both states — F04 spec §8 (alpha.4.2) renames the installed app (manifest name/short_name "Lonely Planner") on purpose.
+#   F04 replacements: test_f04.py::test_n02_static_names[manifest_name|manifest_short_name|manifest_icons_unchanged].
 #
 # Runs everything available for F04 and prints a pass/fail summary:
 #   1. F04 browser suite (tests/f04/test_f04.py) — WIZARD_FEATURE 'on' plus the 'off' cases inside it
@@ -18,6 +21,7 @@
 #
 # Deselected in the regression runs (spec §5.19 — exactly these, nothing else):
 #   F02, both states:  test_ac15_static[app_version], test_ac15_static[title_version]          (version strings)
+#                      test_ac15_static[manifest_visible_fields_unchanged]  (installed-app name, F04 spec §8; F04-QA-05)
 #   F03, both states:  test_ac18_static[app_version], test_ac18_static[title_version]          (version strings)
 #                      test_ac10_invite_page_outside_app — asserts the "התחלת הקמה · בקרוב" button on /invite/; /invite/
 #                      is not behind the flag (spec §1.1 replaces that button unconditionally), so it is deselected in
@@ -94,7 +98,8 @@ flip_off() { # src_dir dst_dir → copy with WIZARD_FEATURE='off'
   fi
 }
 
-F02_DESEL=(--deselect "tests/test_f02.py::test_ac15_static[app_version]" --deselect "tests/test_f02.py::test_ac15_static[title_version]")
+F02_DESEL=(--deselect "tests/test_f02.py::test_ac15_static[app_version]" --deselect "tests/test_f02.py::test_ac15_static[title_version]"
+           --deselect "tests/test_f02.py::test_ac15_static[manifest_visible_fields_unchanged]")  # CHANGE 2026-10-12 F04-QA-05
 F03_DESEL_BOTH=(--deselect "test_f03.py::test_ac18_static[app_version]" --deselect "test_f03.py::test_ac18_static[title_version]"
                 --deselect "test_f03.py::test_ac10_invite_page_outside_app")
 F03_DESEL_ON=("${F03_DESEL_BOTH[@]}"

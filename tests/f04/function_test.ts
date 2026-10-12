@@ -1,5 +1,9 @@
-// Plan_Travel F04 QA · create-trip + invite-manager black-box tests (Deno) · version 1.0.0
+// Plan_Travel F04 QA · create-trip + invite-manager black-box tests (Deno) · version 1.1.0
 // CHANGE 2026-10-12 F04-QA: first version (no previous version).
+// CHANGE 2026-10-12 F04-QA-05: 1.0.0 → 1.1.0, alpha.4.2 (spec §8/§8.1): defaults moved to /Lonely_Planner/ (DEFAULT_JOIN,
+//   DEFAULT_APP, the IM-02 email-link check now expects /Lonely_Planner/invite/#invite=…); new NAME-01..03 cases (email
+//   subject / sender name / HTML+text say "Lonely Planner" and never "Plan_Travel"; default invite link; create-trip
+//   default join_url).
 //
 // Written from docs/F04_spec.md §3 / §5 and supabase/functions/create-trip/README.md (export surface only). The function
 // sources (create-trip/index.ts) were NOT read. Case ids match tests/f04/function_cases.md.
@@ -18,8 +22,12 @@
 
 const CT_PATH = new URL("../../supabase/functions/create-trip/index.ts", import.meta.url).href;
 const IM_PATH = new URL("../../supabase/functions/invite-manager/index.ts", import.meta.url).href;
-const DEFAULT_JOIN = "https://orsela.github.io/Plan_Travel/join/";
-const DEFAULT_APP = "https://orsela.github.io/Plan_Travel/app/";
+// CHANGE 2026-10-12 F04-QA-05: new address (spec §8.1); was https://orsela.github.io/Plan_Travel/{join,app}/
+const DEFAULT_JOIN = "https://orsela.github.io/Lonely_Planner/join/";
+const DEFAULT_APP = "https://orsela.github.io/Lonely_Planner/app/";
+const DEFAULT_INVITE = "https://orsela.github.io/Lonely_Planner/invite/";
+const APP_NAME = "Lonely Planner";
+const OLD_NAMES = [/Plan_Travel/, /Vietnam Travel Planner/, /ויאטנם 2026/];
 const ORIGIN = "https://orsela.github.io";
 
 // deno-lint-ignore no-explicit-any
@@ -444,7 +452,8 @@ for (const bad of ["ttps://orsela.github.io/Plan_Travel/app/", "", "not a url"])
     eq(mails.length, 2, "mails sent");
     for (const m of mails) {
       const s = `${m.text ?? ""}\n${m.html ?? ""}`;
-      ok(s.includes("https://orsela.github.io/Plan_Travel/"), "email link does not use the default app origin/path");
+      // CHANGE 2026-10-12 F04-QA-05: default link is now /Lonely_Planner/invite/#invite=… (was /Plan_Travel/)
+      ok(linkOf(m).startsWith(DEFAULT_INVITE + "#invite="), "email link is not " + DEFAULT_INVITE + "#invite=…: " + linkOf(m));
       ok(!/(^|[^h])ttps:\/\//.test(s), "the broken 'ttps://' URL is in the email");
       ok(!/href=(""|''|"#"|'#'|"not a url")/.test(s), "an empty / relative link in the email");
       ok(/^https:\/\//.test(linkOf(m)), "invite link is not absolute https: " + linkOf(m));
@@ -499,4 +508,42 @@ T("IM-11 check invalid (expired / revoked / used / unknown / malformed / missing
     eq(o.raw, '{"valid":false}', "invalid body");
     ok(!o.raw.includes("@"), "email in an invalid check response");
   }
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// CHANGE 2026-10-12 F04-QA-05: NAME · alpha.4.2 app name + address (spec §8, §8.1)
+// ---------------------------------------------------------------------------------------------------------------
+T("NAME-01 invite email: subject 'הוזמנת לנהל טיול ב-Lonely Planner', sender name, HTML + text say Lonely Planner; no old name anywhere", async () => {
+  const { deps, mails } = imDeps(DEFAULT_APP);
+  const h = IM.makeHandler(deps);
+  eq((await im(h, { action: "create", email: "dana@example.com", draft_name: "יפן 2027" }, "admin-jwt")).status, 200, "create");
+  const m = mails[0];
+  eq(m.subject, "הוזמנת לנהל טיול ב-" + APP_NAME, "subject");
+  eq(IM.FROM_NAME, APP_NAME, "FROM_NAME (sender display name)");
+  if (m.from !== undefined) ok(String(m.from).includes(APP_NAME), "mail.from lacks the app name: " + m.from);
+  ok(String(m.html ?? "").includes(APP_NAME), "HTML lacks 'Lonely Planner' (header/footer)");
+  ok(String(m.text ?? "").includes(APP_NAME), "text part lacks 'Lonely Planner'");
+  const all = JSON.stringify(m) + "\n" + String(IM.FROM_NAME) + "\n" + String(IM.EMAIL_SUBJECT ?? "");
+  const hits = OLD_NAMES.filter((re) => re.test(all)).map(String);
+  ok(!hits.length, "old app name in the email: " + hits.join(", "));
+});
+
+T("NAME-02 invite-manager default address: DEFAULT_APP_URL /Lonely_Planner/app/, email link /Lonely_Planner/invite/#invite=<43>", async () => {
+  eq(IM.DEFAULT_APP_URL, DEFAULT_APP, "DEFAULT_APP_URL");
+  ok(/^3\.0\.0-alpha\.4\.1$/.test(String(IM.FN_VERSION)), "invite-manager FN_VERSION is not 3.0.0-alpha.4.1: " + IM.FN_VERSION);
+  eq(IM.resolveAppUrl(undefined).url, DEFAULT_APP, "unset APP_URL");
+  const { deps, mails } = imDeps(IM.resolveAppUrl(undefined).url);
+  const h = IM.makeHandler(deps);
+  eq((await im(h, { action: "create", email: "x@example.com" }, "admin-jwt")).status, 200, "create");
+  ok(/^https:\/\/orsela\.github\.io\/Lonely_Planner\/invite\/#invite=[A-Za-z0-9_-]{43}$/.test(linkOf(mails[0])), "link: " + linkOf(mails[0]));
+});
+
+T("NAME-03 create-trip default join_url https://orsela.github.io/Lonely_Planner/join/#code=<CODE>; FN_VERSION alpha.4.1", async () => {
+  const mod = await loadCT(null);
+  mock(mod);
+  ok(/^3\.0\.0-alpha\.4\.1$/.test(String(mod.FN_VERSION)), "create-trip FN_VERSION is not 3.0.0-alpha.4.1: " + mod.FN_VERSION);
+  const r = await create(mod);
+  eq(r.status, 200, "create " + r.raw);
+  eq(r.body.join_url, DEFAULT_JOIN + "#code=" + CREATED.join_code, "join_url");
+  ok(!r.raw.includes("Plan_Travel"), "old path in the response");
 });

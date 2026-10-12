@@ -1,4 +1,4 @@
-"""Plan_Travel F04 QA · Playwright black-box suite · version 1.2.0
+"""Plan_Travel F04 QA · Playwright black-box suite · version 1.3.0
 CHANGE 2026-10-12 F04-QA: first version (no previous version).
 CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.1.0, follows the two spec changes approved by Or after the first run:
   - F04-DB-02: the fake create-trip (F04Backend.create_trip_from_invite) now also writes trip_kv `tripname` = the trimmed
@@ -13,6 +13,15 @@ CHANGE 2026-10-12 F04-QA-04: 1.1.0 → 1.2.0, follows alpha.4.1 (spec §1.8 F04-
     test_c20_layout_390_rtl_touch[home] anchors the card on the new button text.
   - New: test_c13_fs_row3_opens_add_point[tap|enter|space], test_c13_fs_row3_without_device_user,
     test_c13_fs_row2_tap_marks_shared, test_c13_fs_rows_tappable_only_when_open (role/tabindex/‹/≥44px at 390px).
+CHANGE 2026-10-12 F04-QA-05: 1.2.0 → 1.3.0, follows alpha.4.2 (spec §8 app name "Lonely Planner", §8.1 new address):
+  - f02.APP_PATH is now /Lonely_Planner/; JOIN_BASE → https://orsela.github.io/Lonely_Planner/join/; VERSION → alpha.4.2;
+    test_c21_static[title_version] now asserts <title> == "Lonely Planner" exactly (the version is no longer in it);
+    test_c16_join_page… expects the brand "Lonely Planner" (was "Plan_Travel").
+  - New: test_n01_no_old_name_rendered[<screen>] (no "Plan_Travel" / "Vietnam Travel Planner" / app-name "ויאטנם 2026" on
+    the landing, gate, wizard, done, first-steps card, עוד sheet, admin, /invite/, /join/; brand present where the spec
+    puts it), test_n02_static_names[…] (manifest name/short_name, apple-mobile-web-app-title, /invite/ + /join/ <title>),
+    test_n03_whatsapp_text_name_and_url[done|card|sheet], test_n04_old_address_redirects[…] (ops/old_address_redirect
+    served at /Plan_Travel/, https://orsela.github.io/Lonely_Planner/** intercepted locally).
 
 Black-box acceptance tests for docs/F04_spec.md §5 (criteria 1–16, 19, 20 from the browser side, plus the static part
 of 21), written from the spec and the approved mockup artboards F04_* only. NOT read: app/index.html, invite/index.html,
@@ -78,8 +87,10 @@ APP_PATH = f02.APP_PATH
 PT_URL, PT_KEY = f02.PT_URL, f02.PT_KEY
 IM_URL = PT_URL + "/functions/v1/invite-manager"
 CT_URL = PT_URL + "/functions/v1/create-trip"
-JOIN_BASE = "https://orsela.github.io/Plan_Travel/join/"
-VERSION = "3.0.0-alpha.4.1"  # CHANGE 2026-10-12 F04-QA-04: was 3.0.0-alpha.4
+JOIN_BASE = "https://orsela.github.io/Lonely_Planner/join/"  # CHANGE 2026-10-12 F04-QA-05: was /Plan_Travel/join/
+VERSION = "3.0.0-alpha.4.2"  # CHANGE 2026-10-12 F04-QA-05: was 3.0.0-alpha.4.1 (F04-QA-04: was 3.0.0-alpha.4)
+APP_NAME = "Lonely Planner"  # CHANGE 2026-10-12 F04-QA-05: spec §8
+OLD_NAMES = ["Plan_Travel", "Vietnam Travel Planner"]  # CHANGE 2026-10-12 F04-QA-05: never rendered as the app name
 ALPHA3_REF = os.environ.get("ALPHA3_REF", "e591edc")
 PROTECTED = f02.PROTECTED
 VIEWPORT = f02.VIEWPORT
@@ -2654,7 +2665,7 @@ def test_c15_more_join_link_row(env, role):
 
 
 def test_c16_join_page_coming_soon_clears_hash(env):
-    """C16 + §1.10: /join/#code=… shows 'Plan_Travel' + 'ההצטרפות לטיול תיפתח בקרוב' + text; the hash is removed; the code
+    """C16 + §1.10: /join/#code=… shows 'Lonely Planner' (§8) + 'ההצטרפות לטיול תיפתח בקרוב' + text; the hash is removed; the code
     is neither shown nor sent anywhere; 390px clean."""
     serve_pages(env)
     if "/join/" not in env.server.overrides:
@@ -2665,7 +2676,7 @@ def test_c16_join_page_coming_soon_clears_hash(env):
     P = []
     if not wait_has(page, TXT["join_title"], 6):
         P.append("title %r missing" % TXT["join_title"])
-    if not has(page, TXT["join_text"]) or not has(page, "Plan_Travel"):
+    if not has(page, TXT["join_text"]) or not has(page, APP_NAME):  # CHANGE 2026-10-12 F04-QA-05: brand was "Plan_Travel"
         P.append("text / brand missing")
     page.wait_for_timeout(500)
     if "#code" in page.url or "ABCD2345" in page.url:
@@ -2871,7 +2882,8 @@ STATIC = ["protected:" + n for n in PROTECTED] + [
 
 @pytest.mark.parametrize("check", STATIC)
 def test_c21_static(check, tmp_path):
-    """C21 (static part): protected functions byte-identical to alpha.3; APP_VERSION / PT_VERSION / <title> 3.0.0-alpha.4;
+    """C21 (static part): protected functions byte-identical to alpha.3; APP_VERSION / PT_VERSION 3.0.0-alpha.4.2, <title>
+    == "Lonely Planner";
     'CHANGE 2026-10-12 F04-…'; node --check on every inline script of app/, invite/, join/; countries.json / currencies.json
     per §4; not precached by the SW; /join/ outside the PWA scope."""
     html = app_html()
@@ -2886,8 +2898,9 @@ def test_c21_static(check, tmp_path):
     elif check == "pt_version":
         assert re.search(r"""PT_VERSION\s*=\s*['"]%s['"]""" % re.escape(VERSION), html), "PT_VERSION != %s" % VERSION
     elif check == "title_version":
+        # CHANGE 2026-10-12 F04-QA-05: spec §8 — <title> is exactly the app name, no version (was: carries VERSION)
         m = re.search(r"<title>(.*?)</title>", html, re.S)
-        assert m and VERSION in m.group(1), "<title> does not carry %s: %r" % (VERSION, m and m.group(1))
+        assert m and m.group(1).strip() == APP_NAME, "<title> is not exactly %r: %r" % (APP_NAME, m and m.group(1))
     elif check == "change_comments":
         miss = [p for p in ("app/index.html", "invite/index.html", "join/index.html")
                 if not (REPO_DIR / p).is_file() or "CHANGE 2026-10-12 F04-" not in (REPO_DIR / p).read_text(encoding="utf-8")]
@@ -2996,3 +3009,265 @@ def test_harness_fake_semantics():
     assert be2.sign_in_with_otp("A", "t2", {"email": "other@example.com", "options": {"shouldCreateUser": False}}).get("messageId")
     res = be2.verify_otp("A", "t2", {"email": "other@example.com", "token": OTP, "type": "email"})
     assert res["session"]["user"]["id"] == other
+
+
+# =====================================================================================================
+# CHANGE 2026-10-12 F04-QA-05: alpha.4.2 — app name "Lonely Planner" (spec §8) and new address (spec §8.1)
+# =====================================================================================================
+def old_name_hits(page, scope=None, vn=True):
+    """Old app names in the rendered text of `scope` (default body) and in document.title."""
+    t = page.evaluate("(s)=>{const e=s?document.querySelector(s):document.body;return [e?e.innerText:'',document.title]}", scope)
+    txt = "\n".join(t)
+    names = OLD_NAMES + (["ויאטנם 2026"] if vn else [])
+    return [n for n in names if n in txt], txt
+
+
+NAME_SCREENS = ["gate", "email", "code", "step1", "step2", "step3", "done", "home_card", "more_sheet", "admin",
+                "landing_invalid", "landing_off_valid", "invite_valid", "invite_invalid", "join"]
+
+
+@pytest.mark.parametrize("scr", NAME_SCREENS)
+def test_n01_no_old_name_rendered(env, scr):
+    """§8: no rendered 'Plan_Travel' / 'Vietnam Travel Planner' (nor 'ויאטנם 2026' as the app name) on the screens before a
+    trip exists, the trip-less pages and the F04/F03 manager UI; 'Lonely Planner' shown where §8 puts the brand (landing,
+    wizard header, spam hint, admin sub 'Lonely Planner · סופר-אדמין', /invite/, /join/). Trip content (a trip's own
+    name/header) is out of scope, so home/admin are checked inside their F04/F03 regions only."""
+    be = env.backend
+    P = []
+    scope, vn, need = None, True, APP_NAME
+    if scr == "gate":
+        dev = gate_device(env)
+        need = None  # §8 lists no brand on the F02 card
+    elif scr == "email":
+        dev = gate_device(env)
+        gate_to_email(dev)
+    elif scr in ("code", "step1", "step2", "step3", "done"):
+        if scr == "code":
+            dev, _, _ = token_link(env)
+            assert wait_screen(dev.page, "code") == "code", "code screen not reached"
+            click_text(dev.page, TXT["spam"])
+            dev.page.wait_for_timeout(400)
+            hint = dev.page.evaluate("()=>{const e=document.getElementById('ptWzSpamHint');return e?e.innerText:''}")
+            if APP_NAME not in hint:
+                P.append("spam hint lacks %r: %r" % (APP_NAME, hint))
+        elif scr == "step1":
+            dev, _, _ = to_step1(env)
+        elif scr == "step2":
+            dev, _, _ = to_step2(env)
+        else:
+            dev, _, _ = to_step3(env)
+            if scr == "done":
+                create_and_done(dev)
+    elif scr == "home_card":
+        tid, code, dev = boot_trip(env, role="manager", n_days=3)
+        assert wait_has(dev.page, TXT["first_steps"], 6), "first-steps card missing"
+        scope, need = "#ptFirstSteps", None
+    elif scr == "more_sheet":
+        tid, code, dev = boot_trip(env, role="manager", n_days=3)
+        f03.open_more(dev.page)
+        click_text(dev.page, TXT["more_row"])
+        dev.page.wait_for_timeout(800)
+        scope, need = "#ptF04Sheet", None
+    elif scr == "admin":
+        tid, dev = f03.boot(env, admin=True, email="or@example.com")
+        f03.open_admin(dev.page)
+        vn, need = False, APP_NAME + " · סופר-אדמין"   # the admin list may show a trip named "ויאטנם 2026"
+    elif scr == "landing_invalid":
+        dev = env.new_device("L")
+        dev.goto(APP_PATH + "?invite=1#invite=" + "Z" * 43, ready=False)
+        assert wait_has(dev.page, TXT["inv_bad"], 8), "invalid landing not shown: %r" % btext(dev.page)[:200]
+    elif scr == "landing_off_valid":
+        serve_wizard_off(env)
+        dev, _, _ = token_link(env)
+        assert wait_screen(dev.page, "f03_landing") == "f03_landing", "'off': F03 landing not shown"
+    elif scr in ("invite_valid", "invite_invalid"):
+        serve_pages(env)
+        iid, token = be.add_invite(INVITE_EMAIL, DRAFT, sent_days_ago=0, expires_in_days=7, inviter="אור")
+        dev = env.new_device("I")
+        dev.page.goto(env.server.origin + "/invite/#invite=" + (token if scr == "invite_valid" else "Z" * 43),
+                      wait_until="domcontentloaded")
+        assert wait_has(dev.page, TXT["inv_ok"] if scr == "invite_valid" else TXT["inv_bad"], 8), "invite page state"
+    else:
+        serve_pages(env)
+        dev = env.new_device("J")
+        dev.page.goto(env.server.origin + "/join/#code=ABCD2345", wait_until="domcontentloaded")
+        assert wait_has(dev.page, TXT["join_title"], 6), "join page not shown"
+    dev.page.wait_for_timeout(500)
+    hits, txt = old_name_hits(dev.page, scope, vn)
+    if hits:
+        P.append("%s: old app name rendered: %r" % (scr, hits))
+    if need and norm(need) not in norm(txt):
+        P.append("%s: %r not shown" % (scr, need))
+    assert not P, "\n".join(P)
+
+
+def _meta(html, name):
+    m = re.search(r"""<meta[^>]+name=["']%s["'][^>]*>""" % re.escape(name), html, re.I)
+    c = m and re.search(r"""content=["']([^"']*)["']""", m.group(0))
+    return c.group(1) if c else None
+
+
+@pytest.mark.parametrize("check", ["manifest_name", "manifest_short_name", "apple_title", "invite_title", "join_title",
+                                   "no_old_name_in_visible_html", "manifest_icons_unchanged"])
+def test_n02_static_names(check):
+    """§8: installed-app name (manifest name / short_name, apple-mobile-web-app-title) is 'Lonely Planner'; the /invite/ +
+    /join/ <title> carry it; no old name inside <title>, apple title or manifest of any of the three pages."""
+    if check == "manifest_icons_unchanged":
+        # replaces the icons part of F02 test_ac15_static[manifest_visible_fields_unchanged] (deselected by run.sh 1.2.0:
+        # §8 renames name/short_name on purpose)
+        man = json.loads((APP_DIR / "manifest.json").read_text(encoding="utf-8"))
+        base = f02.BASELINE_DIR / "manifest.json"
+        if not base.is_file():
+            pytest.skip("v2.15.2 baseline not available (BASELINE_DIR)")
+        assert man.get("icons") == json.loads(base.read_text(encoding="utf-8")).get("icons"), "manifest icons changed"
+    elif check.startswith("manifest_"):
+        man = json.loads((APP_DIR / "manifest.json").read_text(encoding="utf-8"))
+        k = check[len("manifest_"):]
+        assert man.get(k) == APP_NAME, "manifest %s = %r" % (k, man.get(k))
+    elif check == "apple_title":
+        assert _meta(app_html(), "apple-mobile-web-app-title") == APP_NAME, "apple-mobile-web-app-title = %r" % _meta(app_html(), "apple-mobile-web-app-title")
+    elif check in ("invite_title", "join_title"):
+        html = (REPO_DIR / check.split("_")[0] / "index.html").read_text(encoding="utf-8")
+        m = re.search(r"<title>(.*?)</title>", html, re.S)
+        # §8 renames the /invite/ and /join/ titles; only the app <title> must be exactly the name (test_c21_static)
+        assert m and APP_NAME in m.group(1) and not any(n in m.group(1) for n in OLD_NAMES), \
+            "%s <title> = %r" % (check.split("_")[0], m and m.group(1))
+    else:
+        bad = []
+        for f in (APP_DIR / "index.html", REPO_DIR / "invite" / "index.html", REPO_DIR / "join" / "index.html"):
+            h = f.read_text(encoding="utf-8")
+            vis = [(re.search(r"<title>(.*?)</title>", h, re.S) or [None, ""])[1], _meta(h, "apple-mobile-web-app-title") or "",
+                   _meta(h, "application-name") or ""]
+            bad += ["%s: %r" % (f.parent.name, v) for v in vis if any(n in v for n in OLD_NAMES + ["ויאטנם 2026"])]
+        man = (APP_DIR / "manifest.json").read_text(encoding="utf-8")
+        mj = json.loads(man)
+        bad += ["manifest %s: %r" % (k, mj.get(k)) for k in ("name", "short_name", "description")
+                if any(n in str(mj.get(k) or "") for n in OLD_NAMES)]
+        assert not bad, "old name in a displayed field: %r" % bad
+
+
+@pytest.mark.parametrize("where", ["done", "card", "sheet"])
+def test_n03_whatsapp_text_name_and_url(env, where):
+    """§8 + §8.1: the WhatsApp join message says '…ב-Lonely Planner 🧳' and carries https://orsela.github.io/Lonely_Planner/
+    join/#code=<CODE> (Done, the first-steps card, the עוד sheet); never the old name or path."""
+    if where == "done":
+        dev, iid, token = to_step3(env)
+        create_and_done(dev)
+        code = env.backend.rows["trip_join_codes"][(env.backend.trips_created[0],)]["code"]
+    else:
+        tid, code, dev = boot_trip(env, role="manager", n_days=3)
+        assert wait_has(dev.page, TXT["first_steps"], 6), "first-steps card missing"
+        if where == "sheet":
+            f03.open_more(dev.page)
+            click_text(dev.page, TXT["more_row"])
+            dev.page.wait_for_timeout(800)
+    w = wa_url(dev) or ""
+    msg = wa_text(w)
+    P = []
+    if not w.startswith("https://wa.me/?text="):
+        P.append("WhatsApp target %r" % w)
+    if "ב-" + APP_NAME + " 🧳" not in msg:
+        P.append("message lacks 'ב-%s 🧳': %r" % (APP_NAME, msg))
+    if JOIN_BASE + "#code=" + code not in msg:
+        P.append("message lacks %s#code=%s: %r" % (JOIN_BASE, code, msg))
+    if any(n in msg for n in OLD_NAMES):
+        P.append("old name/path in the message: %r" % msg)
+    assert not P, "\n".join(P)
+
+
+REDIRECT_DIR = REPO_DIR / "ops" / "old_address_redirect"
+NEW_BASE = "https://orsela.github.io/Lonely_Planner/"
+LANDED_HTML = b"<!doctype html><meta charset=utf-8><title>landed</title><script>window.__landed=location.href</script>"
+
+
+def serve_old_address(env):
+    """The redirect repo at the OLD path: /Plan_Travel/{,index.html,app/,invite/,join/} from ops/old_address_redirect;
+    GitHub Pages answers any other path with 404.html — emulated for the paths the tests open."""
+    o = env.server.overrides
+    for sub in ("", "app/", "invite/", "join/"):
+        b = (REDIRECT_DIR / sub / "index.html").read_bytes()
+        o["/Plan_Travel/" + sub] = b
+        o["/Plan_Travel/" + sub + "index.html"] = b
+    for unknown in ("/Plan_Travel/foo", "/Plan_Travel/foo/bar.html", "/Plan_Travel/app/old-page"):
+        o[unknown] = (REDIRECT_DIR / "404.html").read_bytes()
+
+
+def intercept_new_address(dev, real_invite=False):
+    """https://orsela.github.io/Lonely_Planner/** → a stub that records location.href (hash included), or the real local
+    /invite/ page. Registered after Env's catch-all route, so it takes precedence."""
+    hits = []
+
+    def h(route, request):
+        hits.append(request.url)
+        if real_invite and "/Lonely_Planner/invite/" in request.url and request.resource_type == "document":
+            return route.fulfill(status=200, content_type="text/html; charset=utf-8",
+                                 body=(REPO_DIR / "invite" / "index.html").read_bytes())
+        if request.resource_type == "document":
+            return route.fulfill(status=200, content_type="text/html; charset=utf-8", body=LANDED_HTML)
+        return route.abort()
+    dev.ctx.route("https://orsela.github.io/**", h)
+    return hits
+
+
+REDIRECTS = [
+    ("/Plan_Travel/invite/#invite=TOKEN43abc", NEW_BASE + "invite/#invite=TOKEN43abc"),
+    ("/Plan_Travel/app/?invite=1#invite=XYZ", NEW_BASE + "app/?invite=1#invite=XYZ"),
+    ("/Plan_Travel/join/#code=ABC23456", NEW_BASE + "join/#code=ABC23456"),
+    ("/Plan_Travel/join/?x=1#code=ABC23456", NEW_BASE + "join/?x=1#code=ABC23456"),
+    ("/Plan_Travel/", NEW_BASE + "app/"),
+    ("/Plan_Travel/index.html#admin", NEW_BASE + "app/#admin"),
+    ("/Plan_Travel/foo", NEW_BASE + "app/"),
+    ("/Plan_Travel/foo/bar.html?a=b#c", NEW_BASE + "app/?a=b#c"),
+]
+
+
+@pytest.mark.parametrize("old,new", REDIRECTS, ids=[o for o, _ in REDIRECTS])
+def test_n04_old_address_redirects(env, old, new):
+    """§8.1 + ops/old_address_redirect: every old-path page forwards with location.replace() to the same sub-path under
+    https://orsela.github.io/Lonely_Planner/, keeping ?query and #hash; unknown old paths (404.html) → the app; the
+    redirect page itself is not left in history (replace)."""
+    serve_old_address(env)
+    dev = env.new_device("R")
+    intercept_new_address(dev)
+    page = dev.page
+    page.goto(env.server.origin + f02.BLANK_PATH)
+    page.goto(env.server.origin + old, wait_until="domcontentloaded")
+    end = time.time() + 6
+    landed = None
+    while time.time() < end and not landed:
+        try:
+            landed = page.evaluate("()=>window.__landed||null")
+        except PWError:
+            pass
+        page.wait_for_timeout(150)
+    assert landed == new, "%s landed on %r, expected %r" % (old, landed or page.url, new)
+    page.go_back(wait_until="domcontentloaded")
+    page.wait_for_timeout(300)
+    assert page.url.startswith(env.server.origin + f02.BLANK_PATH), \
+        "Back from the new address went to %r, not the page before the old link (location.replace expected)" % page.url
+
+
+def test_n04_old_invite_link_end_to_end(env):
+    """§8.1: an invite link already sent (old /Plan_Travel/invite/#invite=<token>) reaches the real /invite/ page under
+    /Lonely_Planner/, which validates the token ('ההזמנה שלך אומתה') and links on into the app; old page has the brand."""
+    serve_old_address(env)
+    be = env.backend
+    iid, token = be.add_invite(INVITE_EMAIL, DRAFT, sent_days_ago=0, expires_in_days=7, inviter="אור")
+    dev = env.new_device("R")
+    intercept_new_address(dev, real_invite=True)
+    page = dev.page
+    page.goto(env.server.origin + "/Plan_Travel/invite/#invite=" + token, wait_until="domcontentloaded")
+    P = []
+    if not wait_has(page, TXT["inv_ok"], 10):
+        P.append("valid invite page not reached via the old link (url=%s, text=%r)" % (page.url, btext(page)[:200]))
+    if not page.url.startswith(NEW_BASE + "invite/"):
+        P.append("not on the new address: %s" % page.url)
+    if not any(r.get("action") == "fn" for r in env.net):
+        P.append("invite-manager check not called from the new address")
+    hits, _ = old_name_hits(page)
+    if hits:
+        P.append("old name on the invite page: %r" % hits)
+    old_html = (REDIRECT_DIR / "invite" / "index.html").read_text(encoding="utf-8")
+    if APP_NAME not in old_html or "location.replace" not in old_html:
+        P.append("old-address page lacks the brand or location.replace")
+    assert not P, "\n".join(P)

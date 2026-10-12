@@ -92,3 +92,43 @@ Out of scope, noted from dev notes §8: a new trip still uses the device-wide "�
 Phone (add to the checklist):
 - [ ] On the "צעדים ראשונים" card, tapping "הוספת היעד הראשון ליום 1" or "הוספת נקודה" opens "הוספת נקודת עניין · יום 1", and closing it returns home.
 - [ ] Tapping "שליחת קישור לקבוצה" opens WhatsApp, and the row turns ✓.
+
+## alpha.4.2 (2026-10-12) — app name "Lonely Planner" + new address (F04-NAME-01/02/03)
+CHANGE 2026-10-12 F04-QA-05: new section. Contract: spec §8 and §8.1. Branch `f04` @ 7d984df. Deliverable under test: `ops/old_address_redirect/`.
+
+### Test changes (all marked `CHANGE 2026-10-12 F04-QA-05`)
+- **Harness:** the local server now serves the app under `/Lonely_Planner/` (F02 harness 1.0.1, `APP_PATH`).
+- **F03 harness 1.0.2:** `PROD_APP_URL` is now `/Lonely_Planner/app/`, and the fake email subject is "…ב-Lonely Planner". The F03 Deno test (1.0.1) has the same subject, sender and URL changes. It needs a real database, so it is not run here.
+- **F04 suite 1.3.0:**
+  - `JOIN_BASE` is now `https://orsela.github.io/Lonely_Planner/join/` and `VERSION` is 3.0.0-alpha.4.2.
+  - `test_c21_static[title_version]` asserts the app `<title>` == "Lonely Planner" exactly.
+  - The /join/ test expects the brand "Lonely Planner".
+- **New browser tests:**
+  - `test_n01_no_old_name_rendered[15 screens]`: gate, email, code (the spam hint contains "Lonely Planner"), steps 1–3, Done, first-steps card, the "עוד" sheet, admin ("Lonely Planner · סופר-אדמין"), in-app landing (invalid; F03 valid with the wizard off), /invite/ valid and invalid, /join/.
+  - `test_n02_static_names[7]`: manifest name and short_name, apple title, the /invite/ and /join/ `<title>` (they carry the name; the spec does not require them to be exactly the name), no old name in displayed fields, manifest icons unchanged.
+  - `test_n03_whatsapp_text_name_and_url[done|card|sheet]`.
+  - `test_n04_old_address_redirects[8]`: the old pages are served at `/Plan_Travel/` and `https://orsela.github.io/Lonely_Planner/**` is intercepted locally. Query and hash are kept, unknown old paths go to the app, and Back skips the redirect page (location.replace).
+  - `test_n04_old_invite_link_end_to_end`: the old invite link reaches the real /invite/ page at the new address, and the token is validated.
+- **F04 Deno tests 1.1.0:** the defaults moved to `/Lonely_Planner/`, and the IM-02 email link is now `/Lonely_Planner/invite/#invite=…`. New cases:
+  - NAME-01: the email subject, `FROM_NAME`, HTML and text say Lonely Planner, and no old name appears anywhere.
+  - NAME-02: the default address and the invite link.
+  - NAME-03: the create-trip default `join_url`.
+- **run.sh 1.2.0:** deselects F02 `test_ac15_static[manifest_visible_fields_unchanged]` in both states. The installed-app name changes on purpose (§8); the icons part is now covered by `test_n02_static_names[manifest_icons_unchanged]`.
+- **MANUAL.md 1.1.0:** new URLs and a new section 6.
+
+| Suite | Result |
+|---|---|
+| F04 browser suite 1.3.0 | 126/126 (92 + 34 new) |
+| F03 regression, WIZARD_FEATURE=on / off | 47 passed, 1 skipped, 11 deselected / 55 passed, 1 skipped, 3 deselected |
+| F03 deselected tests run on their own, on | 11 failed, the same expected set as before (version pins alpha.3.4; "בקרוב" /invite/ button; F03 landing replaced by the code screen) |
+| F02 regression, WIZARD_FEATURE=on / off | 36 passed, 1 skipped, 3 deselected — each. Before the deselection: 1 failure each, `manifest_visible_fields_unchanged` ("manifest name changed"), expected by §8 |
+| Deno: F04 function tests · create-trip · invite-manager | 31/31 · 9/9 · 21/21 |
+| DB | no DB change; not re-run |
+
+Defects: none.
+
+Phone (alpha.4.2, see MANUAL.md section 6):
+- [ ] Re-add the installed app from `https://orsela.github.io/Lonely_Planner/app/`. The icon is named "Lonely Planner", and the trip, data and sign-in carry over.
+- [ ] Old links redirect: `…/Plan_Travel/invite/#invite=…` from an earlier email opens the invite at `…/Lonely_Planner/invite/`. `…/Plan_Travel/app/` and `…/Plan_Travel/join/#code=…` land on the new address, and Back does not loop.
+- [ ] A new invite email: subject "הוזמנת לנהל טיול ב-Lonely Planner", sender "Lonely Planner", header and footer say Lonely Planner, and the button goes to `…/Lonely_Planner/invite/`.
+- [ ] Dashboard (Or): secret `APP_URL` = `https://orsela.github.io/Lonely_Planner/app/`; Auth URL configuration and the SMTP sender name updated.

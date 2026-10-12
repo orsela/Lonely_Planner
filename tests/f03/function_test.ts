@@ -1,5 +1,7 @@
-// Plan_Travel F03 QA · invite-manager black-box tests (Deno) · version 1.0.0
+// Plan_Travel F03 QA · invite-manager black-box tests (Deno) · version 1.0.1
 // CHANGE 2026-10-05 F03-QA: first version (no previous version).
+// CHANGE 2026-10-12 F04-QA-05: 1.0.0 → 1.0.1: F04 alpha.4.2 (F04 spec §8/§8.1) — default APP_URL /Lonely_Planner/app/,
+//   FN-11 subject "הוזמנת לנהל טיול ב-Lonely Planner" and sender name "Lonely Planner" (were Plan_Travel). Nothing else.
 //
 // Written from docs/F03_spec.md §3/§5 only (the function source was NOT read). Case ids match tests/f03/function_cases.md.
 //
@@ -22,7 +24,7 @@ const URL_ = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const REMOTE = Deno.env.get("INVITE_MANAGER_URL") ?? "";
-const APP_URL = Deno.env.get("APP_URL") ?? "https://orsela.github.io/Plan_Travel/app/";
+const APP_URL = Deno.env.get("APP_URL") ?? "https://orsela.github.io/Lonely_Planner/app/"; // CHANGE 2026-10-12 F04-QA-05
 const FN_PATH = new URL("../../supabase/functions/invite-manager/index.ts", import.meta.url).href;
 const DOMAIN = "f03qa.test";
 
@@ -226,8 +228,8 @@ t("FN-11 create: email content (subject, from name, RTL HTML + text, link, expir
   const email = addr("mail");
   const { mails, token } = await create(email, "יפן 2027");
   const m = mails[0];
-  eq(m.subject, "הוזמנת לנהל טיול ב-Plan_Travel", "subject");
-  ok(!m.from || /Plan_Travel/.test(m.from), "from name is not Plan_Travel: " + m.from);
+  eq(m.subject, "הוזמנת לנהל טיול ב-Lonely Planner", "subject"); // CHANGE 2026-10-12 F04-QA-05: was ב-Plan_Travel
+  ok(!m.from || /Lonely Planner/.test(m.from), "from name is not Lonely Planner: " + m.from); // CHANGE 2026-10-12 F04-QA-05
   ok([m.to].flat().join(",").includes(email), "to");
   ok(m.html && /dir=["']?rtl/i.test(m.html), "HTML part missing or not RTL");
   ok(m.text && m.text.length > 20, "plain-text part missing");

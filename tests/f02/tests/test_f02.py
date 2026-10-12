@@ -1,5 +1,7 @@
-"""Plan_Travel F02 QA · Playwright + static suite · version 1.0.0
+"""Plan_Travel F02 QA · Playwright + static suite · version 1.0.1
 CHANGE 2026-10-04 F02-QA: first version (no previous version).
+CHANGE 2026-10-12 F04-QA-05: 1.0.0 → 1.0.1: the local server serves APP_DIR under /Lonely_Planner/ (was /Plan_Travel/),
+  following the site address move (F04 spec §8.1). Nothing else changed.
 
 Black-box acceptance tests for docs/F02_spec.md §8, written from the spec only (the implementation under app/,
 scripts/, F02_dev_notes.md and migration 0005 were NOT read). Reference for "same as v2.15.2": the baseline at
@@ -52,7 +54,7 @@ FAKE_JS = (HERE / "fake_supabase.js").read_text(encoding="utf-8")
 APP_DIR = Path(os.environ.get("APP_DIR", "/home/claude/plan_travel/app"))
 BASELINE_DIR = Path(os.environ.get("BASELINE_DIR", "/home/claude/orsela/vietnam_travel_planner"))
 SCRIPTS_DIR = Path(os.environ.get("SCRIPTS_DIR", "/home/claude/plan_travel/scripts"))
-APP_PATH = "/Plan_Travel/"
+APP_PATH = "/Lonely_Planner/"  # CHANGE 2026-10-12 F04-QA-05: was "/Plan_Travel/" (F04 spec §8.1 new address)
 BASE_PATH = "/Vietnam_Travel_Planner/"
 BLANK_PATH = "/__qa__/blank.html"
 
