@@ -1,17 +1,27 @@
 # Plan_Travel – CHANGELOG
 
-## 3.0.0-alpha.3 — S2 (dev, not deployed)
+## 3.0.0-alpha.3.4 — S2 (F03 done, 2026-10-12)
 
-### F03 · Super-admin invites a manager — 2026-10-05
-- `app/index.html`: flag `ADMIN_FEATURE='on'|'off'`; "החשבון שלי" in עוד (link email via `auth.updateUser`, linked email,
-  "ניהול מערכת" for platform admins); `#admin` screen (filter, cards, revoked toggle, offline notice, no trip chrome);
-  invite sheet + actions sheet (resend / revoke with confirm); `#invite=` landing before trip boot (token never stored or logged).
-  `off` = alpha.2 behaviour. Protected functions byte-identical; 3 existing lines changed (title, PT_VERSION, APP_VERSION).
-- `supabase/functions/invite-manager`: create / resend / revoke / check, Gmail SMTP 465 (denomailer 1.6.0), Deno tests.
-- DB: `0008_f03` (invite tracking columns, one active invite per email, `admin_trip_summary()` RPC);
-  `0009_qa_f03_harness` (`qa.f03_run()`, 49 scenarios). Not applied yet.
-- Dev self-checks (local only): qa.f01 109/109, qa.f02 37/37, qa.f03 49/49 on local Postgres 16; Deno 16/16;
-  F02 suite 39/39 (+1 skip) in both flag states; F03 smoke 91/91. See docs/F03_dev_notes.md.
+### F03 · Super-admin invites a manager — 2026-10-05 → 2026-10-12
+- App (`app/`, now 3.0.0-alpha.3.4): flag `ADMIN_FEATURE='on'|'off'`; "החשבון שלי" in עוד (link email via
+  `auth.updateUser`, linked email, "ניהול מערכת" for platform admins); admin screen (filter, cards, revoked toggle,
+  offline notice, no trip chrome); invite + actions sheets; in-app `#invite=` landing. `off` = alpha.2 behaviour.
+  Protected functions byte-identical.
+- Invite page `invite/` (new, outside the installed app's scope): the link in the email opens it; it runs the
+  `check` call and shows valid / invalid / no connection itself.
+- Edge Function `invite-manager` (deployed, 3.0.0-alpha.3.7): create / resend / revoke / check; own MIME + SMTP client
+  over smtp.gmail.com:465 (denomailer removed — it broke Hebrew subjects); redesigned RTL email (button
+  "קבלת ההזמנה והקמת הטיול", 3 steps, fallback link); mailer errors logged without secrets.
+- DB: `0008_f03` (invite tracking columns, one active invite per email, `admin_trip_summary()`), `0009_qa_f03_harness`
+  — applied by Or 2026-10-09. Or registered as platform admin (email linked to his phone identity, membership kept).
+- Fixes found in live testing (2026-10-09 → 12): link-email error showed "no connection" on server errors; Gmail showed
+  raw MIME (subject encoding); invite link while the app is open (hash reload, `?invite=1`, launch_handler + launchQueue,
+  `/invite/` page); root cause of the "dead button": the `APP_URL` secret was `ttps://…` (fixed by Or 2026-10-11).
+- QA: browser 58/58 (+1 skip), F02 regression 37/37 in both flag states, function 18/18, DB qa.f01 109/109,
+  qa.f02 37/37, qa.f03 49/49; advisors: one expected note (admin RPC is security definer, refuses non-admins).
+  Or's phone: email linked, admin screen, create / resend / revoke, email received and the button opens the invite.
+  See docs/qa/F03_QA.md.
+- Open for F04: harden `invite-manager` so an invalid `APP_URL` falls back to the default.
 
 ## 3.0.0-alpha.2 — S1
 
