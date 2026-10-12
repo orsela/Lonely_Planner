@@ -5,7 +5,7 @@
 --   What changed from 0001–0009: 2 new functions only. No new tables, columns, indexes, policies or triggers, and no
 --   new client grants (both functions: execute revoked from public/anon/authenticated, granted to service_role only).
 --   create_trip_from_invite writes trips / trip_countries / trip_currencies / trip_members / trip_join_codes / trip_kv
---   (keys 'trip' and, since F04-DB-02, 'tripname') and marks the manager_invites row used, all in the caller's single transaction; the existing F01 triggers
+--   and marks the manager_invites row used, all in the caller's single transaction; the existing F01 triggers
 --   (currency cap 10, base-currency lock, last manager, trip_kv updated_by) stay in force.
 --
 -- Contract: docs/F04_spec.md §2 (decisions D3, D4, D7). Idempotent: `create or replace` + re-applied grants; safe to
@@ -288,12 +288,6 @@ begin
            order by g.ord)::text,
          p_user
     from pg_catalog.generate_series(v_start::timestamp, v_end::timestamp, interval '1 day') with ordinality as g(d, ord);
-
-  -- CHANGE 2026-10-12 F04-DB-02: also write trip_kv key 'tripname' (plain text = the trip name), the key the app's
-  --   existing getTripName() reads (planner:tripname). Before: not written, so the v1 home header and ניהול → הגדרות מסע
-  --   showed the fallback "מסע של חלומות" for a new trip (dev notes §6.5; Or 2026-10-12: fix in F04).
-  insert into public.trip_kv (trip_id, key, value, updated_by)
-  values (v_trip, 'tripname', v_name, p_user);
 
   -- 6. consume the invite
   update public.manager_invites set used_at = pg_catalog.now(), trip_id = v_trip where id = inv.id;
