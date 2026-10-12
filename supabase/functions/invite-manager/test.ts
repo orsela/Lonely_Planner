@@ -98,7 +98,7 @@ class MemStore implements InviteStore {
 const ADMIN = "aaaaaaaa-0000-4000-8000-000000000001";
 const MANAGER = "bbbbbbbb-0000-4000-8000-000000000002";
 const JWT = { admin: "jwt-admin", manager: "jwt-manager" } as const;
-const APP = "https://orsela.github.io/Plan_Travel/app/";
+const APP = "https://orsela.github.io/Lonely_Planner/app/";
 const ORIGIN = "https://orsela.github.io";
 
 function setup(opts: { failMail?: boolean } = {}) {
@@ -167,7 +167,7 @@ Deno.test("helpers: email normalization/validation, token format, CORS", async (
 
 Deno.test("email: RTL html + text, subject, link, expiry, escaping, no images/pixels", () => {
   const m = renderInviteEmail({ to: "d@x.com", inviter: "אור", draftName: "יפן <2027>", link: APP + "#invite=T", expiresAt: "2026-10-10T08:00:00Z" });
-  eq(m.subject, "הוזמנת לנהל טיול ב-Plan_Travel");
+  eq(m.subject, "הוזמנת לנהל טיול ב-Lonely Planner"); // CHANGE 2026-10-12 F04-NAME-01: app name
   assert(m.html.includes('dir="rtl"'));
   assert(m.html.includes("יפן &lt;2027&gt;") && !m.html.includes("<2027>"), "escaping");
   assert(m.html.includes(">קבלת ההזמנה והקמת הטיול</a>") && m.html.includes('target="_blank"') && m.html.includes(APP + "#invite=T"));
@@ -488,7 +488,7 @@ Deno.test("F03-MAIL-04 smtpSend: full dialogue against a fake server; AUTH failu
 Deno.test("F04 resolveAppUrl: https URL kept; ttps / http / empty / not-a-URL → default with fallback", () => {
   eq(resolveAppUrl(APP), { url: APP, fallback: false });
   eq(resolveAppUrl(undefined), { url: DEFAULT_APP_URL, fallback: false });
-  for (const bad of ["ttps://orsela.github.io/Plan_Travel/app/", "http://orsela.github.io/Plan_Travel/app/", "", "  ", "not a url", "https://"]) {
+  for (const bad of ["ttps://orsela.github.io/Lonely_Planner/app/", "http://orsela.github.io/Lonely_Planner/app/", "", "  ", "not a url", "https://"]) {
     eq(resolveAppUrl(bad), { url: DEFAULT_APP_URL, fallback: true }, bad);
   }
 });
@@ -509,7 +509,7 @@ Deno.test("F04 invalid APP_URL → emails use DEFAULT_APP_URL; one app_url_inval
       body: JSON.stringify({ action: "create", email: "z@example.com" }),
     }));
     eq(res.status, 200, bad);
-    assert(sent[0].text.includes("https://orsela.github.io/Plan_Travel/invite/#invite="), "default link not used for " + bad);
+    assert(sent[0].text.includes("https://orsela.github.io/Lonely_Planner/invite/#invite="), "default link not used for " + bad);
     if (bad) assert(!sent[0].text.includes(bad), "bad APP_URL leaked into the email");
     eq(logs.filter((l) => l.includes("app_url_invalid_fallback")).length, 1, "fallback log lines for " + bad);
     if (bad.trim()) assert(!logs.join("").includes(bad), "APP_URL value logged");

@@ -12,7 +12,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ויאטנם 2026">
+<!-- CHANGE 2026-10-12 F04-NAME-01: app display name "Plan_Travel"/"Vietnam Travel Planner"/"ויאטנם 2026" → "Lonely Planner" (Or, 2026-10-12) -->
+<meta name="apple-mobile-web-app-title" content="Lonely Planner">
 <script>
 if('serviceWorker' in navigator){
  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})});
@@ -22,7 +23,8 @@ if('serviceWorker' in navigator){
 <!-- CHANGE 2026-10-04 F02-VER-02: title version v2.15.2 -> v3.0.0-alpha.2 (Plan_Travel F02: same app on the plan-travel backend). -->
 <!-- CHANGE 2026-10-05 F03-VER-02: title version v3.0.0-alpha.2 -> v3.0.0-alpha.3 (Plan_Travel F03: super-admin invites a manager). -->
 <!-- CHANGE 2026-10-12 F04-VER-02: title version v3.0.0-alpha.3.4 -> v3.0.0-alpha.4 (Plan_Travel F04: an invited manager sets up a trip in three steps). -->
-<title>Vietnam Travel Planner — ויאטנם 2026 · v3.0.0-alpha.4.1 (Plan_Travel)</title>
+<!-- CHANGE 2026-10-12 F04-NAME-01: title is the app name only (was "Vietnam Travel Planner — ויאטנם 2026 · v3.0.0-alpha.4.1 (Plan_Travel)"); the version stays in APP_VERSION / PT_VERSION. -->
+<title>Lonely Planner</title>
 <!-- CHANGE 2026-09-30 PERF-01 (v2.11.2): xlsx.full.min.js (~900KB) is no longer loaded here on every start; ensureXLSX() in the main script loads it only when Excel backup/import is used. -->
 <script>
 /* CHANGE 2026-10-04 F02-FLAG-01: F02 flags — top-level consts in their own classic script, placed before the F02 gate
@@ -313,7 +315,7 @@ async function invoke(action,payload){
    revoked, replaced, used, malformed, random) → one constant markup string (F03_LandingInvalid), so the page is
    byte-identical whatever the reason. Network error → "אין חיבור. נסו שוב" with a retry button.
    --------------------------------------------------------------------------------------------------------- */
-const LAND_BRAND='<div class="pt-brand">Plan_Travel</div>';
+const LAND_BRAND='<div class="pt-brand">Lonely Planner</div>'; /* CHANGE 2026-10-12 F04-NAME-01: app display name "Plan_Travel"/"Vietnam Travel Planner"/"ויאטנם 2026" → "Lonely Planner" (Or, 2026-10-12) */
 const LAND_H1='<h1 '+'id="ptInviteTitle"';   /* one source occurrence of the id (only one landing variant is in the DOM at a time) */
 const LAND_INVALID=LAND_BRAND+'<section class="pt-card pt-center"><div class="pt-ring">'+ICON.broken+'</div>'+LAND_H1+'>הקישור כבר לא בתוקף</h1><p>ייתכן שפג תוקפו, שנשלח במקומו קישור חדש, או שההזמנה בוטלה.</p><p class="pt-dim">בקש/י ממי שהזמין אותך לשלוח את ההזמנה שוב, ופתח/י את הקישור מהמייל האחרון.</p></section>';
 const LAND_LOADING=LAND_BRAND+'<section class="pt-card pt-center" aria-busy="true"><div class="pt-spin" aria-hidden="true"></div>'+LAND_H1+' style="font-size:17px">בודקים את ההזמנה…</h1></section>';
@@ -570,7 +572,7 @@ function renderAdmin(){
    if(adm.showRevoked)body+=g.rev.map(x=>inviteCard(x,off)).join('');
   }
  }
- el.innerHTML='<div class="pt-adm-head"><button type="button" class="pt-iconbtn pt-bare" id="ptAdminBack" aria-label="חזרה למסך עוד">'+ICON.back+'</button><div style="flex-grow:1;min-width:0"><h1 id="ptAdminTitle">ניהול מערכת</h1><div class="pt-sub">Plan_Travel · סופר-אדמין</div></div></div>'+
+ el.innerHTML='<div class="pt-adm-head"><button type="button" class="pt-iconbtn pt-bare" id="ptAdminBack" aria-label="חזרה למסך עוד">'+ICON.back+'</button><div style="flex-grow:1;min-width:0"><h1 id="ptAdminTitle">ניהול מערכת</h1><div class="pt-sub">Lonely Planner · סופר-אדמין</div></div></div>'+
   '<div class="pt-adm-body"><button class="pt-btn" type="button" id="ptInviteOpen"'+(off?' disabled':'')+'>'+ICON.plus+'הזמנת מנהל לקבוצה חדשה</button>'+
   '<div class="pt-seg" role="group" aria-label="סינון">'+seg+'</div>'+body+
   '<div class="pt-foot">'+ICON.lock+'<span>מוצגים רק שם, מנהלים, יעד, תאריכים ומספר חברים. התוכן פרטי.</span></div></div>';
@@ -870,7 +872,7 @@ const CUR_MAX=10,COUNTRY_MAX=15,DAYS_MAX=120,RESEND_S=45,OTP_TTL_MS=3600000;
 const CALL_TIMEOUT_MS=20000,DATA_TIMEOUT_MS=15000;
 /* spec §4: the order of this list is the order of the "נפוצות" chips (not countries.json order) */
 const POPULAR=['TH','GR','US','IT','ES','FR','GB','DE','PT','CY','GE','VN','JP','IN','NL','CZ','HU','AT','MX','AE'];
-const JOIN_BASE='https://orsela.github.io/Plan_Travel/join/';   /* = create-trip's default JOIN_URL (used to rebuild the link from trip_join_codes) */
+const JOIN_BASE='https://orsela.github.io/Lonely_Planner/join/'; /* CHANGE 2026-10-12 F04-NAME-02: site address /Plan_Travel/ → /Lonely_Planner/ (repo renamed, Or 2026-10-12) */   /* = create-trip's default JOIN_URL (used to rebuild the link from trip_join_codes) */
 const HOME_CUR=[['ILS','₪ שקל · ILS'],['USD','$ דולר · USD'],['EUR','€ יורו · EUR']];
 const TX={
  offline:'אין חיבור. נסו שוב כשהרשת תחזור.',
@@ -921,7 +923,7 @@ async function copyText(t){
  if(!ok){try{const ta=document.createElement('textarea');ta.value=t;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');ta.remove()}catch{}}
  return ok;
 }
-function waUrl(name,url){return'https://wa.me/?text='+encodeURIComponent('מצטרפים לטיול "'+name+'" ב-Plan_Travel 🧳\nנכנסים מהקישור, כותבים את השם ומחכים לאישור:\n'+url)}
+function waUrl(name,url){return'https://wa.me/?text='+encodeURIComponent('מצטרפים לטיול "'+name+'" ב-Lonely Planner 🧳\nנכנסים מהקישור, כותבים את השם ומחכים לאישור:\n'+url)}
 const ICON={
  check:'<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#146c43" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
  check18:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#146c43" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -982,7 +984,7 @@ function h1(t,st){return'<h1 id="ptWzTitle"'+(st?' style="'+st+'"':'')+'>'+esc(t
 function errP(center){return'<p class="pt-wz-err" id="ptWzErr" role="alert"'+(center?' style="text-align:center"':'')+'></p>'}
 function nextB(){return'<button type="button" class="pt-btn" id="ptWzNext" data-net>המשך ←</button>'}
 function backB(){return'<button type="button" class="pt-btn pt-out" id="ptWzBack">חזרה</button>'}
-function head(right){return'<div class="pt-wz-top"><span class="pt-wz-brand">Plan_Travel</span><span class="pt-wz-stepno">'+esc(right||'')+'</span></div>'}
+function head(right){return'<div class="pt-wz-top"><span class="pt-wz-brand">Lonely Planner</span><span class="pt-wz-stepno">'+esc(right||'')+'</span></div>'}
 function progress(n){
  const lb=['פרטי הטיול','יעדים','אישור וקישור'];
  return head('שלב '+n+' מתוך 3')+'<div class="pt-wz-bar" aria-hidden="true">'+[1,2,3].map(i=>'<span'+(i<=n?' class="on"':'')+'></span>').join('')+'</div>'+
@@ -1070,7 +1072,7 @@ function codeScreen(){
   errP(true)+
   '<div class="pt-wz-links"><button type="button" class="pt-wz-link" id="ptWzResend" data-net data-hold disabled>שליחה חוזרת</button><span class="pt-wz-dot" aria-hidden="true">·</span>'+
   '<button type="button" class="pt-wz-link" id="ptWzSpam" aria-expanded="false" aria-controls="ptWzSpamHint">לא הגיע? בדקו בספאם</button></div>'+
-  '<p class="pt-wz-hint" id="ptWzSpamHint" hidden>חפשו מייל מ-Plan_Travel בספאם או בקידומי מכירות, וודאו שהכתובת למעלה נכונה.</p>'+
+  '<p class="pt-wz-hint" id="ptWzSpamHint" hidden>חפשו מייל מ-Lonely Planner בספאם או בקידומי מכירות, וודאו שהכתובת למעלה נכונה.</p>'+
   privNote()+'</div>',
   '<button type="button" class="pt-btn" id="ptWzVerify" data-net data-hold disabled>אימות והמשך להקמה</button>');
  const ins=[...document.querySelectorAll('#ptWizard .pt-otp')];
@@ -1781,7 +1783,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.4.1'; /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.4.2'; /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -6353,7 +6355,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.4.1'; /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.4.2'; /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;

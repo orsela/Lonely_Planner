@@ -80,7 +80,7 @@ Body `{action, …}`. Every action requires `Authorization: Bearer <user JWT>`; 
 | action | input | does |
 |---|---|---|
 | `lookup` | — | `find_invite_for_email(user.email)` → `{found, draft_name, inviter_name, expires_at}` (no ids, no email echo). |
-| `create` | `name, display_name, start_date, end_date, home_currency, default_lang, default_role, countries[], currencies[], center` | `rpc('create_trip_from_invite', {p_user: user.id, p_email: user.email, p_payload})`. Maps `invite_invalid` → 409 `invite_invalid`, `invalid_payload` → 400 `invalid_payload` {field}, `too_many_currencies` → 400. Success → 200 `{trip_id, join_code, join_url, created}` where `join_url = <JOIN_URL base>#code=<join_code>`; `JOIN_URL` secret optional, default `https://orsela.github.io/Plan_Travel/join/`, validated like APP_URL (must start with `https://`, end with `/`; else default). |
+| `create` | `name, display_name, start_date, end_date, home_currency, default_lang, default_role, countries[], currencies[], center` | `rpc('create_trip_from_invite', {p_user: user.id, p_email: user.email, p_payload})`. Maps `invite_invalid` → 409 `invite_invalid`, `invalid_payload` → 400 `invalid_payload` {field}, `too_many_currencies` → 400. Success → 200 `{trip_id, join_code, join_url, created}` where `join_url = <JOIN_URL base>#code=<join_code>`; `JOIN_URL` secret optional, default `https://orsela.github.io/Lonely_Planner/join/`, validated like APP_URL (must start with `https://`, end with `/`; else default). |
 
 - CORS identical to `invite-manager` (app origin + localhost). Never log the JWT, email or payload names; log only action, status and error code.
 - Rate limit (in-memory, per user id): max 10 `create` and 30 `lookup` per 10 minutes → 429 `rate_limited`.
@@ -128,7 +128,7 @@ Wizard
 
 Result
 11. After create: one `trips` row with the entered fields; `trip_countries` in order; `trip_currencies` = 3 bases (home sort 0) + destinations/added; one active manager membership with the display name; one `trip_join_codes` row (8 chars, allowed alphabet); `trip_kv.trip` with N empty days, consecutive `dd/mm/yyyy` dates from start to end, `day` 1…N, `waypoints: []`, centre coords of the first country's capital, `country` = first country; `trip_kv.tripname` = the trip name, so the v1 home header and ניהול → הגדרות מסע show it (not "מסע של חלומות"); invite `used_at` and `trip_id` set.
-12. Done shows the join URL `https://orsela.github.io/Plan_Travel/join/#code=<CODE>`; WhatsApp opens `wa.me` with the trip name and URL; copy writes the URL.
+12. Done shows the join URL `https://orsela.github.io/Lonely_Planner/join/#code=<CODE>`; WhatsApp opens `wa.me` with the trip name and URL; copy writes the URL.
 13. Entering the trip shows the new trip (not the Vietnam seed, not another trip of the same user), with all global elements, the first-steps card (managers only) and empty days; reloading keeps the same trip (D5).
 14. Deleting all days (if the UI allows) or a stored empty array never brings back `SEED_DATA` in cloud mode with the flag on; no screen throws on 0, 1 or 18 empty days.
 15. "עוד" shows "קישור הצטרפות לקבוצה" for managers only; it shows the same URL.
@@ -158,3 +158,23 @@ Definition of Done
 - Functions: Deno unit tests for `create-trip` (mocked service client/RPC) and the `invite-manager` additions (APP_URL cases, `check.email`).
 - DB: `qa.f04_run()` for criteria 5, 10, 11, 17 and payload validation (each invalid field), idempotency, cap 10, join-code alphabet, day generation across a month boundary and a leap day (2028-02-28 → 2028-03-01 = 3 days).
 - Or's phone after deployment (§6.6).
+
+## 8. App display name (Or, 2026-10-12) — alpha.4.2
+
+The app's name everywhere it is displayed is **Lonely Planner** (F04-NAME-01): `<title>` (name only, no version), the
+installed-app name (`manifest.json` name/short_name, `apple-mobile-web-app-title`), every brand line in the app (landing,
+admin "Lonely Planner · סופר-אדמין", wizard header), the WhatsApp join message ("…ב-Lonely Planner 🧳"), the spam hint,
+the `/invite/` and `/join/` page titles and brand, and the invite email (subject "הוזמנת לנהל טיול ב-Lonely Planner",
+sender name, header, footer). Not renamed: code identifiers, comments, storage keys, and the web address
+`orsela.github.io/Plan_Travel/…` (a repo rename is a separate decision). Supabase dashboard (Or): the two code-email
+templates and the SMTP sender name.
+
+### 8.1 Site address (Or, 2026-10-12): `orsela.github.io/Lonely_Planner/`
+
+Repo `orsela/Plan_Travel` is renamed `orsela/Lonely_Planner` (F04-NAME-02); GitHub Pages then serves
+`https://orsela.github.io/Lonely_Planner/{app,invite,join}/`. Code defaults follow: app `JOIN_BASE`, `create-trip`
+`DEFAULT_JOIN_URL` (alpha.4.1), `invite-manager` `DEFAULT_APP_URL` (alpha.4.1). Dashboard (Or): secret `APP_URL` =
+`https://orsela.github.io/Lonely_Planner/app/`; Auth → URL Configuration (Site URL / Redirect URLs) to the new path.
+Old address: a new repo `orsela/Plan_Travel` holds only redirect pages (`/app/`, `/invite/`, `/join/`, keeping `?query`
+and `#hash`) so links already sent keep working; installed home-screen apps must be re-added from the new address
+(same origin, so the device's Supabase session and local data carry over).

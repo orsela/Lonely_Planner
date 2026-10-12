@@ -1,7 +1,7 @@
 {
-  "name": "מתכנן הטיול לוייטנאם - המשפחה",
-  "short_name": "ויאטנם 2026",
-  "description": "מסלול, תקציב, יומן, אלבום וצ'אט משפחתי לטיול לוייטנאם 2026",
+  "name": "Lonely Planner",
+  "short_name": "Lonely Planner",
+  "description": "מתכננים יחד, מטיילים יחד – מסלול, תקציב, יומן, אלבום וצ'אט לטיול",
   "start_url": ".",
   "scope": "./",
   "id": "plan-travel",
@@ -38,5 +38,6 @@
       "auto"
     ]
   },
-  "_change_launch": "CHANGE 2026-10-09 F03-LAND-04: launch_handler navigate-existing — an invite link tapped in Gmail while the installed app was already open only brought the app to the front (no navigation). What changed: one new member; nothing else."
+  "_change_launch": "CHANGE 2026-10-09 F03-LAND-04: launch_handler navigate-existing — an invite link tapped in Gmail while the installed app was already open only brought the app to the front (no navigation). What changed: one new member; nothing else.",
+  "_change_name": "CHANGE 2026-10-12 F04-NAME-01: name \"מתכנן הטיול לוייטנאם - המשפחה\" / short_name \"ויאטנם 2026\" -> \"Lonely Planner\" (Or). id unchanged, so installed apps update in place. description no longer mentions Vietnam."
 }

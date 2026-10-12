@@ -1,4 +1,4 @@
-// Plan_Travel Edge Function `invite-manager` · version 3.0.0-alpha.4.0 · F04 (first version: F03)
+// Plan_Travel Edge Function `invite-manager` · version 3.0.0-alpha.4.1 · F04 (first version: F03)
 // CHANGE 2026-10-12 F04-FN-05: APP_URL hardening + `check` returns the invite's email (docs/F04_spec.md §3.2).
 //   What changed from 3.0.0-alpha.3.7: (1) the APP_URL secret is used only if it parses as a URL, starts with https://
 //   and has a host; otherwise DEFAULT_APP_URL is used and ONE log line `app_url_invalid_fallback` is written (never the
@@ -15,7 +15,7 @@
 //   3. production wiring (supabase-js service client + a small built-in SMTP client over smtp.gmail.com:465 TLS),
 //      only when this file is the entry point.
 //
-// Secrets: GMAIL_USER, GMAIL_APP_PASSWORD, APP_URL (default https://orsela.github.io/Plan_Travel/app/).
+// Secrets: GMAIL_USER, GMAIL_APP_PASSWORD, APP_URL (default https://orsela.github.io/Lonely_Planner/app/).
 // Provided by Supabase: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (or set PT_SERVICE_KEY to an sb_secret_… key).
 // Never logs tokens, request bodies or email addresses; never returns token_hash.
 
@@ -25,12 +25,12 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.4
 // =====================================================================================================
 // 1. Pure helpers
 // =====================================================================================================
-export const FN_VERSION = "3.0.0-alpha.4.0"; // CHANGE 2026-10-12 F04-FN-05: APP_URL hardening + check.email (was "3.0.0-alpha.3.7"); // CHANGE 2026-10-10 F03-LAND-05: link via /invite/ bridge; F03-LAND-03: ?invite=1 in the link; F03-MAIL-04: own MIME+SMTP (denomailer removed); F03-MAIL-03: subject pre-encoded; F03-MAIL-02: redesigned invite email; F03-FN-03: mailer error logging; // CHANGE 2026-10-09 F03-FN-02: bumped for the startServer()/main.ts entry split
+export const FN_VERSION = "3.0.0-alpha.4.1"; // CHANGE 2026-10-12 F04-NAME-01: app display name → Lonely Planner (was "3.0.0-alpha.4.0"); // CHANGE 2026-10-12 F04-FN-05: APP_URL hardening + check.email (was "3.0.0-alpha.3.7"); // CHANGE 2026-10-10 F03-LAND-05: link via /invite/ bridge; F03-LAND-03: ?invite=1 in the link; F03-MAIL-04: own MIME+SMTP (denomailer removed); F03-MAIL-03: subject pre-encoded; F03-MAIL-02: redesigned invite email; F03-FN-03: mailer error logging; // CHANGE 2026-10-09 F03-FN-02: bumped for the startServer()/main.ts entry split
 export const INVITE_TTL_DAYS = 7;
-export const DEFAULT_APP_URL = "https://orsela.github.io/Plan_Travel/app/";
+export const DEFAULT_APP_URL = "https://orsela.github.io/Lonely_Planner/app/"; // CHANGE 2026-10-12 F04-NAME-02: was /Plan_Travel/app/ (repo renamed)
 export const FALLBACK_INVITER = "מנהל המערכת";
-export const EMAIL_SUBJECT = "הוזמנת לנהל טיול ב-Plan_Travel";
-export const FROM_NAME = "Plan_Travel";
+export const EMAIL_SUBJECT = "הוזמנת לנהל טיול ב-Lonely Planner"; // CHANGE 2026-10-12 F04-NAME-01: app name Plan_Travel → Lonely Planner (subject, sender name, email header/footer)
+export const FROM_NAME = "Lonely Planner";
 const DAY_MS = 86_400_000;
 
 /** Fixed error codes (translated by the client dictionary). */
@@ -165,7 +165,7 @@ export function renderInviteEmail(p: { to: string; inviter: string; draftName: s
     "",
     "הקישור אישי ומיועד לכתובת הזו בלבד. אם לא ציפית להזמנה, אפשר להתעלם מהמייל.",
     "",
-    "נשלח ממערכת Plan_Travel. אין להשיב למייל זה.",
+    "נשלח ממערכת Lonely Planner. אין להשיב למייל זה.",
   ].join("\n");
   const L = htmlEscape(p.link);
   const stepRows = steps.map((t, i) =>
@@ -174,7 +174,7 @@ export function renderInviteEmail(p: { to: string; inviter: string; draftName: s
   const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${htmlEscape(EMAIL_SUBJECT)}</title></head>` +
     `<body dir="rtl" style="margin:0;padding:16px 12px;background:#eceae3;color:#17211b;font-family:Arial,'Segoe UI',sans-serif">` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden" dir="rtl">` +
-    `<tr><td style="background:#0f6b4f;color:#ffffff;padding:20px;text-align:right"><div style="font-size:20px;font-weight:900">Plan_Travel</div><div style="font-size:13px;opacity:.9">מתכננים יחד, מטיילים יחד</div></td></tr>` +
+    `<tr><td style="background:#0f6b4f;color:#ffffff;padding:20px;text-align:right"><div style="font-size:20px;font-weight:900">Lonely Planner</div><div style="font-size:13px;opacity:.9">מתכננים יחד, מטיילים יחד</div></td></tr>` +
     `<tr><td style="padding:24px 20px 8px;text-align:right">` +
     `<div style="font-size:13px;color:#5f6861;margin:0 0 6px">הזמנה אישית</div>` +
     `<h1 style="margin:0 0 10px;font-size:22px;line-height:1.35">${headlineHtml}</h1>` +
@@ -189,7 +189,7 @@ export function renderInviteEmail(p: { to: string; inviter: string; draftName: s
     `<tr><td style="padding:16px 20px 20px;text-align:right;font-size:12px;line-height:1.6;color:#5f6861">הכפתור לא עובד? העתיקו את הקישור לדפדפן:<br>` +
     `<a href="${L}" target="_blank" rel="noopener" dir="ltr" style="word-break:break-all;color:#0f6b4f">${L}</a><br><br>` +
     `הקישור אישי ומיועד לכתובת הזו בלבד. אם לא ציפית להזמנה, אפשר להתעלם מהמייל.</td></tr>` +
-    `<tr><td style="border-top:1px solid #efeee8;padding:12px 20px;font-size:11.5px;color:#5f6861;text-align:right">נשלח ממערכת Plan_Travel. אין להשיב למייל זה.</td></tr>` +
+    `<tr><td style="border-top:1px solid #efeee8;padding:12px 20px;font-size:11.5px;color:#5f6861;text-align:right">נשלח ממערכת Lonely Planner. אין להשיב למייל זה.</td></tr>` +
     `</table></body></html>`;
   return { to: p.to, subject: EMAIL_SUBJECT, text, html };
 }

@@ -102,7 +102,7 @@ Deno.test("create: rpc args, join_url, created flag, CORS", async () => {
   const m = mock();
   const r = await call({ action: "create", ...PAYLOAD, extra: "ignored" }, { origin: "https://orsela.github.io" });
   eq(r.status, 200);
-  eq(r.j, { trip_id: "t1", join_code: "X7K2M9QP", join_url: "https://orsela.github.io/Plan_Travel/join/#code=X7K2M9QP", created: true });
+  eq(r.j, { trip_id: "t1", join_code: "X7K2M9QP", join_url: "https://orsela.github.io/Lonely_Planner/join/#code=X7K2M9QP", created: true });
   eq(r.r.headers.get("access-control-allow-origin"), "https://orsela.github.io");
   eq(m.calls[0].name, "create_trip_from_invite");
   eq(m.calls[0].args, { p_user: U.id, p_email: "dana@example.com", p_payload: PAYLOAD });

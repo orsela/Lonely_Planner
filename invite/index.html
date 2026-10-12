@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#0f6b4f">
-<title>הזמנה · Plan_Travel</title>
+<title>הזמנה · Lonely Planner</title>
+<!-- CHANGE 2026-10-12 F04-NAME-01: display name Plan_Travel → Lonely Planner (title + brand). -->
 <!-- Plan_Travel invite page · version 3.0.0-alpha.4 · F04
      CHANGE 2026-10-12 F04-INV-01: what changed from 3.0.0-alpha.3.6: the VALID card now leads into the app's setup wizard
      (artboard F04_Landing): copy "…הזמין אותך לנהל את הקבוצה "<draft>". ההקמה לוקחת כ-3 דקות.", an expiry line instead of
@@ -52,7 +53,7 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
 </style>
 </head>
 <body>
-<main id="m" aria-live="polite"><div class="brand">Plan_Travel</div><section class="card center" aria-busy="true"><div class="spin" aria-hidden="true"></div><h1 style="font-size:17px">בודקים את ההזמנה…</h1></section></main>
+<main id="m" aria-live="polite"><div class="brand">Lonely Planner</div><section class="card center" aria-busy="true"><div class="spin" aria-hidden="true"></div><h1 style="font-size:17px">בודקים את ההזמנה…</h1></section></main>
 <script>
 (function(){
   'use strict';
@@ -60,7 +61,7 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
   var KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';   /* publishable by design (RLS + the function are the protection) */
   var TOKEN_RE=/^[A-Za-z0-9_-]{43}$/;
   var APP_LINK='../app/?invite=1#invite=';   /* CHANGE 2026-10-12 F04-INV-01: the app's own landing (F03-LAND-01) continues to the F04 wizard */
-  var BRAND='<div class="brand">Plan_Travel</div>';
+  var BRAND='<div class="brand">Lonely Planner</div>';
   var ICON_OK='<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#146c43" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   var ICON_BROKEN='<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#4b524c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/><path d="M3 3l18 18"/></svg>';
   var ICON_WIFI='<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#4b524c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><path d="M12 19h.01"/><path d="M3 3l18 18"/></svg>';

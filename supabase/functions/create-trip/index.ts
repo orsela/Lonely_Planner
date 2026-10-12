@@ -1,4 +1,4 @@
-// Plan_Travel Edge Function `create-trip` · version 3.0.0-alpha.4.0 · F04
+// Plan_Travel Edge Function `create-trip` · version 3.0.0-alpha.4.1 · F04
 // CHANGE 2026-10-12 F04-FN-01: new file (no previous version). An invited manager whose email is verified looks up
 //   their invite and creates the trip (docs/F04_spec.md §3.1). Runs with the service role; verify_jwt is OFF for this
 //   function — it verifies the caller's JWT itself with auth.getUser(jwt) and requires a confirmed email.
@@ -12,14 +12,14 @@
 // Testability (QA contract): this module is importable without starting a server (main.ts calls startServer()).
 //   setDeps({getUser?, rpc?, now?}) replaces the real Supabase calls; resetDeps() restores them and clears the
 //   rate limiter. handler(req) is the request handler used by startServer().
-// Secrets: optional JOIN_URL (default https://orsela.github.io/Plan_Travel/join/). Provided by Supabase: SUPABASE_URL,
+// Secrets: optional JOIN_URL (default https://orsela.github.io/Lonely_Planner/join/). Provided by Supabase: SUPABASE_URL,
 //   SUPABASE_SERVICE_ROLE_KEY (or PT_SERVICE_KEY = an sb_secret_… key, preferred when present).
 // Logs: one JSON line per request with action, status and error code only — never the JWT, email, payload or names.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 
-export const FN_VERSION = "3.0.0-alpha.4.0";
-export const DEFAULT_JOIN_URL = "https://orsela.github.io/Plan_Travel/join/";
+export const FN_VERSION = "3.0.0-alpha.4.1"; // CHANGE 2026-10-12 F04-NAME-02: default join URL → /Lonely_Planner/join/ (was "3.0.0-alpha.4.0")
+export const DEFAULT_JOIN_URL = "https://orsela.github.io/Lonely_Planner/join/"; // CHANGE 2026-10-12 F04-NAME-02: was /Plan_Travel/join/ (repo renamed)
 export const RATE_WINDOW_MS = 10 * 60 * 1000;
 export const RATE_MAX: Record<string, number> = { create: 10, lookup: 30 };
 
