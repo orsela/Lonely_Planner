@@ -1,0 +1,4 @@
+# CHANGE 2026-10-12: ignore local test byproducts (python caches, run logs)
+__pycache__/
+*.pyc
+tests/**/.last_run_*.txt
