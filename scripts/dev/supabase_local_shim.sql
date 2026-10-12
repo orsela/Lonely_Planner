@@ -34,3 +34,9 @@ $$;
 grant usage on schema auth   to anon, authenticated, service_role;
 grant usage on schema public to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
+
+-- CHANGE 2026-10-12 F04-DEVDB-01: pgcrypto in schema `extensions` (as on Supabase), needed by 0010_f04.sql
+-- (extensions.gen_random_bytes for the join code). What changed from the F03 version: these 3 lines only.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+grant usage on schema extensions to anon, authenticated, service_role;

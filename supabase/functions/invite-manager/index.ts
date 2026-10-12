@@ -1,4 +1,9 @@
-// Plan_Travel Edge Function `invite-manager` · version 3.0.0-alpha.3.7 · F03
+// Plan_Travel Edge Function `invite-manager` · version 3.0.0-alpha.4.0 · F04 (first version: F03)
+// CHANGE 2026-10-12 F04-FN-05: APP_URL hardening + `check` returns the invite's email (docs/F04_spec.md §3.2).
+//   What changed from 3.0.0-alpha.3.7: (1) the APP_URL secret is used only if it parses as a URL, starts with https://
+//   and has a host; otherwise DEFAULT_APP_URL is used and ONE log line `app_url_invalid_fallback` is written (never the
+//   value) — the email link is always built from that checked URL (resolveAppUrl, applied in makeHandler);
+//   (2) `check` (valid case) adds `email`; the invalid response stays exactly {valid:false}. Nothing else changed.
 // CHANGE 2026-10-05 F03-FN-01: new file (no previous version). Super-admin manager invites: actions create / resend /
 //   revoke / check (docs/F03_spec.md §3). Runs with the service role; verify_jwt is OFF for this function because
 //   `check` is called by an invitee who has no session — every other action verifies the caller's JWT itself and
@@ -20,7 +25,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.4
 // =====================================================================================================
 // 1. Pure helpers
 // =====================================================================================================
-export const FN_VERSION = "3.0.0-alpha.3.7"; // CHANGE 2026-10-10 F03-LAND-05: link via /invite/ bridge; F03-LAND-03: ?invite=1 in the link; F03-MAIL-04: own MIME+SMTP (denomailer removed); F03-MAIL-03: subject pre-encoded; F03-MAIL-02: redesigned invite email; F03-FN-03: mailer error logging; // CHANGE 2026-10-09 F03-FN-02: bumped for the startServer()/main.ts entry split
+export const FN_VERSION = "3.0.0-alpha.4.0"; // CHANGE 2026-10-12 F04-FN-05: APP_URL hardening + check.email (was "3.0.0-alpha.3.7"); // CHANGE 2026-10-10 F03-LAND-05: link via /invite/ bridge; F03-LAND-03: ?invite=1 in the link; F03-MAIL-04: own MIME+SMTP (denomailer removed); F03-MAIL-03: subject pre-encoded; F03-MAIL-02: redesigned invite email; F03-FN-03: mailer error logging; // CHANGE 2026-10-09 F03-FN-02: bumped for the startServer()/main.ts entry split
 export const INVITE_TTL_DAYS = 7;
 export const DEFAULT_APP_URL = "https://orsela.github.io/Plan_Travel/app/";
 export const FALLBACK_INVITER = "מנהל המערכת";
@@ -118,6 +123,19 @@ export interface MailMessage {
   subject: string;
   text: string;
   html: string;
+}
+
+/** CHANGE 2026-10-12 F04-FN-05: new helper (no alpha.3 equivalent). The APP_URL secret is used only if it parses as a
+ *  URL, starts with "https://" and has a non-empty host. Anything else (e.g. the "ttps://…" typo of 2026-10-11, an
+ *  empty string, not a URL) → DEFAULT_APP_URL with fallback=true. undefined (secret not set) → the default, no fallback. */
+export function resolveAppUrl(v: string | undefined | null): { url: string; fallback: boolean } {
+  if (v === undefined || v === null) return { url: DEFAULT_APP_URL, fallback: false };
+  const s = String(v).trim();
+  try {
+    const u = new URL(s);
+    if (s.startsWith("https://") && u.protocol === "https:" && u.host) return { url: s, fallback: false };
+  } catch { /* not a URL */ }
+  return { url: DEFAULT_APP_URL, fallback: true };
 }
 
 /** Invite email (artboard F03_Email).
@@ -230,7 +248,7 @@ export interface Deps {
   sendMail(msg: MailMessage): Promise<void>;
   now(): Date;
   random(n: number): Uint8Array;
-  appUrl: string;
+  appUrl: string; // CHANGE 2026-10-12 F04-FN-05: checked with resolveAppUrl() in makeHandler
   log(event: string, fields?: Record<string, unknown>): void;
 }
 
@@ -251,6 +269,11 @@ export function mailErr(e: unknown): Record<string, unknown> {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
+  // CHANGE 2026-10-12 F04-FN-05: every link (create / resend email) is built from the checked APP_URL; an unusable value
+  //   falls back to DEFAULT_APP_URL with a single warning line (the value itself is never logged).
+  const app = resolveAppUrl(deps.appUrl as string | undefined);
+  if (app.fallback) deps.log("app_url_invalid_fallback");
+  const appUrl = app.url;
   const json = (origin: string | null, status: number, body: unknown) =>
     new Response(JSON.stringify(body), {
       status,
@@ -309,7 +332,7 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
       throw e;
     }
     try {
-      await deps.sendMail(renderInviteEmail({ to: email, inviter, draftName: draft, link: inviteLink(deps.appUrl, token), expiresAt: row.expires_at }));
+      await deps.sendMail(renderInviteEmail({ to: email, inviter, draftName: draft, link: inviteLink(appUrl, token), expiresAt: row.expires_at }));
     } catch (e) {
       // CHANGE 2026-10-09 F03-FN-03: log the mailer's error name/message (never the password, token or address) —
       //   the first live send failed with no detail. What changed from 3.0.0-alpha.3.1: one log line, same response.
@@ -340,7 +363,7 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     try {
       await deps.sendMail(renderInviteEmail({
         to: inv.email, inviter: inv.inviter_name || FALLBACK_INVITER, draftName: inv.draft_name,
-        link: inviteLink(deps.appUrl, token), expiresAt: expires,
+        link: inviteLink(appUrl, token), expiresAt: expires,
       }));
     } catch (e) {
       deps.log("email_error", mailErr(e)); // CHANGE 2026-10-09 F03-FN-03 (see actCreate)
@@ -377,7 +400,8 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     const now = deps.now();
     if (!inv || !isOpen(inv) || isExpired(inv, now)) return INVALID;
     if (!inv.opened_at) await deps.store.markOpened(inv.id, now.toISOString());
-    return { valid: true, draft_name: inv.draft_name, inviter_name: inv.inviter_name || FALLBACK_INVITER, expires_at: inv.expires_at };
+    // CHANGE 2026-10-12 F04-FN-05: + email (the invite's address; the app pre-fills the code screen). Was without it in alpha.3.
+    return { valid: true, draft_name: inv.draft_name, inviter_name: inv.inviter_name || FALLBACK_INVITER, expires_at: inv.expires_at, email: inv.email };
   }
 
   return async function handle(req: Request): Promise<Response> {
@@ -582,7 +606,7 @@ export function startServer(): void {
     sendMail: gmailSender(env("GMAIL_USER"), env("GMAIL_APP_PASSWORD")),
     now: () => new Date(),
     random: (n) => crypto.getRandomValues(new Uint8Array(n)),
-    appUrl: env("APP_URL") || DEFAULT_APP_URL,
+    appUrl: Deno.env.get("APP_URL") as string, // CHANGE 2026-10-12 F04-FN-05: raw secret, checked in makeHandler (was env("APP_URL") || DEFAULT_APP_URL)
     // only event names, invite ids and error codes — never tokens, hashes, emails or bodies
     log: (event, fields) => console.log(JSON.stringify({ fn: "invite-manager", v: FN_VERSION, event, ...(fields || {}) })),
   });

@@ -10,6 +10,7 @@
 // No assertion library is imported (to stay runnable offline).
 
 import {
+  DEFAULT_APP_URL, resolveAppUrl, // CHANGE 2026-10-12 F04-FN-05: for the APP_URL hardening tests at the end
   corsHeaders, type Deps, FALLBACK_INVITER, inviteLink, type InviteRow, type InviteStore, isValidEmail, type MailMessage,
   makeHandler, makeToken, type NewInvite, normalizeEmail, renderInviteEmail, sha256Hex, TOKEN_RE,
 } from "./index.ts";
@@ -360,7 +361,9 @@ Deno.test("C10 valid token → draft name, inviter, expiry; opened_at set once; 
   const t = s.tokenOf(s.sent[0]);
   const r = await s.call({ action: "check", token: t }); // no JWT
   eq(r.status, 200);
-  eq(r.body, { valid: true, draft_name: "יפן 2027", inviter_name: "אור", expires_at: s.store.rows.get(c.body.invite_id)!.expires_at });
+  // CHANGE 2026-10-12 F04-FN-05: + email (docs/F04_spec.md §3.2: `check` valid case returns the invite's address). The
+  //   only edit to an existing test: the alpha.3 body had no `email`, and this assertion compares the whole body.
+  eq(r.body, { valid: true, draft_name: "יפן 2027", inviter_name: "אור", expires_at: s.store.rows.get(c.body.invite_id)!.expires_at, email: "d@example.com" });
   const first = s.store.rows.get(c.body.invite_id)!.opened_at;
   assert(first);
   s.advance(3600_000);
@@ -412,6 +415,8 @@ Deno.test("F03-MAIL-04 buildMime: folded subject decodes, lines ≤ 78, both par
   const raw = buildMime({ from: "s@gmail.com", fromName: "Plan_Travel", to: "a@b.co", subject: m.subject, text: m.text, html: m.html, date: new Date(0), id: "abc" });
   const [head, body] = [raw.slice(0, raw.indexOf("\r\n\r\n")), raw.slice(raw.indexOf("\r\n\r\n") + 4)];
   for (const l of raw.split("\r\n")) if (l.length > 78) throw new Error("long line " + l.length + ": " + l.slice(0, 40));
+  // CHANGE 2026-10-12 F04-FN-05: lint suppression only (the ASCII range is intentional); assertion unchanged.
+  // deno-lint-ignore no-control-regex
   if (!/^[\x00-\x7f]*$/.test(raw)) throw new Error("non-ASCII in message");
   const lines = head.split("\r\n");
   for (const l of lines) if (!/^[A-Za-z-]+: /.test(l) && !/^ /.test(l)) throw new Error("header line not a field or fold: " + l);
@@ -475,4 +480,47 @@ Deno.test("F03-MAIL-04 smtpSend: full dialogue against a fake server; AUTH failu
   if (ok.seen.some((s) => s.includes("pw") && !s.startsWith("AUTH"))) throw new Error("password leaked");
   const bad = await run(535);
   if (!(bad.err instanceof Error) || !bad.err.message.startsWith("SMTP 535")) throw new Error("auth failure not surfaced: " + bad.err);
+});
+
+// ---------------------------------------------------------------------------------------------------
+// CHANGE 2026-10-12 F04-FN-05: new tests (F04 §3.2) — APP_URL hardening, check.email
+// ---------------------------------------------------------------------------------------------------
+Deno.test("F04 resolveAppUrl: https URL kept; ttps / http / empty / not-a-URL → default with fallback", () => {
+  eq(resolveAppUrl(APP), { url: APP, fallback: false });
+  eq(resolveAppUrl(undefined), { url: DEFAULT_APP_URL, fallback: false });
+  for (const bad of ["ttps://orsela.github.io/Plan_Travel/app/", "http://orsela.github.io/Plan_Travel/app/", "", "  ", "not a url", "https://"]) {
+    eq(resolveAppUrl(bad), { url: DEFAULT_APP_URL, fallback: true }, bad);
+  }
+});
+
+Deno.test("F04 invalid APP_URL → emails use DEFAULT_APP_URL; one app_url_invalid_fallback log line without the value", async () => {
+  for (const bad of ["ttps://evil.example/app/", "", "nonsense"]) {
+    const store = new MemStore();
+    store.admins.add(ADMIN);
+    const sent: MailMessage[] = [];
+    const logs: string[] = [];
+    const h = makeHandler({
+      store, verifyJwt: () => Promise.resolve(ADMIN), sendMail: (m) => (sent.push(m), Promise.resolve()),
+      now: () => new Date("2026-10-12T09:00:00Z"), random: (n) => crypto.getRandomValues(new Uint8Array(n)), appUrl: bad,
+      log: (e, f) => logs.push(JSON.stringify({ e, ...(f || {}) })),
+    });
+    const res = await h(new Request("https://x/functions/v1/invite-manager", {
+      method: "POST", headers: { "content-type": "application/json", authorization: "Bearer a" },
+      body: JSON.stringify({ action: "create", email: "z@example.com" }),
+    }));
+    eq(res.status, 200, bad);
+    assert(sent[0].text.includes("https://orsela.github.io/Plan_Travel/invite/#invite="), "default link not used for " + bad);
+    if (bad) assert(!sent[0].text.includes(bad), "bad APP_URL leaked into the email");
+    eq(logs.filter((l) => l.includes("app_url_invalid_fallback")).length, 1, "fallback log lines for " + bad);
+    if (bad.trim()) assert(!logs.join("").includes(bad), "APP_URL value logged");
+  }
+});
+
+Deno.test("F04 check: valid → email of the invite; invalid shape unchanged", async () => {
+  const s = setup();
+  await s.call({ action: "create", email: "  Mixed@Example.com ", draft_name: null }, JWT.admin);
+  const t = s.tokenOf(s.sent[0]);
+  const r = await s.call({ action: "check", token: t });
+  eq(r.body.email, "mixed@example.com");
+  eq((await s.call({ action: "check", token: "x" })).body, { valid: false });
 });
