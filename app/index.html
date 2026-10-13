@@ -49,6 +49,12 @@ const ADMIN_FEATURE='on';
    in cloud mode, and boot prefers the last selected/created trip. 'off' = exactly the 3.0.0-alpha.3 behaviour: the F04
    block returns on its first line and every F04 line in the gate / F03 landing / loadState is skipped. */
 const WIZARD_FEATURE='on';
+/* CHANGE 2026-10-13 F20-FLAG-01: new flag (no alpha.4.2 equivalent). 'on' = F20 (docs/F20_spec.md): the super-admin opens the
+   app on a start chooser (ניהול מערכת + all their trips), the F03 admin screen runs without a trip ("הטיולים שלי" in its
+   header), an avatar button in the trip's home header opens a sheet to switch trip / go to the admin screen, and "ניהול
+   מערכת" leaves "עוד". 'off' = exactly the 3.0.0-alpha.4.2 behaviour: the F20 block returns on its first line and every F20
+   hook line (gate, F03 renderAccount / renderAdmin) is a no-op. Needs STORAGE_BACKEND='cloud'. */
+const SWITCH_FEATURE='on';
 </script>
 <!-- CHANGE 2026-10-05 F03-UI-01: NEW block (no 3.0.0-alpha.2 equivalent) — F03 "super-admin invites a manager"
      (docs/F03_spec.md). Style + one classic script, placed after the flags script and BEFORE the F02 gate block so it
@@ -420,6 +426,9 @@ function renderAccount(){
  }
  h+='<button type="button" class="pt-li" id="ptAdminRow"'+(acct.isAdmin?'':' hidden')+'><span class="pt-ic" style="background:#eef0fb">'+ICON.shield+'</span><span class="pt-main"><b>ניהול מערכת</b><span class="pt-sub">קבוצות והזמנת מנהלים</span></span><span class="pt-badge adm">סופר-אדמין</span><span class="pt-chev" aria-hidden="true">‹</span></button>';
  card.innerHTML=h;
+ /* CHANGE 2026-10-13 F20-MORE-01: what changed from 3.0.0-alpha.4.2: with SWITCH_FEATURE='on' (window.__ptF20 exists) the
+    "ניהול מערכת" row is not rendered in "עוד" (it lives in the in-trip switcher, spec §1.5 / D6). 'off': no-op. */
+ if(window.__ptF20){const r=$('ptAdminRow');if(r)r.remove()}
  const l=$('ptLinkEmailRow');if(l)l.onclick=openLinkEmail;
  const a=$('ptAdminRow');if(a)a.onclick=()=>openAdmin(true);
 }
@@ -576,6 +585,10 @@ function renderAdmin(){
   '<div class="pt-adm-body"><button class="pt-btn" type="button" id="ptInviteOpen"'+(off?' disabled':'')+'>'+ICON.plus+'הזמנת מנהל לקבוצה חדשה</button>'+
   '<div class="pt-seg" role="group" aria-label="סינון">'+seg+'</div>'+body+
   '<div class="pt-foot">'+ICON.lock+'<span>מוצגים רק שם, מנהלים, יעד, תאריכים ומספר חברים. התוכן פרטי.</span></div></div>';
+ /* CHANGE 2026-10-13 F20-ADMIN-03: what changed from 3.0.0-alpha.4.2: with SWITCH_FEATURE='on' the header is rebuilt by F20
+    after each render: the back control (#ptAdminBack) is replaced by the button "הטיולים שלי" (#ptAdminSwitch) and the
+    subtitle "Lonely Planner · סופר-אדמין" gets the badge style (spec §1.2, artboard F20_Admin). 'off': no-op. */
+ if(window.__ptF20)window.__ptF20.adminHead(el);
 }
 function findInvite(id){return adm.items.find(x=>x.kind==='invite'&&x.id===id)||null}
 function adminClick(e){
@@ -697,6 +710,33 @@ try{
  new MutationObserver(()=>{if(!started&&window.__PT&&window.__PT.started)setTimeout(onStarted,0)})
   .observe(document.documentElement,{attributes:true,attributeFilter:['class']});
 }catch{}
+
+/* CHANGE 2026-10-13 F20-ADMIN-01: new lines (no alpha.4.2 equivalent), additive — no existing statement changed. With
+   SWITCH_FEATURE='on' the F20 block can show this admin screen WITHOUT a trip (spec §1.2): open() = the existing
+   openAdmin() for a user whose platform_admins row F20 has just read, plus the screen's click handler on the element
+   (onStarted, which normally adds it, has not run: no trip); close() = closeAdmin's clean-up without the trip parts
+   (no switchPanel / refreshAccount / history.back — F20 owns the history entries in that mode). The network listeners
+   below only act while no trip has started (inside a trip onStarted's own listeners do the same as before). */
+function adminSolo(){
+ if(!api)return false;
+ acct.isAdmin=true;acct.adminKnown=true;
+ openAdmin(false);
+ const el=$('admin');
+ if(el&&!started&&!el.__ptF20){el.__ptF20=1;el.addEventListener('click',adminClick)}
+ return adm.open;
+}
+function adminSoloClose(){
+ if(!adm.open)return;
+ adm.open=false;adm.pushed=false;adm.items=[];
+ closeSheet();
+ document.documentElement.classList.remove('pt-admin-open');
+ const el=$('admin');if(el)el.remove();
+}
+if(typeof SWITCH_FEATURE!=='undefined'&&SWITCH_FEATURE==='on'){
+ window.addEventListener('online',()=>{if(!started&&adm.open)loadAdmin()});
+ window.addEventListener('offline',()=>{if(!started&&adm.open)renderAdmin()});
+ try{Object.defineProperty(window,'__ptF03Admin',{value:Object.freeze({open:adminSolo,close:adminSoloClose,isOpen:()=>adm.open,isAdmin:()=>acct.isAdmin}),writable:false,configurable:false})}catch{}
+}
 
 function attach(a){if(!api&&a&&typeof a==='object')api=a}
 try{Object.defineProperty(window,'__ptF03',{value:Object.freeze({version:F03_VERSION,attach,takeOverBoot}),writable:false,configurable:false})}catch{}
@@ -1747,6 +1787,532 @@ function attach(a){if(!api&&a&&typeof a==='object')api=a}
 try{Object.defineProperty(window,'__ptF04',{value:Object.freeze({version:F04_VERSION,attach,fromInvite,gateCard,emptyTrip}),writable:false,configurable:false})}catch{}
 })();
 </script>
+<!-- CHANGE 2026-10-13 F20-UI-01: NEW block (no 3.0.0-alpha.4.2 equivalent) — F20 "the super-admin entry is separate from the
+     trips" (docs/F20_spec.md, mockup row 6, alternative A). Style + one classic script, placed after the F04 block and BEFORE
+     the F02 gate block, so window.__ptF20 exists when the gate runs. With SWITCH_FEATURE='off' (or STORAGE_BACKEND!=='cloud')
+     the script returns on its first line, window.__ptF20 is undefined, every F20 hook line is a no-op and the styles match
+     nothing: exactly the 3.0.0-alpha.4.2 behaviour.
+     - F20-CHOOSE-01: start chooser #ptChoose for the super-admin (artboard F20_Choose), shown by the gate instead of a trip
+     - F20-ADMIN-02: the F03 admin screen standalone (no trip started) + its header "הטיולים שלי" (artboard F20_Admin)
+     - F20-SWITCH-01: in-trip avatar button + bottom sheet "הטיולים שלי" / "ניהול" (artboard F20_SwitchSheet)
+     - F20-D3-01: device option "לפתוח תמיד ישר לטיול האחרון" (raw key pt:_device:open_last_trip)
+     All network calls go through the gate's client (bridge F20-GATE-01 in the gate block below); read-only, existing RLS. -->
+<style>
+/* CHANGE 2026-10-13 F20-UI-01: F20 styles. Only new pt-f20-* classes / ids (+ .pt-badge.last); reuses the UI-kit variables and
+   the F03 pt-* classes. Nothing existing is overridden; the one rule that touches an existing element (v1 home ⚙️ margin) only
+   matches when the F20 avatar button is in that header row. */
+html.pt-choose body>*:not(#ptChoose):not(#ptToast){display:none!important}
+#ptChoose{position:fixed;inset:0;z-index:1000;overflow-y:auto;overflow-x:hidden;background:var(--bg);color:var(--text);-webkit-overflow-scrolling:touch;padding:22px 16px calc(24px + env(safe-area-inset-bottom));box-sizing:border-box}
+#ptChoose[hidden]{display:none}
+.pt-f20-in{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.pt-f20-hero{text-align:center;padding:8px 0 6px}
+.pt-f20-brand{font-size:20px;font-weight:900;color:var(--primary)}
+.pt-f20-hero h1{margin:6px 0 0;font-size:18px;overflow-wrap:anywhere}
+.pt-f20-sec{font-size:12px;font-weight:800;color:var(--muted);margin:6px 4px 0}
+.pt-f20-list{display:flex;flex-direction:column;gap:10px}
+.pt-f20-card{display:flex;gap:12px;align-items:center;width:100%;box-sizing:border-box;text-align:right;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:14px;color:var(--text);font:inherit;min-height:64px;cursor:pointer;touch-action:manipulation}
+.pt-f20-card.pt-f20-adm{border-color:#c7cbef}
+.pt-f20-ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#eef0fb}
+.pt-f20-flag{font-size:24px;line-height:1;width:44px;text-align:center;flex-shrink:0;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.pt-f20-main{flex:1;min-width:0}
+.pt-f20-main b{font-size:15px;display:block;overflow-wrap:anywhere}
+.pt-f20-sub{display:block;font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.pt-f20-chev{color:var(--muted);font-size:18px;flex-shrink:0}
+.pt-badge.last{background:#eaf7ef;color:#146c43}
+.pt-f20-note{margin:0;padding:12px 4px;font-size:13px;color:var(--muted);text-align:center}
+.pt-f20-note .pt-btn{margin:10px auto 0}
+.pt-f20-chk{display:flex;align-items:center;gap:10px;font-size:13px;color:#3a443d;min-height:44px;padding:0 4px;margin-top:6px;cursor:pointer}
+.pt-f20-cbx{position:relative;width:44px;height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-inline-start:-11px}
+.pt-f20-cbx input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.pt-f20-box{width:22px;height:22px;border-radius:6px;border:2px solid #9aa19b;background:#fff;display:flex;align-items:center;justify-content:center;box-sizing:border-box;pointer-events:none}
+.pt-f20-box svg{visibility:hidden}
+.pt-f20-cbx input:checked+.pt-f20-box{background:var(--primary);border-color:var(--primary)}
+.pt-f20-cbx input:checked+.pt-f20-box svg{visibility:visible}
+.pt-f20-cbx input:focus-visible+.pt-f20-box{outline:2px solid var(--primary);outline-offset:2px}
+/* admin header (F03 #admin, header only) */
+#admin .pt-adm-head.pt-f20-head{max-width:none;background:#fff;border-bottom:1px solid var(--border);padding:14px max(14px,calc((100% - 592px)/2)) 10px;margin-bottom:12px;box-sizing:border-box}
+.pt-f20-shield{width:36px;height:36px;border-radius:10px;background:#eef0fb;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pt-badge.pt-f20-mini{padding:1px 7px}
+.pt-f20-sw{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--border);background:#fff;color:var(--text);font:inherit;font-size:12.5px;font-weight:800;white-space:nowrap;cursor:pointer;flex-shrink:0;touch-action:manipulation}
+/* in-trip avatar button + switch sheet */
+.pt-f20-av{width:44px;height:44px;min-width:44px;border-radius:50%;border:2px solid var(--primary);background:#edf8f3;color:var(--primary);font:inherit;font-weight:900;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer;flex-shrink:0;touch-action:manipulation}
+/* v1 home (HOME_LAYOUT='v1'): the header row is space-between; keep ⚙️ next to the avatar at the left end (only when the avatar exists) */
+#home .homehero-top:has(>.pt-f20-av)>.menuic{margin-inline-start:auto;margin-inline-end:8px}
+#ptF20Sheet{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;justify-content:center}
+#ptF20Sheet[hidden]{display:none}
+#ptF20Sheet .pt-scrim{position:absolute;inset:0;background:#0f172a66}
+#ptF20Sheet .pt-sheet{position:relative;width:100%;max-width:560px;max-height:min(90vh,760px);overflow-y:auto;overflow-x:hidden;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -8px 28px #00000020;padding:10px 16px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px;color:var(--text);box-sizing:border-box}
+.pt-f20-who{display:flex;align-items:center;gap:10px}
+.pt-f20-who .pt-f20-main b{font-size:15px}
+.pt-f20-dot{width:40px;height:40px;border-radius:50%;background:#edf8f3;color:var(--primary);font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pt-f20-rows{display:flex;flex-direction:column}
+.pt-f20-row{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;text-align:right;background:none;border:0;border-top:1px solid #efeee8;padding:10px 2px;min-height:58px;color:var(--text);font:inherit}
+.pt-f20-rows>.pt-f20-row:first-child{border-top:0}
+button.pt-f20-row{cursor:pointer;touch-action:manipulation}
+.pt-f20-row .pt-f20-flag{font-size:22px;width:40px}
+.pt-f20-row .pt-f20-ic{width:40px;height:40px;border-radius:11px}
+.pt-f20-row .pt-f20-main b{font-size:14px}
+</style>
+<script>
+/* CHANGE 2026-10-13 F20-UI-01 (3.0.0-alpha.5): new script (no alpha.4.2 equivalent). One IIFE; exposes only the frozen,
+   read-only object window.__ptF20 {version, attach, check, route, adminHead} used by the gate (F20-GATE-01, F20-BOOT-01/02)
+   and the F03 block (F20-ADMIN-03 header hook, F20-MORE-01). Stores nothing except the device option D3
+   (`pt:_device:open_last_trip`) and, as before, `pt:_device:active_trip` (through the gate). Memberships, trip details and
+   the admin flag live in this closure only (memory, per page load). */
+(function(){
+'use strict';
+if(typeof SWITCH_FEATURE==='undefined'||SWITCH_FEATURE!=='on')return;          /* off: nothing at all (alpha.4.2) */
+if(typeof STORAGE_BACKEND!=='undefined'&&STORAGE_BACKEND!=='cloud')return;     /* local-only: no chooser / switcher */
+
+const F20_VERSION='3.0.0-alpha.5';
+const D3_KEY='open_last_trip';                        /* raw device key pt:_device:open_last_trip = "1" when on */
+const FLAGS_TIMEOUT_MS=10000;
+/* CHANGE 2026-10-13 F20-BOOT-03: what changed from the first F20 draft (no alpha.4.2 equivalent): the platform_admins check has
+   its own 2.5 s bound instead of the gate's 8 s PT_TIMEOUT_MS, so it never delays boot by more than ~2.5 s; a timeout counts
+   as "not super-admin" (spec §1.4: the admin check fails → normal boot). It still runs in parallel with fetchTrips. */
+const PT_ADMIN_CHECK_MS=2500;
+const ROLE_HE={manager:'מנהל',editor:'עורך',viewer:'צופה'};
+const TX={
+ offline:'אין חיבור. נסו שוב כשהרשת תחזור.',
+ loading:'טוענים…',
+ loadFail:'לא הצלחנו לטעון את הטיולים. נסו שוב.',
+ retry:'נסו שוב',
+ none:'אין עדיין טיולים',
+ d3:'לפתוח תמיד ישר לטיול האחרון',
+ avatar:'החשבון שלי ומעבר בין טיולים',
+ here:'כאן עכשיו',
+ current:'הטיול הנוכחי'
+};
+let api=null;   /* set by the gate: {client(),uid(),withTimeout,timeoutMs,activeTrips(),cacheTrip(),clearCached(),dev{get,set,del},enterTrip(),started(),tripId(),role(),phase()} */
+const st={
+ rows:null,                 /* active memberships, newest first (trip_id, display_name, role, joined_at) */
+ isAdmin:false,adminKnown:false,
+ pending:null,              /* number of pending invites (admin only), null = unknown / failed */
+ det:null,detState:'idle',detP:null,   /* trip details by id: {name,start,end,cc,members} */
+ flags:null,
+ mode:'',                   /* '' | 'choose' | 'admin' (standalone) | 'trip' */
+ adminBehind:false,         /* the current #admin history entry has the chooser entry behind it */
+ closing:false,seq:0,          /* bumped on every chooser/admin switch (stale timers check it) */
+ sheetPushed:false,afterBack:null,sheetRet:null
+};
+
+/* ?choose=1 (spec §1.2/§1.4): read once and removed from the address bar at once; ?trip= = a specific destination. */
+let chooseAsked=false,tripAsked=false;
+try{
+ const sp=new URLSearchParams(location.search);
+ tripAsked=sp.has('trip');
+ if(sp.has('choose')){chooseAsked=sp.get('choose')==='1';sp.delete('choose');const q=sp.toString();history.replaceState(history.state,'',location.pathname+(q?'?'+q:'')+location.hash)}
+}catch{}
+
+/* ---------------------------------------------------------------------------------------------------------
+   small helpers
+   --------------------------------------------------------------------------------------------------------- */
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
+function onReady(fn){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fn,{once:true});else fn()}
+function online(){return navigator.onLine!==false}
+function adminFeature(){return typeof ADMIN_FEATURE!=='undefined'&&ADMIN_FEATURE==='on'&&!!window.__ptF03Admin}
+function parts(iso){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||''));return m?{y:m[1],m:m[2],d:m[3]}:null}
+/* chooser: dd/mm–dd/mm/yyyy (both years when they differ) · sheet: dd/mm–dd/mm */
+function range(s,e,year){
+ const a=parts(s),b=parts(e);
+ if(a&&b){if(!year)return a.d+'/'+a.m+'–'+b.d+'/'+b.m;return a.y===b.y?a.d+'/'+a.m+'–'+b.d+'/'+b.m+'/'+b.y:a.d+'/'+a.m+'/'+a.y+'–'+b.d+'/'+b.m+'/'+b.y}
+ const x=a||b;return x?(x.d+'/'+x.m+(year?'/'+x.y:'')):'';
+}
+function membersTxt(n){n=Number(n)||0;return n===1?'חבר אחד':n+' חברים'}
+function firstLetter(s){const a=Array.from(String(s||'').trim());return a.length?a[0]:''}
+function flagCalc(c){c=String(c||'').toUpperCase();if(!/^[A-Z]{2}$/.test(c))return'';return String.fromCodePoint(0x1F1E6+c.charCodeAt(0)-65,0x1F1E6+c.charCodeAt(1)-65)}
+function toast(msg){
+ onReady(()=>{let el=$('ptToast');if(!el){el=document.createElement('div');el.id='ptToast';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.appendChild(el)}
+  el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2800)});
+}
+function fetchT(url,opts,ms){
+ const ac=typeof AbortController!=='undefined'?new AbortController():null;
+ const t=setTimeout(()=>{try{ac&&ac.abort()}catch{}},ms);
+ return fetch(url,Object.assign({},opts,ac?{signal:ac.signal}:{})).finally(()=>clearTimeout(t));
+}
+function appPath(){return location.pathname}
+/* the trip main script runs once per page load: switching trip / leaving a running trip = new URL + reload */
+function reloadTo(url){try{history.replaceState(null,'',url)}catch{}try{location.reload()}catch{}}
+const ICON={
+ shield:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3730a3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
+ swap:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>',
+ pin:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+ check:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#146c43" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="'+TX.current+'" style="flex-shrink:0"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+ person:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'
+};
+
+/* ---------------------------------------------------------------------------------------------------------
+   data (read-only, existing RLS): platform_admins own row, admin_trip_summary(), trips / trip_countries / trip_members
+   --------------------------------------------------------------------------------------------------------- */
+/* F20-BOOT-01: the admin check — started by the gate in parallel with fetchTrips; never rejects (failure = not admin, D4) */
+function check(){
+ if(!api||!adminFeature())return Promise.resolve(false);
+ const c=api.client(),uid=api.uid();
+ if(!c||!uid||!online())return Promise.resolve(false);
+ return Promise.resolve()
+  .then(()=>api.withTimeout(c.from('platform_admins').select('user_id').eq('user_id',uid).maybeSingle(),PT_ADMIN_CHECK_MS))   /* F20-BOOT-03 */
+  .then(r=>{const ok=!!(r&&!r.error&&r.data);st.isAdmin=ok;st.adminKnown=!(r&&r.error);return ok})
+  .catch(()=>{st.isAdmin=false;return false});
+}
+function loadFlags(){
+ if(st.flags)return Promise.resolve(st.flags);
+ return fetchT('countries.json',{cache:'no-cache'},FLAGS_TIMEOUT_MS).then(r=>{if(!r.ok)throw new Error('http '+r.status);return r.json()})
+  .then(a=>{const m={};(Array.isArray(a)?a:[]).forEach(x=>{if(x&&/^[A-Z]{2}$/.test(x.code)&&x.flag)m[x.code]=String(x.flag)});st.flags=m;return m})
+  .catch(()=>null);
+}
+function flagOf(code){if(!code)return'';const c=String(code).toUpperCase();return(st.flags&&st.flags[c])||flagCalc(c)}
+function loadDetails(force){
+ if(st.detState==='ready'&&!force)return Promise.resolve(true);
+ if(st.detP)return st.detP;
+ const rows=st.rows||[];const ids=rows.map(r=>r&&r.trip_id).filter(Boolean);
+ if(!ids.length){st.det={};st.detState='ready';return Promise.resolve(true)}
+ st.detState='loading';
+ st.detP=(async()=>{
+  const c=api&&api.client();if(!c||!online())throw new Error('offline');
+  const T=p=>api.withTimeout(p,api.timeoutMs);
+  const soft=p=>T(p).then(r=>r&&!r.error?r.data:null,()=>null);   /* optional parts: a failure only drops that part */
+  const[t,cc,mm]=await Promise.all([
+   T(c.from('trips').select('id,name,start_date,end_date').in('id',ids)),
+   soft(c.from('trip_countries').select('trip_id,country_code,sort').in('trip_id',ids)),
+   soft(c.from('trip_members').select('trip_id').in('trip_id',ids).eq('status','active')),
+   loadFlags()]);
+  if(!t||t.error||!Array.isArray(t.data))throw new Error('trips');
+  const det={};
+  t.data.forEach(x=>{if(x&&x.id)det[x.id]={name:x.name||'',start:x.start_date||null,end:x.end_date||null,cc:'',ccSort:Infinity,members:null}});
+  /* the trip's first country = lowest `sort` (sort 0) */
+  (Array.isArray(cc)?cc:[]).forEach(x=>{const d=x&&det[x.trip_id];if(!d)return;const s=isFinite(Number(x.sort))?Number(x.sort):1e9;if(!d.cc||s<d.ccSort){d.cc=String(x.country_code||'');d.ccSort=s}});
+  if(Array.isArray(mm)){Object.keys(det).forEach(k=>{det[k].members=0});mm.forEach(x=>{const d=x&&det[x.trip_id];if(d)d.members++})}
+  st.det=det;st.detState='ready';return true;
+ })().catch(()=>{st.detState=online()?'error':'offline';return false}).finally(()=>{st.detP=null});
+ return st.detP;
+}
+function loadPending(){
+ if(!st.isAdmin||!online()||!api)return Promise.resolve();
+ const c=api.client();if(!c)return Promise.resolve();
+ return api.withTimeout(c.rpc('admin_trip_summary'),api.timeoutMs).then(r=>{
+  if(!r||r.error||!Array.isArray(r.data)){st.pending=null;return}
+  st.pending=r.data.map(x=>{if(typeof x==='string'){try{return JSON.parse(x)}catch{return null}}return x})
+   .filter(x=>x&&x.kind==='invite'&&x.status==='pending').length;
+ },()=>{st.pending=null});
+}
+function rowFor(tid){return(st.rows||[]).find(r=>r&&r.trip_id===tid)||null}
+function tripName(tid){const d=st.det&&st.det[tid];return d&&d.name?d.name:'טיול'}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F20-BOOT-02: the gate's decision point (spec §1.4). Called by resolveAndStart once the memberships are known (online,
+   client + session exist). Returns true when F20 took over (chooser / standalone admin / direct D3 entry); false = the
+   gate continues exactly as alpha.4.2 (D4: everyone who is not a super-admin, or whose admin check failed).
+   --------------------------------------------------------------------------------------------------------- */
+async function route(rows,cached,chk){
+ st.rows=Array.isArray(rows)?rows.filter(r=>r&&r.trip_id).slice():[];
+ let admin=false;try{admin=!!(await chk)}catch{admin=false}
+ if(!api)return false;
+ const last=cached&&rowFor(cached.trip_id);
+ if(!admin){
+  /* D4 (boot as today: cached trip, else newest). With WIZARD_FEATURE='on' the gate's F04-BOOT-01 line already prefers the
+     cached trip (return false = unchanged path). With it 'off' that line takes the newest membership, which would undo a
+     switch made in the sheet; so here, and only then, F20 enters the cached trip itself. */
+  if(last&&!(typeof WIZARD_FEATURE!=='undefined'&&WIZARD_FEATURE==='on')){api.enterTrip(last.trip_id,last.role);return true}
+  return false;
+ }
+ if(tripAsked)return false;                                      /* opened for a specific trip: normal boot */
+ if(location.hash==='#admin'){st.adminBehind=false;showAdmin();return true}     /* §1.2 standalone admin */
+ const d3=api.dev.get(D3_KEY)==='1';
+ if(d3&&!chooseAsked&&last){api.enterTrip(last.trip_id,last.role);return true}   /* D3: straight to the cached trip */
+ if(!st.rows.length)api.clearCached();                          /* as the not-connected path does */
+ showChooser();
+ return true;
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F20-CHOOSE-01: start chooser #ptChoose (artboard F20_Choose) — no trip chrome (html.pt-choose hides every other body child)
+   --------------------------------------------------------------------------------------------------------- */
+function chooserRoot(){
+ let el=$('ptChoose');
+ if(!el){
+  el=document.createElement('main');el.id='ptChoose';el.setAttribute('dir','rtl');el.setAttribute('aria-labelledby','ptChooseTitle');
+  el.innerHTML='<div class="pt-f20-in"><div class="pt-f20-hero"><div class="pt-f20-brand">Lonely Planner</div><h1 id="ptChooseTitle"></h1></div>'+
+   '<div id="ptChooseAdminSec"></div>'+
+   '<div class="pt-f20-sec" id="ptChooseTripsTitle">הטיולים שלי</div><div class="pt-f20-list" id="ptChooseTrips" aria-labelledby="ptChooseTripsTitle" role="group"></div>'+
+   '<label class="pt-f20-chk" for="ptChooseD3"><span class="pt-f20-cbx"><input type="checkbox" id="ptChooseD3"><span class="pt-f20-box" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span>'+TX.d3+'</label></div>';
+  document.body.appendChild(el);
+  el.addEventListener('click',chooseClick);
+  $('ptChooseD3').addEventListener('change',e=>{if(!api)return;if(e.target.checked)api.dev.set(D3_KEY,'1');else api.dev.del(D3_KEY)});
+ }
+ return el;
+}
+function showChooser(){
+ st.mode='choose';st.seq++;if(api&&api.phase)api.phase('choose');
+ onReady(()=>{
+  if(st.mode!=='choose')return;
+  const de=document.documentElement;
+  de.classList.remove('pt-booting','pt-gate','pt-admin-open');de.classList.add('pt-choose');
+  const g=$('ptGate');if(g)g.remove();
+  const el=chooserRoot();el.hidden=false;el.scrollTop=0;
+  $('ptChooseD3').checked=!!api&&api.dev.get(D3_KEY)==='1';
+  renderChooser();
+  loadDetails().then(renderChooser);
+  if(st.isAdmin)loadPending().then(renderChooser);
+ });
+}
+function renderChooser(){
+ if(!$('ptChoose'))return;
+ const nm=st.rows&&st.rows[0]&&String(st.rows[0].display_name||'').trim();
+ $('ptChooseTitle').textContent=nm?'שלום '+nm+', לאן נכנסים?':'שלום, לאן נכנסים?';
+ const n=Number(st.pending)||0;
+ $('ptChooseAdminSec').innerHTML=st.isAdmin?
+  '<div class="pt-f20-sec" style="margin-bottom:10px">ניהול</div><button type="button" class="pt-f20-card pt-f20-adm" id="ptChooseAdmin"><span class="pt-f20-ic">'+ICON.shield+'</span>'+
+  '<span class="pt-f20-main"><b>ניהול מערכת</b><span class="pt-f20-sub">כל הקבוצות והזמנת מנהלים</span></span>'+
+  (n>0?'<span class="pt-badge wait" id="ptChoosePending">'+n+' ממתינות</span>':'')+'<span class="pt-f20-chev" aria-hidden="true">‹</span></button>':'';
+ const box=$('ptChooseTrips'),rows=st.rows||[];
+ let h='';
+ if(!rows.length)h='<p class="pt-f20-note" id="ptChooseNone">'+TX.none+'</p>';
+ else if(st.detState==='ready'){
+  const cached=api&&api.cached?api.cached():null;
+  h=rows.map(r=>{
+   const d=st.det&&st.det[r.trip_id]||{};
+   const sub=[ROLE_HE[r.role]||r.role||'',range(d.start,d.end,true),d.members!=null?membersTxt(d.members):''].filter(Boolean);
+   const fl=flagOf(d.cc);
+   const last=cached&&cached.trip_id===r.trip_id;
+   return'<button type="button" class="pt-f20-card" data-trip="'+esc(r.trip_id)+'"><span class="pt-f20-flag" aria-hidden="true">'+(fl?esc(fl):ICON.pin)+'</span>'+
+    '<span class="pt-f20-main"><b>'+esc(tripName(r.trip_id))+'</b><span class="pt-f20-sub">'+sub.map(esc).join(' · ')+'</span></span>'+
+    (last?'<span class="pt-badge last" id="ptChooseLastBadge">אחרון</span>':'')+'<span class="pt-f20-chev" aria-hidden="true">‹</span></button>';
+  }).join('');
+ }
+ else if(st.detState==='error'||st.detState==='offline')
+  h='<div class="pt-f20-note" id="ptChooseErr" role="alert">'+(st.detState==='offline'?TX.offline:TX.loadFail)+'<button type="button" class="pt-btn pt-out pt-sm" id="ptChooseRetry">'+TX.retry+'</button></div>';
+ else h='<p class="pt-f20-note" id="ptChooseLoading" aria-busy="true">'+TX.loading+'</p>';
+ const foc=document.activeElement&&box.contains(document.activeElement)?(document.activeElement.dataset.trip||document.activeElement.id):null;
+ box.innerHTML=h;
+ if(foc){const f=box.querySelector('[data-trip="'+foc+'"]')||$(foc);try{f&&f.focus({preventScroll:true})}catch{}}
+}
+function chooseClick(e){
+ const b=e.target.closest('button');if(!b||b.disabled)return;
+ if(b.id==='ptChooseAdmin'){openAdminFromChooser();return}
+ if(b.id==='ptChooseRetry'){loadDetails(true).then(renderChooser);renderChooser();return}
+ if(b.dataset.trip){enterFromChooser(b.dataset.trip)}
+}
+function leaveChooser(){
+ document.documentElement.classList.remove('pt-choose');
+ const el=$('ptChoose');if(el)el.remove();
+}
+function enterFromChooser(tid){
+ const r=rowFor(tid);if(!r||!api)return;
+ st.mode='trip';leaveChooser();
+ api.enterTrip(r.trip_id,r.role);   /* writeCached → setTrip → installStorage → start (no reload: no trip has started yet) */
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F20-ADMIN-02: the F03 admin screen without a trip (window.__ptF03Admin, F20-ADMIN-01 in the F03 block)
+   --------------------------------------------------------------------------------------------------------- */
+function showAdmin(){
+ st.mode='admin';st.seq++;if(api&&api.phase)api.phase('admin');
+ onReady(()=>{
+  if(st.mode!=='admin')return;
+  const de=document.documentElement;
+  de.classList.remove('pt-choose','pt-booting','pt-gate');
+  const g=$('ptGate');if(g)g.remove();
+  const ch=$('ptChoose');if(ch)ch.hidden=true;
+  if(!window.__ptF03Admin||!window.__ptF03Admin.open()){st.mode='';showChooser()}
+ });
+}
+function openAdminFromChooser(){
+ try{history.pushState({ptF20Admin:1},'',location.pathname+location.search+'#admin');st.adminBehind=true}catch{st.adminBehind=false}
+ showAdmin();
+}
+function closeAdminSolo(){
+ st.closing=true;try{window.__ptF03Admin&&window.__ptF03Admin.close()}catch{}st.closing=false;
+}
+/* "הטיולים שלי" in the admin header (spec §1.2) */
+function backFromAdmin(){
+ if(!api)return;
+ if(api.started()){reloadTo(appPath()+'?choose=1');return}          /* a trip had started: reload to the chooser, D3 ignored */
+ if(st.adminBehind&&location.hash==='#admin'){
+  const seq=st.seq;
+  try{history.back()}catch{}
+  setTimeout(()=>{if(st.mode==='admin'&&st.seq===seq)toChooser()},700);   /* safety net if no hashchange arrives */
+  return;
+ }
+ toChooser();
+}
+function toChooser(){
+ closeAdminSolo();
+ if(location.hash==='#admin'){try{history.replaceState(null,'',location.pathname+location.search)}catch{}}
+ st.adminBehind=false;
+ showChooser();
+}
+/* F20-ADMIN-03: called by renderAdmin (F03) after each render — the back control becomes "הטיולים שלי" */
+function adminHead(el){
+ const h=el&&el.querySelector('.pt-adm-head');if(!h)return;
+ h.classList.add('pt-f20-head');
+ const t=h.querySelector('h1');   /* F03's own title element (#ptAdminTitle) is kept and moved, not re-created */
+ h.innerHTML='<span class="pt-f20-shield">'+ICON.shield+'</span><div class="pt-f20-ht" style="flex-grow:1;min-width:0"></div>'+
+  '<button type="button" class="pt-f20-sw" id="ptAdminSwitch">'+ICON.swap+'הטיולים שלי</button>';
+ const box=h.querySelector('.pt-f20-ht');if(t)box.appendChild(t);
+ box.insertAdjacentHTML('beforeend','<div class="pt-sub">Lonely Planner · <span class="pt-badge adm pt-f20-mini">סופר-אדמין</span></div>');
+ const b=$('ptAdminSwitch');if(b)b.onclick=backFromAdmin;
+}
+window.addEventListener('hashchange',()=>{
+ if(!api||api.started())return;                                   /* inside a trip F03 handles #admin as before */
+ if(location.hash==='#admin'){if(st.mode==='choose'&&st.isAdmin){st.adminBehind=true;showAdmin()}}
+ else if(st.mode==='admin'){st.adminBehind=false;closeAdminSolo();showChooser()}   /* browser back from admin → chooser */
+});
+/* the F03 screen may close itself (e.g. admin_trip_summary answers not_platform_admin): never leave a blank page */
+try{
+ new MutationObserver(()=>{
+  if(st.mode==='admin'&&!st.closing&&window.__ptF03Admin&&!window.__ptF03Admin.isOpen()&&!(api&&api.started())){
+   st.isAdmin=window.__ptF03Admin.isAdmin();st.adminBehind=false;
+   if(location.hash==='#admin'){try{history.replaceState(null,'',location.pathname+location.search)}catch{}}
+   showChooser();
+  }
+ }).observe(document.documentElement,{attributes:true,attributeFilter:['class']});
+}catch{}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F20-SWITCH-01: in-trip avatar button + bottom sheet (artboard F20_SwitchSheet). Visible (D5) to the super-admin, and to
+   anyone with ≥2 active trips; a user with one trip and no admin sees no button.
+   --------------------------------------------------------------------------------------------------------- */
+function myName(){const r=api&&rowFor(api.tripId());return r&&String(r.display_name||'').trim()||''}
+function switchVisible(){return!!st.rows&&(st.isAdmin||st.rows.length>=2)}
+function avatarHtml(id){
+ const l=firstLetter(myName());
+ return'<button type="button" class="pt-f20-av" id="'+id+'" data-pt-switch aria-haspopup="dialog" aria-label="'+TX.avatar+'">'+(l?'<span aria-hidden="true">'+esc(l)+'</span>':ICON.person)+'</button>';
+}
+function injectAvatar(){
+ const show=switchVisible();
+ [['ptAvatarBtn',()=>{const h=document.querySelector('#homeV2 .hv2-head');return h&&h.lastElementChild}],
+  ['ptAvatarBtnV1',()=>document.querySelector('#home .homehero-top')]].forEach(([id,host])=>{
+  const old=$(id);
+  if(!show){if(old)old.remove();return}
+  const h=host();if(!h)return;
+  if(old)old.remove();
+  h.insertAdjacentHTML('beforeend',avatarHtml(id));
+  $(id).addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openSwitch()});
+ });
+}
+function sheetLayer(){
+ let l=$('ptF20Sheet');
+ if(!l){
+  l=document.createElement('div');l.id='ptF20Sheet';l.hidden=true;l.setAttribute('dir','rtl');
+  l.innerHTML='<div class="pt-scrim" data-f20-close></div><div class="pt-sheet" role="dialog" aria-modal="true" aria-label="מעבר בין טיולים" id="ptF20SheetBox" tabindex="-1"></div>';
+  document.body.appendChild(l);
+  l.addEventListener('click',sheetClick);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!l.hidden)closeSwitch()});
+ }
+ return l;
+}
+function openSwitch(){
+ const l=sheetLayer(),s=$('ptF20SheetBox');
+ if(!l.hidden)return;
+ st.sheetRet=document.activeElement;
+ const nm=myName(),letter=firstLetter(nm);
+ s.innerHTML='<div class="pt-handle" aria-hidden="true"></div>'+
+  '<div class="pt-f20-who"><span class="pt-f20-dot" aria-hidden="true">'+(letter?esc(letter):ICON.person)+'</span><div class="pt-f20-main"><b id="ptSwitchName">'+esc(nm||'החשבון שלי')+'</b><span class="pt-f20-sub pt-ltr" id="ptSwitchEmail" hidden></span></div>'+
+  '<button type="button" class="pt-iconbtn pt-bare" data-f20-close aria-label="סגירה">×</button></div>'+
+  '<div class="pt-f20-sec" id="ptSwitchTripsTitle">הטיולים שלי</div><div class="pt-f20-rows" id="ptSwitchTrips" role="group" aria-labelledby="ptSwitchTripsTitle"></div>'+
+  (st.isAdmin?'<div class="pt-f20-sec">ניהול</div><div class="pt-f20-rows"><button type="button" class="pt-f20-row" id="ptSwitchAdmin"><span class="pt-f20-ic">'+ICON.shield.replace(/22/g,'20')+'</span>'+
+   '<span class="pt-f20-main"><b>ניהול מערכת</b><span class="pt-f20-sub">יציאה מהטיול למסך הניהול</span></span><span class="pt-badge adm">סופר-אדמין</span></button></div>':'');
+ l.hidden=false;s.scrollTop=0;
+ try{history.pushState(Object.assign({},history.state||{},{ptF20Sheet:1}),'');st.sheetPushed=true}catch{st.sheetPushed=false}
+ try{s.focus({preventScroll:true})}catch{}
+ renderSwitchTrips();
+ if(st.detState!=='ready')loadDetails().then(renderSwitchTrips);
+ fillEmail();
+}
+async function fillEmail(){
+ try{
+  const c=api&&api.client();if(!c)return;
+  const g=await api.withTimeout(c.auth.getSession(),api.timeoutMs);const u=g&&g.data&&g.data.session&&g.data.session.user;
+  const e=u&&u.email?String(u.email):'';const el=$('ptSwitchEmail');
+  if(el&&e){el.textContent=e;el.hidden=false}
+ }catch{}
+}
+function renderSwitchTrips(){
+ const box=$('ptSwitchTrips');if(!box)return;
+ const cur=api&&api.tripId(),rows=st.rows||[];
+ let h;
+ if(st.detState==='ready'){
+  h=rows.map(r=>{
+   const d=st.det&&st.det[r.trip_id]||{},fl=flagOf(d.cc),role=ROLE_HE[r.role]||r.role||'';
+   const flag='<span class="pt-f20-flag" aria-hidden="true">'+(fl?esc(fl):ICON.pin)+'</span>';
+   if(r.trip_id===cur)return'<div class="pt-f20-row" data-trip-current="'+esc(r.trip_id)+'" aria-current="true">'+flag+'<span class="pt-f20-main"><b>'+esc(tripName(r.trip_id))+'</b><span class="pt-f20-sub">'+esc([role,TX.here].filter(Boolean).join(' · '))+'</span></span>'+ICON.check+'</div>';
+   return'<button type="button" class="pt-f20-row" data-trip="'+esc(r.trip_id)+'">'+flag+'<span class="pt-f20-main"><b>'+esc(tripName(r.trip_id))+'</b><span class="pt-f20-sub">'+esc([role,range(d.start,d.end,false)].filter(Boolean).join(' · '))+'</span></span><span class="pt-f20-chev" aria-hidden="true">‹</span></button>';
+  }).join('');
+ }
+ else if(st.detState==='error'||st.detState==='offline')
+  h='<div class="pt-f20-note" id="ptSwitchErr" role="alert">'+(st.detState==='offline'?TX.offline:TX.loadFail)+'<button type="button" class="pt-btn pt-out pt-sm" id="ptSwitchRetry">'+TX.retry+'</button></div>';
+ else h='<p class="pt-f20-note" id="ptSwitchLoading" aria-busy="true">'+TX.loading+'</p>';
+ box.innerHTML=h;
+}
+function sheetClick(e){
+ if(e.target.closest('[data-f20-close]')){closeSwitch();return}
+ const b=e.target.closest('button');if(!b||b.disabled)return;
+ if(b.id==='ptSwitchRetry'){loadDetails(true).then(renderSwitchTrips);renderSwitchTrips();return}
+ if(b.id==='ptSwitchAdmin'){
+  if(!online()){toast(TX.offline);return}
+  leave(appPath()+'#admin');return;                                  /* the trip's offline queue stays in its namespace */
+ }
+ if(b.dataset.trip){
+  if(!online()){toast(TX.offline);return}
+  const r=rowFor(b.dataset.trip);if(!r)return;
+  api.cacheTrip(r.trip_id,r.role);
+  leave(appPath());
+ }
+}
+/* leave the trip: undo the sheet's history entry first (so "back" after the reload does not land on a dead entry) */
+function leave(url){
+ if(st.sheetPushed&&history.state&&history.state.ptF20Sheet){
+  st.afterBack=()=>reloadTo(url);
+  try{history.back()}catch{reloadTo(url);return}
+  setTimeout(()=>{if(st.afterBack){const f=st.afterBack;st.afterBack=null;f()}},500);
+  return;
+ }
+ reloadTo(url);
+}
+function closeSwitch(viaHistory){
+ const l=$('ptF20Sheet');if(!l||l.hidden)return;
+ l.hidden=true;$('ptF20SheetBox').innerHTML='';
+ if(!viaHistory&&st.sheetPushed&&history.state&&history.state.ptF20Sheet){st.sheetPushed=false;try{history.back()}catch{}}
+ st.sheetPushed=false;
+ const r=st.sheetRet;st.sheetRet=null;try{r&&r.isConnected&&r.focus({preventScroll:true})}catch{}
+}
+window.addEventListener('popstate',()=>{
+ if(st.afterBack){const f=st.afterBack;st.afterBack=null;f();return}
+ const l=$('ptF20Sheet');if(l&&!l.hidden){st.sheetPushed=false;closeSwitch(true)}   /* browser back gesture closes the sheet */
+});
+
+/* ---------------------------------------------------------------------------------------------------------
+   start hook: runs once the gate has started the trip main script (html loses pt-booting and __PT.started is true)
+   --------------------------------------------------------------------------------------------------------- */
+let started=false,rowsTry=false;
+async function ensureRows(){
+ if(st.rows&&(st.adminKnown||!adminFeature()||st.isAdmin))return;
+ if(rowsTry||!api||!online()||!api.client()||!api.uid())return;
+ rowsTry=true;
+ try{
+  const[rows]=await Promise.all([st.rows?Promise.resolve(st.rows):api.activeTrips(),check()]);
+  if(Array.isArray(rows))st.rows=rows.filter(r=>r&&r.trip_id);
+ }catch{}
+ rowsTry=false;
+}
+function onStarted(){
+ if(started||!api||!window.__PT||!window.__PT.started)return;
+ started=true;st.mode='trip';
+ leaveChooser();
+ setTimeout(async()=>{await ensureRows();injectAvatar()},0);
+ /* offline start (cached trip): the list needs the network — try again when it returns */
+ window.addEventListener('online',()=>{setTimeout(async()=>{if(!switchVisible()){await ensureRows();injectAvatar()}},1500)});
+}
+try{
+ new MutationObserver(()=>{if(!started&&window.__PT&&window.__PT.started)setTimeout(onStarted,0)})
+  .observe(document.documentElement,{attributes:true,attributeFilter:['class']});
+}catch{}
+
+function attach(a){if(!api&&a&&typeof a==='object')api=a}
+try{Object.defineProperty(window,'__ptF20',{value:Object.freeze({version:F20_VERSION,attach,check,route,adminHead}),writable:false,configurable:false})}catch{}
+})();
+</script>
 <!-- CHANGE 2026-10-04 F02-GATE-01: the v2.15.2 GM-08 block (static supabase-js <script> tag + the inline IIFE that
      created a client for the old live project and defined window.storage on its key-value table) is REMOVED and
      replaced by this block. This replacement is unavoidable: that IIFE held the old project's URL/key, which must
@@ -1783,7 +2349,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.4.2'; /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.5'; /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -1957,8 +2523,15 @@ async function boot(){
 }
 async function resolveAndStart(cached){
  let rows;
+ /* CHANGE 2026-10-13 F20-BOOT-01: new line (no alpha.4.2 equivalent): with SWITCH_FEATURE='on' the super-admin check
+    (own platform_admins row, existing timeout) starts here, in parallel with fetchTrips; it never rejects. 'off': null. */
+ const f20=window.__ptF20?window.__ptF20.check():null;
  try{rows=await fetchTrips(state.uid)}
  catch(e){console.warn('[pt] trip lookup failed',e);if(cached){startCached(cached);return}showCard();return}
+ /* CHANGE 2026-10-13 F20-BOOT-02: new line (no alpha.4.2 equivalent): with SWITCH_FEATURE='on' F20 decides first (spec
+    §1.4): a super-admin gets the start chooser / the standalone admin screen (#admin) / the cached trip (D3); everyone else
+    (and a failed check) continues below exactly as before. 'off': skipped. */
+ if(f20&&await window.__ptF20.route(rows,cached,f20))return;
  if(!rows.length){rDel(PT_ACTIVE_TRIP);showCard();return}   /* unlinked / pending / removed */
  /* CHANGE 2026-10-12 F04-BOOT-01 (D5): what changed from 3.0.0-alpha.3: with WIZARD_FEATURE='on' the cached trip (the last
     one selected or created on this device) wins when it is still among the active memberships; otherwise, and always with
@@ -2053,6 +2626,25 @@ if(window.__ptF04&&STORAGE_BACKEND==='cloud'){
   firstSteps:{get:t=>{try{return JSON.parse(rGet('pt:'+t+':firststeps')||'null')}catch{return null}},set:(t,v)=>rSet('pt:'+t+':firststeps',JSON.stringify(v))},
   enterTrip:(tripId,role)=>{writeCached({trip_id:String(tripId),role:role||null});if(state.started){location.reload();return}setTrip(tripId,role);installStorage();start()},
   started:()=>state.started,tripId:()=>state.tripId,role:()=>state.role
+ });
+}
+
+/* CHANGE 2026-10-13 F20-GATE-01: new lines (no alpha.4.2 equivalent), additive — no existing statement changed. Placed before
+   the F03 bridge (which may leave this IIFE for the #invite= landing). Hands the F20 block (head, window.__ptF20; absent when
+   SWITCH_FEATURE='off' or local-only) read-only access to this gate: its client, uid and timeout helper, the active
+   memberships, the device-level cached trip (read / write / clear) and raw `pt:_device:` keys (D3 option), the gate state,
+   and enterTrip() = the normal path writeCached → setTrip → installStorage → start() (reload when a trip already runs). */
+if(window.__ptF20&&STORAGE_BACKEND==='cloud'){
+ window.__ptF20.attach({
+  withTimeout,timeoutMs:PT_TIMEOUT_MS,client:()=>sb,uid:()=>state.uid,
+  activeTrips:async()=>(sb&&state.uid)?fetchTrips(state.uid):[],
+  cached:()=>readCached(),
+  cacheTrip:(tripId,role)=>writeCached({trip_id:String(tripId),role:role||null}),
+  clearCached:()=>rDel(PT_ACTIVE_TRIP),
+  dev:{get:k=>rGet(PT_DEVICE+k),set:(k,v)=>rSet(PT_DEVICE+k,v),del:k=>rDel(PT_DEVICE+k)},
+  enterTrip:(tripId,role)=>{writeCached({trip_id:String(tripId),role:role||null});if(state.started){location.reload();return}setTrip(tripId,role);installStorage();start()},
+  started:()=>state.started,tripId:()=>state.tripId,role:()=>state.role,
+  phase:p=>{if(!state.started)state.phase=String(p)}
  });
 }
 
@@ -6355,7 +6947,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.4.2'; /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.5'; /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;
