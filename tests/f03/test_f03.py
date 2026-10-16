@@ -1,10 +1,19 @@
-"""Plan_Travel F03 QA · Playwright black-box suite · version 1.0.2
+"""Plan_Travel F03 QA · Playwright black-box suite · version 1.0.3
 CHANGE 2026-10-05 F03-QA: first version (no previous version).
 CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.0.1. test_ac16_off_more_panel_identical_to_alpha2 now ignores the F04 row
   #ptJoinRow ("קישור הצטרפות לקבוצה") when the served app has WIZARD_FEATURE='on' (architect's decision, F04 dev notes §7:
   the row is spec'd F04 behaviour, independent of ADMIN_FEATURE). Nothing else changed.
 CHANGE 2026-10-12 F04-QA-05: 1.0.1 → 1.0.2: F04 alpha.4.2 (F04 spec §8/§8.1): PROD_APP_URL → /Lonely_Planner/app/ and the
   fake invite-manager email subject → "הוזמנת לנהל טיול ב-Lonely Planner". The local app path comes from f02.APP_PATH.
+CHANGE 2026-10-13 F20-QA-02: 1.0.2 → 1.0.3, follows F20 (app 3.0.0-alpha.5, docs/F20_spec.md), only where F20 changes
+  behaviour on purpose; with SWITCH_FEATURE='off' every path below is the 1.0.2 path unchanged:
+  - boot(): a super-admin now lands on the start chooser (#ptChoose, F20 §1.1); boot() taps the trip's row there to enter
+    it (enter=False stops on the chooser). Detected from the page, so it works in both flag states.
+  - open_admin(): with the F20 switcher present (button[data-pt-switch]) the admin screen is reached through the avatar
+    sheet → "ניהול מערכת" (F20 §1.3, reload into the standalone admin) instead of "עוד" (F20 §1.5 removes that row).
+  - test_ac02_admin_entry_for_admin / test_ac02_admin_rpc_refused_shows_no_list / test_ac14_offline_admin: SWITCH-on branch
+    with the same intent through the new entry points (chooser / sheet; header button "הטיולים שלי" instead of the back
+    control; "עוד" must NOT show the row, F20 AC9).
 
 Black-box acceptance tests for docs/F03_spec.md §5 (super-admin invites a manager), written from the spec and the
 approved mockup artboards F03_* only. The F03 implementation (app/index.html changes, supabase/functions/,
@@ -770,14 +779,36 @@ def layout_problems(page, scope=None, label=""):
 # =====================================================================================================
 # Scenario helpers
 # =====================================================================================================
-def boot(env, name="A", role="manager", admin=False, email=None, display="אור", trip=None, path=APP_PATH):
+# CHANGE 2026-10-13 F20-QA-02: F20 start chooser (super-admin) — detected from the page, not from the flag
+CHOOSER_JS = """(t)=>{const c=document.getElementById('ptChoose');if(c&&c.getBoundingClientRect().height>0)return 'choose';
+ const h=document.getElementById('homeV2');if(h&&h.classList.contains('active')&&getComputedStyle(h).display!=='none')return 'app';
+ if(document.body&&document.body.innerText.includes(t))return 'nc';return false}"""
+
+
+def switch_ui(page):
+    """CHANGE 2026-10-13 F20-QA-02: True when the F20 in-trip switcher (avatar) is present (SWITCH_FEATURE='on')."""
+    return page.evaluate("()=>!!document.querySelector('button[data-pt-switch]')")
+
+
+def boot(env, name="A", role="manager", admin=False, email=None, display="אור", trip=None, path=APP_PATH, enter=True):
     be = env.backend
     tid = trip or be.add_trip_full("ויאטנם 2026", "2026-09-15", "2026-10-06", countries=["VN"])
     be.set_kv(tid, "tripname", "טיול QA")
     be.auto_link = {"trip_id": tid, "role": role, "status": "active", "display_name": display}
     be.auto_admin, be.auto_email = admin, email
     dev = env.new_device(name)
-    state = dev.goto(path)
+    # CHANGE 2026-10-13 F20-QA-02: was `state = dev.goto(path)` (waits for home only). A super-admin with SWITCH_FEATURE='on'
+    # lands on the F20 chooser: tap this trip's row (F20 §1.1), or stop there when enter=False.
+    dev.goto(path, ready=False)
+    state = dev.page.wait_for_function(CHOOSER_JS, arg=f02.NC_TITLE, timeout=30000).json_value()
+    if state == "choose":
+        if not enter:
+            dev.page.wait_for_timeout(800)
+            return tid, dev
+        row = dev.page.locator('#ptChooseTrips [data-trip="%s"]' % tid)
+        row.wait_for(timeout=10000)
+        row.click()
+    state = f02.wait_ready(dev.page)
     assert state == "app", "app did not start for a linked %s (state=%s)" % (role, state)
     f02.ensure_user(dev.page)
     return tid, dev
@@ -796,12 +827,31 @@ def open_more(page):
 
 
 def open_admin(page, wait_list=True):
-    open_more(page)
-    assert wait_text(page, TXT["admin_row"]), "row %r not in 'עוד' for a super-admin" % TXT["admin_row"]
-    click_text(page, TXT["admin_row"])
+    if switch_ui(page):  # CHANGE 2026-10-13 F20-QA-02: F20 §1.3/§1.5 — the entry is the avatar sheet, not "עוד"
+        open_switch_admin(page)
+    else:
+        open_more(page)
+        assert wait_text(page, TXT["admin_row"]), "row %r not in 'עוד' for a super-admin" % TXT["admin_row"]
+        click_text(page, TXT["admin_row"])
     assert wait_text(page, TXT["invite_btn"]), "admin screen did not open (no %r)" % TXT["invite_btn"]
     if wait_list:
         page.wait_for_timeout(800)
+
+
+def open_switch_sheet(page):
+    """CHANGE 2026-10-13 F20-QA-02: new helper — open the F20 avatar sheet from the home screen."""
+    f02.tab(page, "home")
+    page.locator("button[data-pt-switch]").filter(visible=True).first.click()
+    page.locator("#ptF20SheetBox").wait_for(state="visible", timeout=8000)
+    page.wait_for_timeout(500)
+
+
+def open_switch_admin(page):
+    """CHANGE 2026-10-13 F20-QA-02: new helper — avatar sheet → "ניהול מערכת" → (reload) standalone admin screen."""
+    open_switch_sheet(page)
+    page.locator("#ptSwitchAdmin").click()
+    page.wait_for_timeout(800)
+    page.wait_for_load_state("domcontentloaded")
 
 
 def admin_dataset(be, admin_trip=True):
@@ -918,6 +968,27 @@ def test_ac02_admin_entry_for_admin(env):
     'עוד'. isPlatformAdmin comes from platform_admins (own row) and is not persisted."""
     d, dev = boot_admin_with_data(env)
     page, be = dev.page, env.backend
+    if switch_ui(page):  # CHANGE 2026-10-13 F20-QA-02: SWITCH on — entry via the avatar sheet; "עוד" has no row (F20 AC9)
+        open_more(page)
+        assert not visible(page, TXT["admin_row"]), "F20: row %r still in 'עוד'" % TXT["admin_row"]
+        open_switch_sheet(page)
+        assert visible(page, TXT["admin_row"], "#ptF20SheetBox"), "row %r missing in the switcher sheet" % TXT["admin_row"]
+        assert visible(page, TXT["admin_badge"], "#ptF20SheetBox"), "badge %r missing" % TXT["admin_badge"]
+        assert be.queries("platform_admins"), "platform_admins was never queried"
+        raw = json.dumps(dev.ls(), ensure_ascii=False)
+        assert "platform_admin" not in raw.lower() and "isplatformadmin" not in raw.lower(), "admin flag persisted in localStorage"
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(400)
+        open_admin(page)
+        assert any(c["fn"] == "admin_trip_summary" for c in be.rpc_calls), "list not loaded with rpc('admin_trip_summary')"
+        sw = page.locator("#ptAdminSwitch")
+        assert sw.count() and sw.is_visible(), "F20: no 'הטיולים שלי' control on the admin header"
+        sw.click()
+        page.wait_for_timeout(1500)
+        page.wait_for_load_state("domcontentloaded")
+        assert not visible(page, TXT["invite_btn"]), "'הטיולים שלי' did not leave the admin screen"
+        page.wait_for_selector("#ptChoose", state="visible", timeout=10000)
+        return
     open_more(page)
     assert visible(page, TXT["admin_row"]), "row %r missing for a super-admin" % TXT["admin_row"]
     assert visible(page, TXT["admin_badge"]), "badge %r missing" % TXT["admin_badge"]
@@ -936,13 +1007,20 @@ def test_ac02_admin_entry_for_admin(env):
 
 def test_ac02_admin_rpc_refused_shows_no_list(env):
     """C1/C2 (client reaction): if admin_trip_summary raises not_platform_admin (row removed after boot), no list renders."""
-    d, dev = boot_admin_with_data(env)
-    page, be = dev.page, env.backend
-    open_more(page)
-    be.rows["platform_admins"].clear()
-    if not visible(page, TXT["admin_row"]):
-        pytest.fail("row %r missing for a super-admin" % TXT["admin_row"])
-    click_text(page, TXT["admin_row"])
+    be = env.backend
+    d = admin_dataset(be)
+    tid, dev = boot(env, "A", role="manager", admin=True, email="or@example.com", trip=d["T1"], enter=False)
+    page = dev.page
+    if page.locator("#ptChooseAdmin").count():  # CHANGE 2026-10-13 F20-QA-02: SWITCH on — the entry after boot is the chooser row
+        be.rows["platform_admins"].clear()
+        page.locator("#ptChooseAdmin").click()
+    else:
+        f02.ensure_user(page)
+        open_more(page)
+        be.rows["platform_admins"].clear()
+        if not visible(page, TXT["admin_row"]):
+            pytest.fail("row %r missing for a super-admin" % TXT["admin_row"])
+        click_text(page, TXT["admin_row"])
     page.wait_for_timeout(1500)
     leaked = [k for k in ("T2", "T3", "P1") if visible(page, NAMES[k])]
     assert not leaked, "list rendered although the RPC refused: %r" % leaked
@@ -1499,13 +1577,22 @@ def test_ac14_card_contents(env):
 
 def test_ac14_offline_admin(env):
     """§1.2: offline → 'אין חיבור — הרשימה תתעדכן כשהרשת תחזור' and actions disabled (no function call)."""
-    d, dev = boot_admin_with_data(env)
-    page, be = dev.page, env.backend
-    open_more(page)
-    dev.offline(True)
-    page.wait_for_timeout(300)
-    assert visible(page, TXT["admin_row"]), "row %r missing offline (isPlatformAdmin is kept in memory)" % TXT["admin_row"]
-    click_text(page, TXT["admin_row"])
+    be = env.backend
+    d = admin_dataset(be)
+    tid, dev = boot(env, "A", role="manager", admin=True, email="or@example.com", trip=d["T1"], enter=False)
+    page = dev.page
+    if page.locator("#ptChooseAdmin").count():  # CHANGE 2026-10-13 F20-QA-02: SWITCH on — admin row on the chooser
+        dev.offline(True)
+        page.wait_for_timeout(300)
+        assert page.locator("#ptChooseAdmin").is_visible(), "chooser admin row missing offline"
+        page.locator("#ptChooseAdmin").click()
+    else:
+        f02.ensure_user(page)
+        open_more(page)
+        dev.offline(True)
+        page.wait_for_timeout(300)
+        assert visible(page, TXT["admin_row"]), "row %r missing offline (isPlatformAdmin is kept in memory)" % TXT["admin_row"]
+        click_text(page, TXT["admin_row"])
     assert wait_text(page, TXT["offline"]), "offline message %r not shown" % TXT["offline"]
     n = len(be.fn_calls)
     if visible(page, TXT["invite_btn"]):

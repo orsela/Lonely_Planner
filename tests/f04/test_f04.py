@@ -1,4 +1,4 @@
-"""Plan_Travel F04 QA · Playwright black-box suite · version 1.3.0
+"""Plan_Travel F04 QA · Playwright black-box suite · version 1.4.0
 CHANGE 2026-10-12 F04-QA: first version (no previous version).
 CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.1.0, follows the two spec changes approved by Or after the first run:
   - F04-DB-02: the fake create-trip (F04Backend.create_trip_from_invite) now also writes trip_kv `tripname` = the trimmed
@@ -22,6 +22,12 @@ CHANGE 2026-10-12 F04-QA-05: 1.2.0 → 1.3.0, follows alpha.4.2 (spec §8 app na
     puts it), test_n02_static_names[…] (manifest name/short_name, apple-mobile-web-app-title, /invite/ + /join/ <title>),
     test_n03_whatsapp_text_name_and_url[done|card|sheet], test_n04_old_address_redirects[…] (ops/old_address_redirect
     served at /Plan_Travel/, https://orsela.github.io/Lonely_Planner/** intercepted locally).
+CHANGE 2026-10-13 F20-QA-02: 1.3.0 → 1.4.0, follows F20 (app 3.0.0-alpha.5, docs/F20_spec.md) only where F20 changes
+  behaviour on purpose: VERSION pin → 3.0.0-alpha.5; test_c19_boot_prefers_cached_trip_only_when_on[off] expects the CACHED
+  trip when the served app has SWITCH_FEATURE='on' (architect decision 2026-10-13, F20 dev notes §6.6: with
+  WIZARD_FEATURE='off' + SWITCH_FEATURE='on' a non-admin boots the still-active cached trip so a switch sticks); with
+  SWITCH_FEATURE='off' it still expects alpha.3 (the newest membership). The admin path of test_n01[admin] goes through
+  the F03 harness helpers (F03 suite 1.0.3: chooser / switcher entry).
 
 Black-box acceptance tests for docs/F04_spec.md §5 (criteria 1–16, 19, 20 from the browser side, plus the static part
 of 21), written from the spec and the approved mockup artboards F04_* only. NOT read: app/index.html, invite/index.html,
@@ -88,7 +94,7 @@ PT_URL, PT_KEY = f02.PT_URL, f02.PT_KEY
 IM_URL = PT_URL + "/functions/v1/invite-manager"
 CT_URL = PT_URL + "/functions/v1/create-trip"
 JOIN_BASE = "https://orsela.github.io/Lonely_Planner/join/"  # CHANGE 2026-10-12 F04-QA-05: was /Plan_Travel/join/
-VERSION = "3.0.0-alpha.4.2"  # CHANGE 2026-10-12 F04-QA-05: was 3.0.0-alpha.4.1 (F04-QA-04: was 3.0.0-alpha.4)
+VERSION = "3.0.0-alpha.5"  # CHANGE 2026-10-13 F20-QA-02: was 3.0.0-alpha.4.2 (F04-QA-05: was 3.0.0-alpha.4.1; F04-QA-04: was 3.0.0-alpha.4)
 APP_NAME = "Lonely Planner"  # CHANGE 2026-10-12 F04-QA-05: spec §8
 OLD_NAMES = ["Plan_Travel", "Vietnam Travel Planner"]  # CHANGE 2026-10-12 F04-QA-05: never rendered as the app name
 ALPHA3_REF = os.environ.get("ALPHA3_REF", "e591edc")
@@ -2788,9 +2794,12 @@ def test_c19_off_no_first_steps_no_join_row(env):
 @pytest.mark.parametrize("state", ["on", "off"])
 def test_c19_boot_prefers_cached_trip_only_when_on(env, state):
     """D5 / §4: two active memberships, the cached pt:_device:active_trip is the OLDER one. 'on' → the cached trip;
-    'off' → alpha.3: the newest joined_at."""
+    'off' → alpha.3: the newest joined_at — unless the served app has SWITCH_FEATURE='on' (F20, architect decision
+    2026-10-13): then 'off' also boots the cached trip."""
     if state == "off":
         serve_wizard_off(env)
+    # CHANGE 2026-10-13 F20-QA-02: F20 dev notes §6.6 (DECIDED) — WIZARD off + SWITCH on boots the cached trip as well
+    switch_on = bool(re.search(r"""const\s+SWITCH_FEATURE\s*=\s*['"]on['"]""", app_html()))
     be = env.backend
     a = be.add_trip_full("טיול א", "2026-09-15", "2026-10-06")
     b = be.add_trip_full("טיול ב", "2026-11-01", "2026-11-10")
@@ -2807,8 +2816,9 @@ def test_c19_boot_prefers_cached_trip_only_when_on(env, state):
     assert f02.wait_ready(dev.page) == "app"
     f02.ensure_user(dev.page)
     f02.wait_until(lambda: f02.trip_name_is(dev.page, "טיול א") or f02.trip_name_is(dev.page, "טיול ב"), page=dev.page, msg="trip name")
-    want = "טיול א" if state == "on" else "טיול ב"
-    assert f02.trip_name_is(dev.page, want), "'%s': expected %r (cached=%s), got the other trip" % (state, want, "טיול א")
+    want = "טיול א" if (state == "on" or switch_on) else "טיול ב"  # CHANGE 2026-10-13 F20-QA-02: `or switch_on`
+    assert f02.trip_name_is(dev.page, want), "'%s' (SWITCH %s): expected %r (cached=%s), got the other trip" % (
+        state, "on" if switch_on else "off", want, "טיול א")
 
 
 # =====================================================================================================
@@ -2882,7 +2892,7 @@ STATIC = ["protected:" + n for n in PROTECTED] + [
 
 @pytest.mark.parametrize("check", STATIC)
 def test_c21_static(check, tmp_path):
-    """C21 (static part): protected functions byte-identical to alpha.3; APP_VERSION / PT_VERSION 3.0.0-alpha.4.2, <title>
+    """C21 (static part): protected functions byte-identical to alpha.3; APP_VERSION / PT_VERSION = VERSION (alpha.5 since F20), <title>
     == "Lonely Planner";
     'CHANGE 2026-10-12 F04-…'; node --check on every inline script of app/, invite/, join/; countries.json / currencies.json
     per §4; not precached by the SW; /join/ outside the PWA scope."""
