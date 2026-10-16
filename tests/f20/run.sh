@@ -79,7 +79,7 @@ pyt() { # name dir testfile logfile [pytest args]
   echo; echo "=== $name · APP_DIR=$APP_DIR"
   (cd "$dir" && $PY -m pytest "$file" -q -rA --tb=line -p no:cacheprovider "$@") >"$log" 2>&1
   local rc=$?
-  grep -E "^(FAILED|ERROR|XFAIL)|[0-9]+ (passed|failed)" "$log" | sed -E 's/ - AssertionError: / — /'
+  grep -E "^(FAILED|ERROR|XFAIL) [^ ]+::|[0-9]+ (passed|failed)" "$log" | sed -E 's/ - AssertionError: / — /'
   summ "$name" "$log" $rc
   return $rc
 }
