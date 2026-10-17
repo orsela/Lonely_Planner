@@ -1,4 +1,4 @@
-"""Plan_Travel F04 QA · Playwright black-box suite · version 1.4.0
+"""Plan_Travel F04 QA · Playwright black-box suite · version 1.4.1
 CHANGE 2026-10-12 F04-QA: first version (no previous version).
 CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.1.0, follows the two spec changes approved by Or after the first run:
   - F04-DB-02: the fake create-trip (F04Backend.create_trip_from_invite) now also writes trip_kv `tripname` = the trimmed
@@ -28,6 +28,8 @@ CHANGE 2026-10-13 F20-QA-02: 1.3.0 → 1.4.0, follows F20 (app 3.0.0-alpha.5, do
   WIZARD_FEATURE='off' + SWITCH_FEATURE='on' a non-admin boots the still-active cached trip so a switch sticks); with
   SWITCH_FEATURE='off' it still expects alpha.3 (the newest membership). The admin path of test_n01[admin] goes through
   the F03 harness helpers (F03 suite 1.0.3: chooser / switcher entry).
+CHANGE 2026-10-17 F20-QA-03: 1.4.0 → 1.4.1: VERSION pin → 3.0.0-alpha.5.1 (F20 D7). test_n01[admin] reaches admin through
+  F03 1.0.4 open_admin (chooser ?choose=1 → admin row). Nothing else changed.
 
 Black-box acceptance tests for docs/F04_spec.md §5 (criteria 1–16, 19, 20 from the browser side, plus the static part
 of 21), written from the spec and the approved mockup artboards F04_* only. NOT read: app/index.html, invite/index.html,
@@ -94,7 +96,7 @@ PT_URL, PT_KEY = f02.PT_URL, f02.PT_KEY
 IM_URL = PT_URL + "/functions/v1/invite-manager"
 CT_URL = PT_URL + "/functions/v1/create-trip"
 JOIN_BASE = "https://orsela.github.io/Lonely_Planner/join/"  # CHANGE 2026-10-12 F04-QA-05: was /Plan_Travel/join/
-VERSION = "3.0.0-alpha.5"  # CHANGE 2026-10-13 F20-QA-02: was 3.0.0-alpha.4.2 (F04-QA-05: was 3.0.0-alpha.4.1; F04-QA-04: was 3.0.0-alpha.4)
+VERSION = "3.0.0-alpha.5.1"  # CHANGE 2026-10-17 F20-QA-03: was 3.0.0-alpha.5. CHANGE 2026-10-13 F20-QA-02: was 3.0.0-alpha.4.2 (F04-QA-05: was 3.0.0-alpha.4.1; F04-QA-04: was 3.0.0-alpha.4)
 APP_NAME = "Lonely Planner"  # CHANGE 2026-10-12 F04-QA-05: spec §8
 OLD_NAMES = ["Plan_Travel", "Vietnam Travel Planner"]  # CHANGE 2026-10-12 F04-QA-05: never rendered as the app name
 ALPHA3_REF = os.environ.get("ALPHA3_REF", "e591edc")

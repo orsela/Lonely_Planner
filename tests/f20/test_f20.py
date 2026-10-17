@@ -1,5 +1,16 @@
-"""Plan_Travel F20 QA · Playwright black-box suite · version 1.0.0
+"""Plan_Travel F20 QA · Playwright black-box suite · version 1.1.0
 CHANGE 2026-10-13 F20-QA-01: first version (no previous version).
+CHANGE 2026-10-17 F20-QA-03: 1.0.0 → 1.1.0, follows alpha.5.1 (spec D5 amended, D7, §1.3, criterion 8; dev notes §7):
+  - VERSION pin → 3.0.0-alpha.5.1.
+  - test_a03 (sheet → admin) replaced by test_a03_reopen_choose_to_admin_ignores_d3 (the only way from a trip to admin is
+    reopening the app at ?choose=1 → chooser → admin row; "הטיולים שלי" → chooser, D3 ignored).
+  - test_s02: avatar only with ≥2 trips for the super-admin too ([one] → no avatar, [four] → avatar).
+  - test_s03: the sheet has NO "ניהול" section / #ptSwitchAdmin / admin texts (was: asserted them).
+  - test_s07[admin] removed (no admin row in the sheet any more); [trip] unchanged.
+  - New: test_e01_no_admin_text_in_trip_ui[one|four] (no "ניהול מערכת" / admin texts on home headers, "עוד", sheet,
+    every tab), test_e02_hash_admin_in_running_trip_reloads_to_standalone[hashchange|trip_query],
+    test_e03_hash_admin_non_admin_in_trip_cleaned_no_reload, test_e04_hash_admin_loop_guard (admin check hangs after the
+    reload → lands in the trip once, hash cleaned, no reload loop).
 
 Black-box acceptance tests for docs/F20_spec.md §3 (criteria 1–14): the super-admin start chooser (#ptChoose), the
 standalone admin screen, the in-trip trip/admin switcher (avatar + sheet), the boot rules of §1.4 and the "עוד" change.
@@ -57,7 +68,7 @@ from playwright.sync_api import Error as PWError  # noqa: E402
 APP_DIR = Path(os.environ["APP_DIR"])
 APP_PATH = f02.APP_PATH
 MAIN_REF = os.environ.get("MAIN_REF", "main")
-VERSION = "3.0.0-alpha.5"
+VERSION = "3.0.0-alpha.5.1"  # CHANGE 2026-10-17 F20-QA-03: was 3.0.0-alpha.5
 APP_NAME = "Lonely Planner"
 OLD_NAMES = ["Plan_Travel", "Vietnam Travel Planner"]
 PROTECTED = f02.PROTECTED
@@ -1241,35 +1252,32 @@ def test_a02_direct_admin_switch_to_chooser_in_place(env):
     assert not P, "\n".join(P)
 
 
-def test_a03_trip_sheet_admin_then_back_to_chooser_ignores_d3(env):
-    """AC8 + §1.2: super-admin inside a trip (D3 on) → sheet 'ניהול מערכת' → standalone admin (no trip chrome, no trip
-    started, #admin); 'הטיולים שלי' → chooser (reload; D3 ignored; ?choose removed)."""
+def test_a03_reopen_choose_to_admin_ignores_d3(env):
+    """D7 + §1.2/§1.4 (CHANGE 2026-10-17 F20-QA-03, replaces the alpha.5 sheet → admin test): from a running trip (D3 on)
+    the way to admin is reopening the app at ?choose=1 → chooser (D3 ignored, query removed) → admin row → standalone admin
+    (no trip chrome, no trip started); 'הטיולים שלי' → chooser; the D3 key is untouched."""
     ids, pre = setup(env, cached="MID", d3=True)
     dev = device(env, pre)
     page = dev.page
     assert boot(dev) == "app"
     ensure_home(page)
-    open_sheet(page)
-    mark_page(page)
-    page.locator(SEL["sw_admin"]).click()
-    st = wait_state(page, "admin", 15)
+    st = boot(dev, APP_PATH + "?choose=1")
+    if st != "choose":
+        pytest.fail("?choose=1 from a trip (D3 on) did not show the chooser (state=%s)" % st)
     P = []
-    if st != "admin":
-        pytest.fail("sheet 'ניהול מערכת' did not land on the admin screen (state=%s)" % st)
-    if same_document(page):
-        P.append("no reload into the standalone admin (spec §1.3: reload to #admin)")
+    if "choose" in urlparse(cur_url(page)).query:
+        P.append("?choose=1 not removed: %s" % cur_url(page))
+    page.locator(SEL["choose_admin"]).click()
+    if wait_state(page, "admin", 15) != "admin":
+        pytest.fail("\n".join(P + ["chooser admin row did not open admin (state=%s)" % state(page)]))
     page.wait_for_timeout(800)
     P += admin_header_problems(page)
     nt = no_trip_started(page)
     if nt["started"] is not False or nt["tripData"] != "undefined":
         P.append("trip started under the admin screen: %r" % nt)
-    if "#admin" not in cur_url(page):
-        P.append("URL hash is not #admin: %s" % cur_url(page))
-    mark_page(page)
     page.locator(SEL["admin_switch"]).click()
-    st = wait_state(page, "choose", 15)
-    if st != "choose":
-        P.append("'הטיולים שלי' (D3 on) did not show the chooser (state=%s)" % st)
+    if wait_state(page, "choose", 15) != "choose":
+        P.append("'הטיולים שלי' did not show the chooser (state=%s)" % state(page))
     page.wait_for_timeout(600)
     if "choose" in urlparse(cur_url(page)).query or "#admin" in cur_url(page):
         P.append("URL not clean: %s" % cur_url(page))
@@ -1357,21 +1365,27 @@ def test_s01_avatar_layouts_no_overlap(env, layout, trips):
 
 
 @pytest.mark.parametrize("trips", ["one", "four"])
-def test_s02_superadmin_avatar_always(env, trips):
-    """D5: the super-admin always gets the avatar (also with one trip)."""
+def test_s02_superadmin_avatar_only_with_two_trips(env, trips):
+    """D5 (amended by D7, CHANGE 2026-10-17 F20-QA-03): the super-admin gets the avatar only with ≥2 active trips; with
+    one trip there is no avatar button in the DOM (was: always)."""
     ids, pre = setup(env, keys=ORDER[:1] if trips == "one" else ORDER, cached="NEW", d3=True)
     dev = device(env, pre)
     page = dev.page
     assert boot(dev) == "app"
     ensure_home(page)
-    assert page.locator(SEL["avatar_any"]).filter(visible=True).count(), "no avatar for the super-admin (%s)" % trips
+    page.wait_for_timeout(800)
+    n = page.locator(SEL["avatar_any"]).filter(visible=True).count()
+    if trips == "one":
+        assert n == 0 and not exists(page, SEL["avatar_any"]), "avatar shown to a super-admin with one trip"
+    else:
+        assert n, "no avatar for a super-admin with 4 trips"
 
 
 def test_s03_sheet_content_superadmin(env):
     """AC8 + §1.3: sheet = dialog 'מעבר בין טיולים' with display name, linked email (LTR), × close; 'הטיולים שלי' rows
     newest first: the current trip a non-link row with the check (role=img 'הטיול הנוכחי') and '<תפקיד> · כאן עכשיו',
-    others buttons '<תפקיד> · dd/mm–dd/mm'; section 'ניהול' with 'ניהול מערכת' / 'יציאה מהטיול למסך הניהול' /
-    'סופר-אדמין'; no foreign trip; no duplicate ids; no old app name."""
+    others buttons '<תפקיד> · dd/mm–dd/mm'; D7 (CHANGE 2026-10-17 F20-QA-03): NO 'ניהול' section — no #ptSwitchAdmin, no
+    'ניהול מערכת' / 'יציאה מהטיול למסך הניהול' / 'סופר-אדמין'; no foreign trip; no duplicate ids; no old app name."""
     ids, pre = setup(env, cached="MID", d3=True, email="or@example.com", confirmed=True)
     dev = device(env, pre)
     page = dev.page
@@ -1419,16 +1433,17 @@ def test_s03_sheet_content_superadmin(env):
     sbox = norm(page.locator(SEL["sheet_box"]).inner_text())
     if "טיול זר" in sbox or "טיול שהוסרתי ממנו" in sbox:
         P.append("foreign / removed trip listed in the sheet")
-    adm = page.locator(SEL["sw_admin"])
-    if not adm.count() or not is_vis(page, SEL["sw_admin"]):
-        P.append("'ניהול מערכת' missing for the super-admin")
-    else:
-        t = norm(adm.inner_text())
-        for k in ("admin_row", "sw_admin_sub", "sw_admin_badge"):
-            if TXT[k] not in t:
-                P.append("admin row lacks %r (%r)" % (TXT[k], t))
-    if TXT["sec_admin"] not in sbox or TXT["sec_trips"] not in sbox:
-        P.append("section titles missing: %r" % sbox[:200])
+    # CHANGE 2026-10-17 F20-QA-03: D7 — the admin section must be absent (was: present for the super-admin)
+    if exists(page, SEL["sw_admin"]):
+        P.append("#ptSwitchAdmin in the sheet (D7)")
+    for k in ("admin_row", "sw_admin_sub", "sw_admin_badge"):
+        if TXT[k] in sbox:
+            P.append("admin text %r in the sheet (D7)" % TXT[k])
+    secs = page.evaluate("()=>[...document.querySelectorAll('#ptF20SheetBox .pt-f20-sec')].map(e=>e.textContent.trim())")
+    if TXT["sec_admin"] in secs:
+        P.append("section 'ניהול' in the sheet (D7)")
+    if TXT["sec_trips"] not in sbox:
+        P.append("section title 'הטיולים שלי' missing: %r" % sbox[:200])
     if dup_ids(page):
         P.append("duplicate ids: %r" % dup_ids(page))
     hits = [n for n in OLD_NAMES if n in sbox]
@@ -1521,10 +1536,10 @@ def test_s06_current_row_does_not_navigate(env):
     assert wait_trip_shown(page, TRIPS["NEW"][0]), "trip changed"
 
 
-@pytest.mark.parametrize("target", ["trip", "admin"])
+@pytest.mark.parametrize("target", ["trip"])  # CHANGE 2026-10-17 F20-QA-03: [admin] removed (D7: no admin row in the sheet)
 def test_s07_offline_tap_toast_no_navigation(env, target):
-    """AC10 + §1.3 (dev notes §6.4 for 'ניהול מערכת'): offline tap on another trip (or on 'ניהול מערכת') → toast
-    'אין חיבור. נסו שוב כשהרשת תחזור.', no navigation, cache unchanged."""
+    """AC10 + §1.3: offline tap on another trip → toast 'אין חיבור. נסו שוב כשהרשת תחזור.', no navigation, cache
+    unchanged."""
     ids, pre = setup(env, keys=ORDER[:2], admin=(target == "admin"), cached="NEW", d3=True, invites=False)
     dev = device(env, pre)
     page = dev.page
@@ -1571,6 +1586,182 @@ def test_s08_more_has_no_admin_row_linked_email_stays(env):
         P.append("'ניהול מערכת' in 'עוד'")
     if TXT["more_linked"] not in norm(more):
         P.append("'מייל מקושר' row missing in 'עוד'")
+    assert not P, "\n".join(P)
+
+
+# =====================================================================================================
+# CHANGE 2026-10-17 F20-QA-03: D7 — admin and trips never mix (criterion 8, alpha.5.1)
+# =====================================================================================================
+ADMIN_TEXTS = [TXT["admin_row"], TXT["sw_admin_sub"], TXT["admin_row_sub"], TXT["admin_sub"]]
+TEXT_IN_UI_JS = """(ts)=>{const vis=e=>{const r=e.getBoundingClientRect();if(r.width<1||r.height<1)return false;
+  for(let a=e;a;a=a.parentElement){const s=getComputedStyle(a);if(s.display==='none'||s.visibility==='hidden')return false}return true};
+ const out=[];for(const e of document.querySelectorAll('body *')){if(!vis(e))continue;
+   const own=[...e.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join(' ')+' '+(e.getAttribute('aria-label')||'');
+   for(const t of ts)if(own.includes(t))out.push(t+' @ '+(e.id?'#'+e.id:e.tagName)+(e.className&&typeof e.className==='string'?'.'+e.className.split(' ')[0]:''))}
+ return out}"""
+
+
+def admin_text_hits(page):
+    return page.evaluate(TEXT_IN_UI_JS, ADMIN_TEXTS)
+
+
+@pytest.mark.parametrize("trips", ["one", "four"])
+def test_e01_no_admin_text_in_trip_ui(env, trips):
+    """Criterion 8 / D7: super-admin inside a trip (1 trip and 4 trips): no 'ניהול מערכת' (nor the admin row sub /
+    'יציאה מהטיול למסך הניהול' / 'Lonely Planner · סופר-אדמין') anywhere in the trip UI — home headers, every tab, 'עוד',
+    and the switcher sheet when the avatar exists; no #ptAdminRow / #ptSwitchAdmin in the DOM; no control navigates to
+    #admin (no href/data attribute naming admin)."""
+    keys = ORDER[:1] if trips == "one" else ORDER
+    ids, pre = setup(env, keys=keys, cached="NEW", d3=True, email="or@example.com", confirmed=True)
+    dev = device(env, pre)
+    page = dev.page
+    assert boot(dev) == "app"
+    ensure_home(page)
+    page.wait_for_timeout(1000)
+    P = []
+    for tab in ("home", "route", "journal", "budget", "more"):
+        try:
+            f02.tab(page, tab)
+        except PWError:
+            P.append("tab %s missing" % tab)
+            continue
+        page.wait_for_timeout(700)
+        h = admin_text_hits(page)
+        if h:
+            P.append("%s: admin text visible %r" % (tab, h[:4]))
+    for sel in (SEL["more_admin_row"], SEL["sw_admin"]):
+        if exists(page, sel):
+            P.append("%s in the DOM" % sel)
+    links = page.evaluate("""()=>[...document.querySelectorAll('a[href*="#admin"],[data-go="admin"],[data-href*="#admin"]')].map(e=>e.outerHTML.slice(0,80))""")
+    if links:
+        P.append("controls pointing at #admin: %r" % links)
+    f02.tab(page, "home")
+    page.wait_for_timeout(400)
+    if trips == "four":
+        open_sheet(page)
+        h = admin_text_hits(page)
+        if h:
+            P.append("sheet: admin text %r" % h[:4])
+        sb = norm(page.locator(SEL["sheet_box"]).inner_text())
+        if TXT["admin_row"] in sb or TXT["sw_admin_badge"] in sb:
+            P.append("sheet text has admin entry: %r" % sb[:200])
+    elif exists(page, SEL["avatar_any"]):
+        P.append("avatar shown with one trip")
+    if "#admin" in cur_url(page):
+        P.append("URL went to #admin")
+    assert not P, "\n".join(P)
+
+
+@pytest.mark.parametrize("how", ["hashchange", "trip_query"])
+def test_e02_hash_admin_in_running_trip_reloads_to_standalone(env, how):
+    """D7 + dev notes §7 F20-D7-05 (architect): super-admin, a trip running; #admin appears (address bar hashchange, or a
+    load that starts a trip: ?trip=<id>#admin) → full reload into the standalone admin: no trip started (__PT.started
+    false, tripData undefined), no trip chrome, header 'הטיולים שלי' / no 'חזרה לטיול'; never the F03 screen layered over
+    the trip; 'הטיולים שלי' → chooser."""
+    ids, pre = setup(env, cached="MID", d3=True)
+    dev = device(env, pre)
+    page = dev.page
+    assert boot(dev) == "app"
+    ensure_home(page)
+    mark_page(page)
+    if how == "hashchange":
+        page.evaluate("()=>{location.hash='#admin'}")
+    else:
+        page.goto(env.server.origin + APP_PATH + "?trip=" + ids["MID"] + "#admin", wait_until="domcontentloaded")
+    end = time.time() + 15
+    overlay = False
+    while time.time() < end:
+        try:
+            if page.evaluate("()=>window.__qaStay===1&&document.documentElement.classList.contains('pt-admin-open')"):
+                overlay = True
+            if page.evaluate("()=>window.__qaStay!==1") and state(page) == "admin":
+                break
+        except PWError:
+            pass
+        page.wait_for_timeout(100)
+    st = wait_state(page, "admin", 10)
+    P = []
+    if how == "hashchange" and overlay:
+        P.append("admin screen was layered over the running trip before the reload")
+    if st != "admin":
+        pytest.fail("\n".join(P + ["%s: no standalone admin (state=%s, url=%s)" % (how, st, cur_url(page))]))
+    if same_document(page):
+        P.append("no full reload (admin layered over the running trip)")
+    page.wait_for_timeout(800)
+    nt = no_trip_started(page)
+    if nt["started"] is not False or nt["tripData"] != "undefined" or nt["homeActive"]:
+        P.append("trip main script running under the admin: %r" % nt)
+    P += admin_header_problems(page)
+    if how == "trip_query" and "trip=" in urlparse(cur_url(page)).query:
+        P.append("?trip= kept on the admin URL: %s" % cur_url(page))
+    page.locator(SEL["admin_switch"]).click()
+    if wait_state(page, "choose", 15) != "choose":
+        P.append("'הטיולים שלי' did not show the chooser (state=%s)" % state(page))
+    if page_errors(dev):
+        P.append("page errors: %r" % page_errors(dev)[:3])
+    assert not P, "\n".join(P)
+
+
+def test_e03_hash_admin_non_admin_in_trip_cleaned_no_reload(env):
+    """§1.2 / dev notes §7: non-admin, trip running, #admin typed → hash cleaned, same document (no reload), no admin UI,
+    still the same trip."""
+    ids, pre = setup(env, keys=ORDER[:2], admin=False, invites=False)
+    dev = device(env, pre)
+    page = dev.page
+    assert boot(dev) == "app"
+    ensure_home(page)
+    mark_page(page)
+    n = len(dev.navs)
+    page.evaluate("()=>{location.hash='#admin'}")
+    page.wait_for_timeout(2500)
+    P = []
+    if not same_document(page):
+        P.append("page reloaded")
+    if "#admin" in cur_url(page):
+        P.append("hash not cleaned: %s" % cur_url(page))
+    if page.evaluate("()=>document.documentElement.classList.contains('pt-admin-open')") or visible(page, TXT["admin_invite_btn"]):
+        P.append("admin UI shown to a non-admin")
+    if state(page) != "app" or trip_id_running(page) != ids["NEW"]:
+        P.append("not in the same trip (state=%s, trip=%r)" % (state(page), trip_id_running(page)))
+    if any("#admin" not in u and u != dev.navs[n - 1] for u in dev.navs[n:]) and not same_document(page):
+        P.append("navigations: %r" % dev.navs[n:])
+    assert not P, "\n".join(P)
+
+
+def test_e04_hash_admin_loop_guard(env):
+    """dev notes §7 F20-D7-05 loop guard: super-admin types #admin in a running trip; after the reload the admin check
+    hangs (→ not super-admin, normal boot into the trip). The page must settle in the trip — one reload, no reload loop
+    (≤ 2 document loads in 12 s), no admin layered over the trip; typing #admin again within 30 s causes no reload.
+    Not asserted: whether #admin is removed from the URL when the admin status is UNKNOWN (check hung) — alpha.4.2 keeps
+    the hash in that case too (fresh #admin load with a hanging check, SWITCH off), see the QA report."""
+    ids, pre = setup(env, cached="MID", d3=True, invites=False)
+    be = env.backend
+    dev = device(env, pre)
+    page = dev.page
+    assert boot(dev) == "app"
+    ensure_home(page)
+    loads = []
+    page.on("load", lambda: loads.append(time.time()))
+    be.hang_tables = {"platform_admins"}
+    page.evaluate("()=>{location.hash='#admin'}")
+    page.wait_for_timeout(12000)
+    P = []
+    if len(loads) > 2:
+        P.append("reload loop: %d document loads in 12 s" % len(loads))
+    st = wait_state(page, "app", 8)
+    if st != "app":
+        P.append("did not settle in the trip (state=%s)" % st)
+    if page.evaluate("()=>document.documentElement.classList.contains('pt-admin-open')"):
+        P.append("admin layered over the trip after the guarded attempt")
+    n = len(loads)
+    mark_page(page)
+    page.evaluate("()=>{location.hash='#admin'}")
+    page.wait_for_timeout(5000)
+    if len(loads) > n + 1:
+        P.append("second #admin within 30 s caused %d loads" % (len(loads) - n))
+    if state(page) != "app":
+        P.append("second attempt: state=%s (expected to stay in the trip)" % state(page))
+    print("loads after first #admin: %d, after second: %d" % (n, len(loads) - n))
     assert not P, "\n".join(P)
 
 
@@ -1730,7 +1921,7 @@ STATIC = ["protected:" + n for n in PROTECTED] + [
 
 @pytest.mark.parametrize("check", STATIC)
 def test_st_static(check, tmp_path):
-    """AC14: protected functions byte-identical to main (alpha.4.2); APP_VERSION / PT_VERSION 3.0.0-alpha.5; <title> ==
+    """AC14: protected functions byte-identical to main (alpha.4.2); APP_VERSION / PT_VERSION = VERSION (alpha.5.1); <title> ==
     'Lonely Planner'; SWITCH_FEATURE next to ADMIN_FEATURE / WIZARD_FEATURE; 'CHANGE 2026-10-13 F20-…' present and
     near every changed hunk; node --check on every inline script; no new duplicate ids; no migration / Edge Function change
     in the branch (spec: 'No database migration, no Edge Function change')."""

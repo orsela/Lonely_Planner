@@ -1,4 +1,4 @@
-"""Plan_Travel F03 QA · Playwright black-box suite · version 1.0.3
+"""Plan_Travel F03 QA · Playwright black-box suite · version 1.0.4
 CHANGE 2026-10-05 F03-QA: first version (no previous version).
 CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.0.1. test_ac16_off_more_panel_identical_to_alpha2 now ignores the F04 row
   #ptJoinRow ("קישור הצטרפות לקבוצה") when the served app has WIZARD_FEATURE='on' (architect's decision, F04 dev notes §7:
@@ -14,6 +14,11 @@ CHANGE 2026-10-13 F20-QA-02: 1.0.2 → 1.0.3, follows F20 (app 3.0.0-alpha.5, do
   - test_ac02_admin_entry_for_admin / test_ac02_admin_rpc_refused_shows_no_list / test_ac14_offline_admin: SWITCH-on branch
     with the same intent through the new entry points (chooser / sheet; header button "הטיולים שלי" instead of the back
     control; "עוד" must NOT show the row, F20 AC9).
+CHANGE 2026-10-17 F20-QA-03: 1.0.3 → 1.0.4, follows F20 alpha.5.1 (D7: no admin entry inside a trip; avatar only with ≥2
+  trips). open_admin() with SWITCH_FEATURE='on' now enters admin by reopening the app at ?choose=1 → chooser admin row
+  (#ptChooseAdmin) — was: avatar sheet → "ניהול מערכת" (removed by D7). The flag is read from the served source
+  (switch_on()), not from the avatar, because a super-admin with one trip has no avatar. test_ac02_admin_entry_for_admin
+  (SWITCH on) asserts no "ניהול מערכת" in "עוד" nor in the trip UI, then the chooser path. open_switch_admin removed.
 
 Black-box acceptance tests for docs/F03_spec.md §5 (super-admin invites a manager), written from the spec and the
 approved mockup artboards F03_* only. The F03 implementation (app/index.html changes, supabase/functions/,
@@ -790,6 +795,18 @@ def switch_ui(page):
     return page.evaluate("()=>!!document.querySelector('button[data-pt-switch]')")
 
 
+SWITCH_RE = re.compile(r"""const\s+SWITCH_FEATURE\s*=\s*['"]on['"]""")
+
+
+def switch_on(env_or_none=None):
+    """CHANGE 2026-10-17 F20-QA-03: SWITCH_FEATURE='on' in the served app (override or APP_DIR source)."""
+    src = None
+    if env_or_none is not None:
+        src = env_or_none.server.overrides.get(APP_PATH)
+        src = src.decode("utf-8") if isinstance(src, bytes) else src
+    return bool(SWITCH_RE.search(src if src else app_html()))
+
+
 def boot(env, name="A", role="manager", admin=False, email=None, display="אור", trip=None, path=APP_PATH, enter=True):
     be = env.backend
     tid = trip or be.add_trip_full("ויאטנם 2026", "2026-09-15", "2026-10-06", countries=["VN"])
@@ -827,8 +844,8 @@ def open_more(page):
 
 
 def open_admin(page, wait_list=True):
-    if switch_ui(page):  # CHANGE 2026-10-13 F20-QA-02: F20 §1.3/§1.5 — the entry is the avatar sheet, not "עוד"
-        open_switch_admin(page)
+    if switch_on():  # CHANGE 2026-10-17 F20-QA-03: F20 D7 — admin only from the start chooser (was: avatar sheet, F20-QA-02)
+        open_chooser_admin(page)
     else:
         open_more(page)
         assert wait_text(page, TXT["admin_row"]), "row %r not in 'עוד' for a super-admin" % TXT["admin_row"]
@@ -846,12 +863,15 @@ def open_switch_sheet(page):
     page.wait_for_timeout(500)
 
 
-def open_switch_admin(page):
-    """CHANGE 2026-10-13 F20-QA-02: new helper — avatar sheet → "ניהול מערכת" → (reload) standalone admin screen."""
-    open_switch_sheet(page)
-    page.locator("#ptSwitchAdmin").click()
+def open_chooser_admin(page):
+    """CHANGE 2026-10-17 F20-QA-03: replaces open_switch_admin (F20-QA-02) — reopen the app at ?choose=1 → chooser →
+    "ניהול מערכת" (#ptChooseAdmin) → standalone admin (F20 D7: the only admin entry)."""
+    origin = "%s://%s" % (urlparse(page.url).scheme, urlparse(page.url).netloc)
+    page.goto(origin + APP_PATH + "?choose=1", wait_until="domcontentloaded")
+    page.locator("#ptChooseAdmin").wait_for(state="visible", timeout=15000)
+    page.wait_for_timeout(500)
+    page.locator("#ptChooseAdmin").click()
     page.wait_for_timeout(800)
-    page.wait_for_load_state("domcontentloaded")
 
 
 def admin_dataset(be, admin_trip=True):
@@ -968,18 +988,17 @@ def test_ac02_admin_entry_for_admin(env):
     'עוד'. isPlatformAdmin comes from platform_admins (own row) and is not persisted."""
     d, dev = boot_admin_with_data(env)
     page, be = dev.page, env.backend
-    if switch_ui(page):  # CHANGE 2026-10-13 F20-QA-02: SWITCH on — entry via the avatar sheet; "עוד" has no row (F20 AC9)
+    if switch_on(env):  # CHANGE 2026-10-17 F20-QA-03 (D7; F20-QA-02 used the avatar sheet): no admin entry in the trip UI
         open_more(page)
         assert not visible(page, TXT["admin_row"]), "F20: row %r still in 'עוד'" % TXT["admin_row"]
-        open_switch_sheet(page)
-        assert visible(page, TXT["admin_row"], "#ptF20SheetBox"), "row %r missing in the switcher sheet" % TXT["admin_row"]
-        assert visible(page, TXT["admin_badge"], "#ptF20SheetBox"), "badge %r missing" % TXT["admin_badge"]
+        f02.tab(page, "home")
+        page.wait_for_timeout(400)
+        assert not visible(page, TXT["admin_row"]), "F20 D7: %r visible on the trip home" % TXT["admin_row"]
         assert be.queries("platform_admins"), "platform_admins was never queried"
         raw = json.dumps(dev.ls(), ensure_ascii=False)
         assert "platform_admin" not in raw.lower() and "isplatformadmin" not in raw.lower(), "admin flag persisted in localStorage"
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(400)
         open_admin(page)
+        assert visible(page, TXT["admin_badge"]) or "סופר-אדמין" in body_text(page), "badge %r missing" % TXT["admin_badge"]
         assert any(c["fn"] == "admin_trip_summary" for c in be.rpc_calls), "list not loaded with rpc('admin_trip_summary')"
         sw = page.locator("#ptAdminSwitch")
         assert sw.count() and sw.is_visible(), "F20: no 'הטיולים שלי' control on the admin header"

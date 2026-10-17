@@ -108,3 +108,58 @@ None in the product.
 ## Files (QA)
 - New: `tests/f20/test_f20.py`, `tests/f20/run.sh`, `tests/f20/MANUAL.md`, `docs/qa/F20_QA.md`.
 - Changed: `tests/f03/test_f03.py` (1.0.3) and `tests/f04/test_f04.py` (1.4.0), both marked `CHANGE 2026-10-13 F20-QA-02`.
+
+## alpha.5.1 (2026-10-17) — D7: admin and trips never mix
+CHANGE 2026-10-17 F20-QA-03: new section. Contract: spec §0 D5 (amended) and D7, §1.3, criterion 8, plus dev notes §7 ("For QA" ids and texts, and the architect decision F20-D7-05). Branch `f20` @ 387111f; sandbox only.
+
+### Test changes (all marked `CHANGE 2026-10-17 F20-QA-03`)
+- **F20 suite 1.0.0 → 1.1.0**
+  - `VERSION` is now 3.0.0-alpha.5.1.
+  - `test_a03` now goes: running trip with D3 on → reopen at `?choose=1` → chooser, with the query removed → admin row → standalone admin (no trip started) → "הטיולים שלי" → chooser, with the D3 key untouched.
+  - `test_s02` is now `test_s02_superadmin_avatar_only_with_two_trips[one|four]`: [one] expects no avatar in the DOM.
+  - `test_s03`: the sheet must have no "ניהול" section, no `#ptSwitchAdmin`, and none of "ניהול מערכת" / "יציאה מהטיול למסך הניהול" / "סופר-אדמין".
+  - `test_s07[admin]` is removed (the row no longer exists); `[trip]` is unchanged.
+  - New tests:
+    - `test_e01_no_admin_text_in_trip_ui[one|four]`: super-admin in a trip. The admin texts must not show on any tab (home, route, journal, budget, עוד), nor in the sheet when one exists. `#ptAdminRow` and `#ptSwitchAdmin` must not be in the DOM, and no control may point at `#admin`.
+    - `test_e02_hash_admin_in_running_trip_reloads_to_standalone[hashchange|trip_query]`: `#admin` typed in a running trip, or a `?trip=<id>#admin` load, does a full reload into the standalone admin. It is never layered over the trip (sampled every 100 ms before the reload). After the reload `__PT.started` is false, `tripData` is undefined, there is no trip chrome, the header is right, and `?trip=` is dropped. "הטיולים שלי" → chooser.
+    - `test_e03_hash_admin_non_admin_in_trip_cleaned_no_reload`: a non-admin who types `#admin` stays in the same document and the same trip, the hash is cleaned, and no admin UI shows.
+    - `test_e04_hash_admin_loop_guard`: super-admin types `#admin`, and after the reload the admin check hangs. Result: exactly 1 reload, the page settles in the trip with no admin overlay, and a second `#admin` within 30 s causes no reload.
+- **F03 suite 1.0.3 → 1.0.4**
+  - `open_admin()` with SWITCH on now reopens the app at `?choose=1` and taps `#ptChooseAdmin`. The F20-QA-02 path through the avatar sheet is gone. The flag is read from the served source, because a super-admin with one trip has no avatar.
+  - `test_ac02_admin_entry_for_admin` (SWITCH on): no "ניהול מערכת" in "עוד" or on the trip home, then the chooser path and the header button "הטיולים שלי" → chooser.
+  - `open_switch_admin` is replaced by `open_chooser_admin`.
+- **F04 suite 1.4.0 → 1.4.1:** `VERSION` is now 3.0.0-alpha.5.1. `test_n01[admin]` reaches admin through the F03 helper.
+- **MANUAL.md 1.1.0:** sections 3, 4 and 5 now have no admin inside a trip and the avatar only with ≥2 trips. New section 8 adds the phone checks for D7, including "reach admin by reopening the app".
+
+### Results (`bash tests/f20/run.sh`, both SWITCH states)
+| Suite | SWITCH_FEATURE='on' | SWITCH_FEATURE='off' |
+|---|---|---|
+| F20 browser suite 1.1.0 | **82/82** (77 − `s07[admin]` + 6 new) | (flag-off cases inside the suite) |
+| F04 suite 1.4.1 | 126/126 | 126/126 |
+| F03 regression 1.0.4, WIZARD on / off | 47 passed, 1 skipped, 11 deselected / 55 passed, 1 skipped, 3 deselected | same |
+| F02 regression, WIZARD on / off | 36 passed, 1 skipped, 3 deselected each | same |
+| Deno: F04 function tests · create-trip · invite-manager | 31/31 · 9/9 · 21/21 | — |
+| DB / Edge Functions | no `supabase/` or `*.sql` change vs `main` → no migration | — |
+
+Overall rc=0. The deselected lists are unchanged; they are the same expected set as alpha.5.
+
+### Failures before the update (all expected by D7 or by the version bump; dev notes §7 lists the same set)
+- **F20: 6 failed.**
+  - `test_st_static[app_version|pt_version]`: version pin.
+  - `test_a03…`, `test_s03…` and `test_s07…[admin]`: they used the removed sheet "ניהול" row.
+  - `test_s02…[one]`: it expected the old avatar rule.
+- **F04: 3 failed with SWITCH on, 2 with SWITCH off.**
+  - `test_c21_static[app_version|pt_version]`: version pin.
+  - `test_n01[admin]` (SWITCH on only): the old `open_admin` path.
+- **F03 with SWITCH on: 15 failed in each WIZARD state.** The F20-QA-02 `open_admin` relied on the sheet row.
+- After the update, all of these pass.
+
+### Defects
+None in the product.
+
+### Observation (not a defect; same as alpha.4.2)
+When the admin status is **unknown** because the `platform_admins` check hangs or fails, a page that ends up in a trip keeps `#admin` in the address bar. Two cases show this:
+- after the F20-D7-05 reload (`test_e04`)
+- with SWITCH off, on a fresh `#admin` load with a hanging check
+
+It does not affect behaviour: no admin is shown and there is no reload loop. A real non-admin always has the hash cleaned (`test_b05`, `test_e03`). Question for the architect: should an unknown admin status also clean the hash?
