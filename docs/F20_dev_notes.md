@@ -109,7 +109,7 @@ text = first letter of the member's display name. Absent for a non-admin with on
 - "הטיולים שלי": `#ptSwitchTrips`; current trip = `div.pt-f20-row[data-trip-current="<id>"][aria-current=true]` with sub
   "<תפקיד> · כאן עכשיו" and `svg[role=img][aria-label="הטיול הנוכחי"]`; other trips = `button.pt-f20-row[data-trip="<id>"]`
   with sub "<תפקיד> · dd/mm–dd/mm"; states `#ptSwitchLoading`, `#ptSwitchErr` + `#ptSwitchRetry`.
-- "ניהול" (super-admin only): `button#ptSwitchAdmin` "ניהול מערכת" / "יציאה מהטיול למסך הניהול" / badge "סופר-אדמין".
+- ~~"ניהול" (super-admin only): `button#ptSwitchAdmin`~~ — **removed in alpha.5.1 (D7)**, see §7.
 - Offline tap on a trip (or on "ניהול מערכת") → toast `#ptToast` "אין חיבור. נסו שוב כשהרשת תחזור.", no navigation.
 - "עוד": `#ptAdminRow` is never in the DOM with the flag on.
 
@@ -208,3 +208,45 @@ trip; `rpc('admin_trip_summary')` on the chooser (admin only); `GET countries.js
     `?choose=1` (removed at once).
 15. Not verified here (needs the real stack / Or's phone): real RLS answers for the `in(...)` member-count query per role,
     iOS installed-app back gesture on the sheet, Safari rendering of flag emoji.
+
+## 7. alpha.5.1 (2026-10-17) — D7: admin and trips are two environments that never mix
+
+Spec: `docs/F20_spec.md` §0 D5 (amended) / D7, §1.3, criterion 8 (commit 4a7a3d6). All changes in `app/index.html`, marked
+`CHANGE 2026-10-17 F20-D7-NN` with what changed from alpha.5. Every change is inside the F20 block except the two version lines.
+
+| CHANGE ID | What changed from 3.0.0-alpha.5 |
+|---|---|
+| F20-D7-01 | `switchVisible()`: avatar only with ≥2 active trips, for everyone. alpha.5 also showed it to a super-admin with one trip. |
+| F20-D7-02 | switcher sheet: the "ניהול" section (`#ptSwitchAdmin` "ניהול מערכת" / "יציאה מהטיול למסך הניהול" / badge "סופר-אדמין") and its click branch (reload to `#admin`) removed for everyone. |
+| F20-D7-03 | in-trip `ensureRows()` (lazy list after an offline start) no longer runs the admin check — the avatar rule does not depend on it. One `platform_admins` query less inside a trip. |
+| F20-D7-04 | `APP_VERSION`, `PT_VERSION`, `F20_VERSION` `'3.0.0-alpha.5'` → `'3.0.0-alpha.5.1'`; `<title>` unchanged "Lonely Planner". |
+
+Existing function bodies outside the F20 block: unchanged vs alpha.5 (only the two version lines). Protected functions
+byte-identical vs `git show main:app/index.html`.
+
+Where admin is reachable now: only the start chooser (`#ptChooseAdmin`, also via `?choose=1`, which still works and is cleaned
+from the URL) and a fresh load at `#admin` as super-admin. Inside a running trip no control leads to admin: no row in "עוד"
+(F20-MORE-01, unchanged), no "ניהול" section in the sheet, nothing in the home headers. Not changed: typing `#admin` into the
+address bar of a running trip still opens the F03 screen (F03's existing hashchange behaviour, not a control); its
+"הטיולים שלי" button then reloads to the chooser (`?choose=1`) as in alpha.5.
+
+**For QA — changed / removed ids and texts (alpha.5.1)**
+- Removed: `#ptSwitchAdmin` and the texts "ניהול" (section title), "ניהול מערכת", "יציאה מהטיול למסך הניהול", "סופר-אדמין" in
+  `#ptF20SheetBox`. The sheet now has only the header (`#ptSwitchName`, `#ptSwitchEmail`, ×) and "הטיולים שלי" (`#ptSwitchTrips`).
+- Changed rule: `#ptAvatarBtn` / `#ptAvatarBtnV1` exist iff the user has ≥2 active trips (super-admin with 1 trip: none).
+- Unchanged: chooser ids, admin header (`#ptAdminSwitch`), D3 key, all other sheet ids/texts.
+
+**Self-checks (2026-10-17)**: `node --check` 8/8 inline blocks OK; no new duplicate ids; protected functions identical vs
+`main`; dev smoke **16/16** (adjusted: sheet asserts no "ניהול"/`#ptSwitchAdmin`, no "ניהול מערכת" text on home/"עוד"; the
+admin standalone steps start from a fresh `#admin` load; new case: super-admin with 1 trip → no avatar, "עוד" without admin,
+`?choose=1` → chooser → admin). `bash tests/f20/run.sh`: F20 suite 71 passed / 6 failed; F04 SWITCH on 123/3, off 124/2;
+F03 SWITCH on 32/15 (wizard on) and 40/15 (wizard off), SWITCH off 47 and 55 green; F02 36 in all four states; Deno 31/9/21;
+DB/functions unchanged. All failures are expected by D7 or the version bump (QA to update):
+- version pins `3.0.0-alpha.5`: F20 `test_st_static[app_version|pt_version]`; F04 `test_c21_static[app_version|pt_version]` (both
+  SWITCH states).
+- F20 suite, asserting the removed in-trip admin entry / old avatar rule: `test_a03_trip_sheet_admin_then_back_to_chooser_ignores_d3`,
+  `test_s02_superadmin_avatar_always[one]`, `test_s03_sheet_content_superadmin`, `test_s07_offline_tap_toast_no_navigation[admin]`.
+- F03 regression with SWITCH on (same 15 in both wizard states) and F04 `test_n01_no_old_name_rendered[admin]`: their
+  `open_admin` (F20-QA-02 edit) opens admin from the avatar sheet's "ניהול מערכת" row; that row is gone, and a super-admin with
+  1 trip has no avatar, so the helper falls back to "עוד" and finds no row. They need the chooser path (`?choose=1` →
+  `#ptChooseAdmin`) or a fresh `#admin` load.
