@@ -219,6 +219,7 @@ Spec: `docs/F20_spec.md` §0 D5 (amended) / D7, §1.3, criterion 8 (commit 4a7a3
 | F20-D7-01 | `switchVisible()`: avatar only with ≥2 active trips, for everyone. alpha.5 also showed it to a super-admin with one trip. |
 | F20-D7-02 | switcher sheet: the "ניהול" section (`#ptSwitchAdmin` "ניהול מערכת" / "יציאה מהטיול למסך הניהול" / badge "סופר-אדמין") and its click branch (reload to `#admin`) removed for everyone. |
 | F20-D7-03 | in-trip `ensureRows()` (lazy list after an offline start) no longer runs the admin check — the avatar rule does not depend on it. One `platform_admins` query less inside a trip. |
+| F20-D7-05 | **Decided by the architect 2026-10-17.** Admin is never layered over a running trip: when a super-admin's `#admin` appears while the trip's main script runs (hashchange, or a load that started a trip, e.g. `?trip=…#admin`), F03 `syncAdminHash` (**one new line**) hands over to the new `__ptF20.adminNav()`. That function does a full navigation to `<app path>#admin` + reload, which boots the standalone admin with no trip. Loop guard: a session marker `pt20:adminNav` in sessionStorage, cleared when the standalone admin shows. A second attempt within 30 s that still started a trip only cleans the hash. Non-admin: unchanged (hash cleaned). |
 | F20-D7-04 | `APP_VERSION`, `PT_VERSION`, `F20_VERSION` `'3.0.0-alpha.5'` → `'3.0.0-alpha.5.1'`; `<title>` unchanged "Lonely Planner". |
 
 Existing function bodies outside the F20 block: unchanged vs alpha.5 (only the two version lines). Protected functions
@@ -226,9 +227,9 @@ byte-identical vs `git show main:app/index.html`.
 
 Where admin is reachable now: only the start chooser (`#ptChooseAdmin`, also via `?choose=1`, which still works and is cleaned
 from the URL) and a fresh load at `#admin` as super-admin. Inside a running trip no control leads to admin: no row in "עוד"
-(F20-MORE-01, unchanged), no "ניהול" section in the sheet, nothing in the home headers. Not changed: typing `#admin` into the
-address bar of a running trip still opens the F03 screen (F03's existing hashchange behaviour, not a control); its
-"הטיולים שלי" button then reloads to the chooser (`?choose=1`) as in alpha.5.
+(F20-MORE-01, unchanged), no "ניהול" section in the sheet, nothing in the home headers. Typing `#admin` into the address bar of a running trip (or any
+path that starts a trip with `#admin`) no longer layers the F03 screen over the trip: F20-D7-05 reloads into the standalone
+admin. Existing function body touched in alpha.5.1: `syncAdminHash` (F03), one line; `'off'`: no-op.
 
 **For QA — changed / removed ids and texts (alpha.5.1)**
 - Removed: `#ptSwitchAdmin` and the texts "ניהול" (section title), "ניהול מערכת", "יציאה מהטיול למסך הניהול", "סופר-אדמין" in
@@ -239,7 +240,11 @@ address bar of a running trip still opens the F03 screen (F03's existing hashcha
 **Self-checks (2026-10-17)**: `node --check` 8/8 inline blocks OK; no new duplicate ids; protected functions identical vs
 `main`; dev smoke **16/16** (adjusted: sheet asserts no "ניהול"/`#ptSwitchAdmin`, no "ניהול מערכת" text on home/"עוד"; the
 admin standalone steps start from a fresh `#admin` load; new case: super-admin with 1 trip → no avatar, "עוד" without admin,
-`?choose=1` → chooser → admin). `bash tests/f20/run.sh`: F20 suite 71 passed / 6 failed; F04 SWITCH on 123/3, off 124/2;
+`?choose=1` → chooser → admin). After F20-D7-05: `node --check` 8/8 OK, protected functions identical vs `main`, no new duplicate
+ids; smoke **18/18** (new: super-admin `#admin` hashchange in a running trip → reload into the standalone admin,
+`__PT.started=false`, no trip chrome, "הטיולים שלי" → chooser; `?trip=x#admin` load → standalone admin, query dropped;
+non-admin `#admin` in a trip → hash cleaned, no reload, no overlay); `bash tests/f20/run.sh --only f20`: 71 passed / 6
+failed, the same 6 as listed below. `bash tests/f20/run.sh`: F20 suite 71 passed / 6 failed; F04 SWITCH on 123/3, off 124/2;
 F03 SWITCH on 32/15 (wizard on) and 40/15 (wizard off), SWITCH off 47 and 55 green; F02 36 in all four states; Deno 31/9/21;
 DB/functions unchanged. All failures are expected by D7 or the version bump (QA to update):
 - version pins `3.0.0-alpha.5`: F20 `test_st_static[app_version|pt_version]`; F04 `test_c21_static[app_version|pt_version]` (both

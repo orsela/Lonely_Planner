@@ -498,6 +498,10 @@ function openLinkEmail(){
 const adm={open:false,pushed:false,items:[],filter:'all',showRevoked:false,state:'idle',err:''};
 function syncAdminHash(){
  if(location.hash!=='#admin')return;
+ /* CHANGE 2026-10-17 F20-D7-05: what changed from alpha.5.1: with SWITCH_FEATURE='on' a super-admin's #admin while a trip runs no
+    longer opens this screen over the trip: F20 does a full navigation to the standalone admin boot (D7: admin is never layered
+    over a running trip). 'off' (no window.__ptF20) and non-admins: unchanged. */
+ if(acct.isAdmin&&!adm.open&&window.__ptF20&&window.__ptF20.adminNav())return;
  if(acct.isAdmin){if(!adm.open)openAdmin(false)}
  else if(acct.adminKnown||!online()){cleanUrl()}
 }
@@ -1934,6 +1938,19 @@ function fetchT(url,opts,ms){
 function appPath(){return location.pathname}
 /* the trip main script runs once per page load: switching trip / leaving a running trip = new URL + reload */
 function reloadTo(url){try{history.replaceState(null,'',url)}catch{}try{location.reload()}catch{}}
+/* CHANGE 2026-10-17 F20-D7-05: new (no alpha.5.1 equivalent). Called by F03 syncAdminHash when a super-admin's #admin appears
+   while a trip's main script runs: full navigation to <app path>#admin + reload, so the gate boots the standalone admin and no
+   trip is started. Loop guard: if such a navigation already happened in this tab within 30 s and the page still started a trip
+   (e.g. the boot-time admin check timed out → normal boot, §1.4), the hash is cleaned instead — never the overlay. Returns
+   true when it handled the hash (F03 then does nothing). */
+function adminNav(){
+ if(!api||!api.started())return false;
+ let last=0;try{last=Number(sessionStorage.getItem('pt20:adminNav'))||0}catch{}
+ if(Date.now()-last<30000){try{sessionStorage.removeItem('pt20:adminNav')}catch{}try{history.replaceState(history.state,'',location.pathname+location.search)}catch{}return true}
+ try{sessionStorage.setItem('pt20:adminNav',String(Date.now()))}catch{}
+ reloadTo(appPath()+'#admin');
+ return true;
+}
 const ICON={
  shield:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3730a3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
  swap:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>',
@@ -2107,7 +2124,8 @@ function enterFromChooser(tid){
    F20-ADMIN-02: the F03 admin screen without a trip (window.__ptF03Admin, F20-ADMIN-01 in the F03 block)
    --------------------------------------------------------------------------------------------------------- */
 function showAdmin(){
- st.mode='admin';st.seq++;if(api&&api.phase)api.phase('admin');
+ st.mode='admin';st.seq++;
+ try{sessionStorage.removeItem('pt20:adminNav')}catch{}   /* CHANGE 2026-10-17 F20-D7-05: the standalone admin was reached: clear the loop guard */if(api&&api.phase)api.phase('admin');
  onReady(()=>{
   if(st.mode!=='admin')return;
   const de=document.documentElement;
@@ -2310,7 +2328,7 @@ try{
 }catch{}
 
 function attach(a){if(!api&&a&&typeof a==='object')api=a}
-try{Object.defineProperty(window,'__ptF20',{value:Object.freeze({version:F20_VERSION,attach,check,route,adminHead}),writable:false,configurable:false})}catch{}
+try{Object.defineProperty(window,'__ptF20',{value:Object.freeze({version:F20_VERSION,attach,check,route,adminHead,adminNav}),writable:false,configurable:false})}catch{}
 })();
 </script>
 <!-- CHANGE 2026-10-04 F02-GATE-01: the v2.15.2 GM-08 block (static supabase-js <script> tag + the inline IIFE that
