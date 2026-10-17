@@ -1,8 +1,9 @@
 # F20 — Super-admin entry is separate from the trips · spec
 
+<!-- CHANGE 2026-10-17 F20-DOCS-02: D7 (Or) — admin only from the start chooser; the in-trip sheet loses its "ניהול" section; version 3.0.0-alpha.5.1. -->
 <!-- CHANGE 2026-10-13 F20-DOCS-01: new file (no previous version). -->
 
-Version target: **3.0.0-alpha.5** (app). No database migration, no Edge Function change. Mockup approved by Or
+Version target: **3.0.0-alpha.5.1** (app; alpha.5 + D7). No database migration, no Edge Function change. Mockup approved by Or
 2026-10-13: canvas https://claude.ai/artifact/FtgwXNmFKoSSrgnuqghbMG, row 6, alternative A (artboards `F20_Choose`,
 `F20_Admin`, `F20_SwitchSheet`). Alternative B (`F20_AdminURL`, a separate /admin/ address) was rejected.
 
@@ -19,7 +20,8 @@ Base: `main` at 3.0.0-alpha.4.2 (F04). Branch `f20`. The live project `vietnam-t
 | D2 | The chooser shows **all** the user's active trips (not only the last one). |
 | D3 | A device option "לפתוח תמיד ישר לטיול האחרון", **off by default**. |
 | D4 | Regular users (not super-admin) boot exactly as today (cached trip, else newest membership). |
-| D5 (Claude default) | The in-trip switcher (avatar button) is shown to the super-admin always, and to any user with ≥2 active trips. Its "ניהול" section only for the super-admin. A user with one trip and no admin sees no button (unchanged screen). |
+| D5 (Claude default, amended by D7) | The in-trip switcher (avatar button) is shown to any user with ≥2 active trips (super-admin included). It lists trips only — never an admin entry (D7). A user with one trip sees no button (unchanged screen). |
+| D7 (Or, 2026-10-17) | **Two environments that never mix:** admin is reachable **only from the start chooser**. Inside a trip there is no way into admin — the switcher sheet has **no "ניהול" section** for anyone, and "עוד" has no admin row. To reach admin from a trip: close and reopen the app (or open `…/app/?choose=1`). Replaces the in-trip admin entry of the 2026-10-13 mockup. |
 | D6 (Claude default) | The "ניהול מערכת" row leaves "עוד" (it lives in the switcher). The "מייל מקושר" row stays. |
 
 ## 1. Screens (match the artboards; Hebrew, RTL, 390px, touch ≥44px, F03/F04 `pt-*` styles)
@@ -67,12 +69,10 @@ page boots with `#admin` (or the chooser's admin row is tapped) and the user is 
   It must not overlap existing header controls at 390px.
 - Tap → bottom sheet (the existing `openSheet` look): header with avatar, display name and the linked email (LTR) if any;
   section "הטיולים שלי": rows as in 1.1 (flag, name, "<תפקיד> · dd/mm–dd/mm"), the current trip marked with a check
-  icon (`role="img" aria-label="הטיול הנוכחי"`) and sub "… · כאן עכשיו"; section "ניהול" (super-admin only): row "ניהול
-  מערכת" / "יציאה מהטיול למסך הניהול" / badge "סופר-אדמין".
+  icon (`role="img" aria-label="הטיול הנוכחי"`) and sub "… · כאן עכשיו". **No "ניהול" section (D7, 2026-10-17).**
 - Tap another trip → `writeCached` + `location.reload()` (the main script is per trip). Offline → toast "אין חיבור. נסו
   שוב כשהרשת תחזור." and stay.
-- Tap "ניהול מערכת" → reload to the standalone admin screen (`#admin`) — the trip's pending offline queue is kept (it is
-  per trip in localStorage and flushes next time the trip opens).
+- (Removed by D7: no "ניהול מערכת" row in the sheet.)
 - The current trip row is not a link (tap does nothing / closes the sheet).
 - The sheet closes on backdrop tap, Escape, and the browser back gesture, like other sheets.
 
@@ -118,8 +118,9 @@ Nothing new is cached except the D3 key and the existing `pt:_device:active_trip
    trip; `?choose=1` still shows the chooser; turning it off removes the key.
 7. Non-admin with 1 trip: no avatar button, boot unchanged. Non-admin with ≥2 trips: avatar button; sheet lists trips,
    no "ניהול" section; switching reloads into the chosen trip and it stays chosen after another reload.
-8. Super-admin inside a trip: avatar sheet shows trips (current checked) + "ניהול מערכת"; tapping it lands on the
-   standalone admin screen (no trip chrome).
+8. Super-admin inside a trip (D7): the avatar is shown only with ≥2 trips; the sheet lists trips only — no "ניהול" section,
+   no "ניהול מערכת" text anywhere in the trip UI (sheet, עוד, header). Opening `#admin` while a trip is running is not
+   offered by any control.
 9. "עוד" no longer shows "ניהול מערכת" (flag on).
 10. Offline boot with a cached trip → the trip (no chooser, no error); offline tap on another trip in the sheet → toast,
     no navigation.
