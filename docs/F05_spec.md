@@ -1,5 +1,7 @@
 # F05 — A member joins from the group link, after manager approval · spec
 
+<!-- CHANGE 2026-10-19 F05-DOCS-03: §1.5 reject confirm is inline in the card (was a sheet); §1.4 the code boxes accept a
+     whole pasted / autofilled code in the first box. -->
 <!-- CHANGE 2026-10-19 F05-DOCS-02: §2 — the two new tables and the internal helpers live in a new schema `private` (closed to
      clients, so `public` keeps exactly the 9 F01 tables and the F02–F04 catalog checks stay valid); business refusals are
      returned as {"error":code} instead of raised, so rate-limit attempt rows survive. -->
@@ -87,8 +89,9 @@ Replaces the F04 "לא מחובר" card content when `JOIN_FEATURE='on'` and the
 - Header "ממתינים לאישור · <N>" + "רק מנהלים רואים". Rows newest first: avatar letter, name, "ביקש/ה להצטרף · לפני X"
   (relative time). The **first** row is expanded: role segmented control (צופה / **עורך** preselected / מנהל, `aria-pressed`)
   and buttons "אישור כ<role>" + "דחייה". Other rows are collapsed with "פתיחה" (expands that row, collapses the other).
-- Approve → `approve-member` `{member_id, decision:'approve', role}`; reject → confirm sheet "לדחות את הבקשה של <name>?"
-  → `{decision:'reject'}`. Row disappears; toast "<name> הצטרף/ה כ<role>" / "הבקשה נדחתה".
+- Approve → `approve-member` `{member_id, decision:'approve', role}`; reject → an **inline confirm** in the same row
+  "לדחות את הבקשה של <name>?" with "כן, לדחות" / "ביטול" (F05-DOCS-03: was a confirm sheet; inline keeps the manager on
+  home and avoids a sheet over the card) → `{decision:'reject'}`. Row disappears; toast "<name> הצטרף/ה כ<role>" / "הבקשה נדחתה".
 - Live: Realtime on `trip_members` `trip_id=eq.<trip>` while home is open (+ refresh on visible and on sync). Offline → the
   card shows the last known list with buttons disabled and "אין חיבור".
 - Errors: `not_pending` (someone else already handled it) → toast "הבקשה כבר טופלה" and refresh; `not_manager` → hide card.

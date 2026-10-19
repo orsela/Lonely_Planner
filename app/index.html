@@ -55,6 +55,12 @@ const WIZARD_FEATURE='on';
    מערכת" leaves "עוד". 'off' = exactly the 3.0.0-alpha.4.2 behaviour: the F20 block returns on its first line and every F20
    hook line (gate, F03 renderAccount / renderAdmin) is a no-op. Needs STORAGE_BACKEND='cloud'. */
 const SWITCH_FEATURE='on';
+/* CHANGE 2026-10-19 F05-FLAG-01: new flag (no alpha.5.1 equivalent). 'on' = F05 (docs/F05_spec.md): the not-connected screen
+   accepts an iPhone transfer code and a pasted join link, managers see "ממתינים לאישור" on home and approve/reject with a
+   role, the active user is the member's display name (the picker never opens), and the members list replaces the fixed one.
+   The /join/ page has its own JOIN_FEATURE. 'off' = exactly the 3.0.0-alpha.5.1 behaviour: the F05 block returns on its first
+   line and every F05 hook line (gate, F04 done screen) is a no-op. Needs STORAGE_BACKEND='cloud'. */
+const JOIN_FEATURE='on';
 </script>
 <!-- CHANGE 2026-10-05 F03-UI-01: NEW block (no 3.0.0-alpha.2 equivalent) — F03 "super-admin invites a manager"
      (docs/F03_spec.md). Style + one classic script, placed after the flags script and BEFORE the F02 gate block so it
@@ -1597,7 +1603,7 @@ function done(){
  paint('done','<div class="pt-wz-center"><div class="pt-ring ok" style="margin-top:8px">'+ICON.check+'</div>'+h1('הטיול נוצר')+
   '<p class="pt-wz-sub" id="ptWzDoneSub"><bdi>'+esc(f.name.trim())+'</bdi> · '+flags+' · <bdi>'+daysTxt(n)+'</bdi></p></div>'+
   '<div class="pt-wz-form" style="gap:12px">'+linkCard(f.name.trim(),r.join_url,{card:'ptWzLinkCard',url:'ptWzUrl',wa:'ptWzWa',copy:'ptWzCopy'})+
-  '<section class="pt-wz-card" style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px"><span class="pt-wz-soonbadge">בקרוב</span><span style="font-size:12.5px;color:#3a443d;line-height:1.5">דף ההצטרפות נפתח בגרסה הבאה (F05). אפשר כבר לשלוח את הקישור: מי שיפתח אותו עכשיו יראה "ההצטרפות תיפתח בקרוב", והקישור ימשיך לעבוד אחר כך.</span></section>'+
+  /* CHANGE 2026-10-19 F05-DONE-01: the F04 "בקרוב" card is shown only with JOIN_FEATURE!=='on' (the join page works now) */(typeof JOIN_FEATURE!=='undefined'&&JOIN_FEATURE==='on'?'':'<section class="pt-wz-card" style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px"><span class="pt-wz-soonbadge">בקרוב</span><span style="font-size:12.5px;color:#3a443d;line-height:1.5">דף ההצטרפות נפתח בגרסה הבאה (F05). אפשר כבר לשלוח את הקישור: מי שיפתח אותו עכשיו יראה "ההצטרפות תיפתח בקרוב", והקישור ימשיך לעבוד אחר כך.</span></section>')+
   '<p class="pt-wz-help" style="text-align:center;margin:0 2px;font-size:12px">הקישור נשמר גם בהגדרות הטיול, אין צורך לשמור אותו עכשיו.</p></div>',
   '<button type="button" class="pt-btn" id="ptWzEnter">כניסה לטיול ←</button>');
  $('ptWzWa').addEventListener('click',()=>markShared(r.trip_id));
@@ -2331,6 +2337,369 @@ function attach(a){if(!api&&a&&typeof a==='object')api=a}
 try{Object.defineProperty(window,'__ptF20',{value:Object.freeze({version:F20_VERSION,attach,check,route,adminHead,adminNav}),writable:false,configurable:false})}catch{}
 })();
 </script>
+<!-- CHANGE 2026-10-19 F05-UI-01: NEW block (no 3.0.0-alpha.5.1 equivalent) — F05 "a member joins from the group link, after
+     manager approval" (docs/F05_spec.md). Style + one classic script, placed after the F20 block and BEFORE the F02 gate block
+     (same convention as F03/F04/F20). With JOIN_FEATURE='off' (or local-only) the script returns on its first lines, the
+     styles match nothing, and every F05 hook line in the gate / F04 done screen is a no-op.
+     - F05-GATE-02: the not-connected screen (artboard F05_Transfer): "כמעט שם" + the 6-digit transfer code (D1) → join-trip
+       claim_transfer → the trip opens; "יש לי קישור הצטרפות מווטסאפ" runs the shared join flow (../join/flow.js, loaded on
+       demand) inside the app; the F04 "כניסה עם הזמנה" card and the F02 device-code card stay below, unchanged.
+     - F05-HOME-01: "ממתינים לאישור" card at the top of home, active managers only (artboard F05_HomeManager): role choice
+       (viewer / editor preselected / manager), approve / reject (inline confirm) → approve-member; live via Realtime on
+       trip_members + refresh on visibility, every 60 s and after each action.
+     - F05-NAME-01: "מי אני" (D10): the member's display_name from trip_members is the active user (KEYS.user of the trip); the
+       user picker never opens in cloud mode (window.openUserModal is wrapped at runtime — the main-script function body is
+       unchanged).
+     - F05-MEMBERS-01: the fixed USERS list (vault chips / colours) is refilled IN PLACE with the trip's active members (cached
+       per trip under the namespaced key 'pt_members' for offline). The USERS declaration itself is unchanged. -->
+<style>
+/* F05-GATE-02 */
+#ptGate.pt-gate-f05{flex-direction:column;justify-content:flex-start;gap:14px;padding-top:24px}
+#ptGate.pt-gate-f05>*{width:100%;max-width:380px;margin:0!important}
+#ptGate.pt-gate-f05>#ptF05Transfer{margin-top:auto!important}
+#ptGate.pt-gate-f05>:last-child{margin-bottom:auto!important}
+#ptGate.pt-f05-joining>*:not(#ptF05Join){display:none!important}
+#ptGate.pt-f05-joining{padding:0;display:block}
+#ptGate.pt-f05-joining>#ptF05Join{max-width:none;min-height:100%}
+#ptF05Transfer{text-align:right;display:flex;flex-direction:column;gap:12px}
+#ptF05Transfer h2{margin:0;font-size:1.35rem}
+#ptF05Transfer p{margin:0;font-size:.86rem;color:var(--muted);line-height:1.55}
+.pt5-lbl{display:block;font-size:12.5px;font-weight:700;color:#3a443d}
+.pt5-otp-row{display:flex;gap:8px;direction:ltr;justify-content:center}
+.pt5-otp{width:44px;height:54px;border:1.5px solid #d6d9cf;border-radius:12px;background:#fff;text-align:center;font-size:22px;font-weight:800;color:#17211b;font-family:inherit;padding:0}
+.pt5-otp:focus{outline:none;border-color:#0f6b4f;box-shadow:0 0 0 3px #0f6b4f22}
+.pt5-otp[aria-invalid="true"]{border-color:#b42318}
+.pt5-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:48px;border:0;border-radius:14px;background:var(--primary,#0f6b4f);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}
+.pt5-btn[disabled]{opacity:.6;cursor:default}
+.pt5-btn.out{background:#fff;color:var(--primary,#0f6b4f);border:1px solid var(--primary,#0f6b4f)}
+.pt5-err{font-size:12.5px;font-weight:700;color:#b42318;line-height:1.5;margin:0}
+.pt5-help{font-size:11.5px;color:var(--muted);text-align:center;line-height:1.5;margin:0}
+.pt5-others{font-size:12px;font-weight:700;color:var(--muted);padding:2px 4px 0}
+#ptF05Alt{display:flex;flex-direction:column;gap:10px;text-align:right}
+#ptF05Alt [hidden],#ptF05Transfer [hidden]{display:none!important}
+.pt5-alt{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 4px;border:0;background:none;color:#17211b;font-size:14px;font-weight:700;text-align:right;cursor:pointer;font-family:inherit}
+.pt5-alt small{display:block;font-size:11.5px;font-weight:600;color:var(--muted)}
+.pt5-in{width:100%;min-height:46px;padding:11px 14px;border:1.5px solid #d6d9cf;border-radius:12px;background:#fff;color:#17211b;font-size:15px;direction:ltr;text-align:left;font-family:inherit}
+/* F05-HOME-01 */
+#ptF05Pending{background:#fffaf1;border:1.5px solid #f5d6a8;border-radius:18px;padding:12px 14px;margin:10px 14px 0;display:flex;flex-direction:column}
+#ptF05Pending .pt5-ph{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#ptF05Pending .pt5-ph b{font-size:14px;color:#8a4a03}
+#ptF05Pending .pt5-ph span{font-size:11.5px;color:#8a4a03}
+.pt5-req{display:flex;flex-direction:column;gap:10px;padding:12px 0;border-top:1px solid #f5d6a8}
+.pt5-req:first-of-type{border-top:0;padding-top:10px}
+.pt5-who{display:flex;align-items:center;gap:10px}
+.pt5-av{width:34px;height:34px;border-radius:50%;color:#fff;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pt5-who .pt5-nm{flex:1;min-width:0}
+.pt5-who .pt5-nm b{display:block;font-size:14px;overflow-wrap:anywhere}
+.pt5-who .pt5-nm small{font-size:11.5px;color:var(--muted)}
+.pt5-seg{display:flex;background:#f1f0ea;border-radius:12px;padding:3px;gap:3px}
+.pt5-seg button{flex:1;min-height:40px;border:0;border-radius:9px;background:none;color:#3a443d;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.pt5-seg button[aria-pressed="true"]{background:#fff;color:#0b5841;box-shadow:0 1px 3px #0000001f}
+.pt5-acts{display:flex;gap:8px}
+.pt5-acts .pt5-btn{min-height:44px;font-size:13.5px;border-radius:12px}
+.pt5-acts .pt5-grow{flex:1}
+.pt5-acts .pt5-btn.ghost{width:auto;padding:0 16px;background:#fff;color:#17211b;border:1px solid #e4e6df}
+.pt5-acts .pt5-btn.danger{background:#b42318}
+.pt5-open{width:auto!important;min-height:44px!important;padding:0 14px;font-size:13px!important}
+.pt5-off{font-size:12px;color:#8a4a03;margin:8px 0 0}
+.pt5-toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:3000;background:#17211b;color:#fff;border-radius:12px;padding:10px 16px;font-size:13.5px;max-width:90vw;display:none}
+.pt5-toast.on{display:block}
+</style>
+<script>
+/* CHANGE 2026-10-19 F05-UI-01 (3.0.0-alpha.6): new script (no alpha.5.1 equivalent). One IIFE; exposes only the frozen,
+   read-only object window.__ptF05 {version, attach, gateCard} used by the gate (F05-GATE-01 attach, F05-GATECARD-01 hook).
+   Never logs or stores the join code or the transfer code: they live only in the inputs / this closure. */
+(function(){
+'use strict';
+if(typeof JOIN_FEATURE==='undefined'||JOIN_FEATURE!=='on')return;              /* off: nothing at all (alpha.5.1) */
+if(typeof STORAGE_BACKEND!=='undefined'&&STORAGE_BACKEND!=='cloud')return;     /* local-only: no joining */
+
+const F05_VERSION='3.0.0-alpha.6';
+const FLOW_JS='../join/flow.js';
+const CALL_TIMEOUT_MS=15000,REFRESH_MS=60000;
+const ROLE={viewer:'צופה',editor:'עורך',manager:'מנהל'};
+const COLORS=['#0369a1','#b42318','#7c3aed','#0f766e','#be185d','#15803d','#b45309'];
+const TX={
+ offline:'אין חיבור. נסו שוב כשהרשת תחזור.',
+ rate:'יותר מדי ניסיונות. נסו שוב מאוחר יותר.',
+ generic:'משהו השתבש. נסו שוב.',
+ transferBad:'הקוד לא תקף. פותחים שוב את קישור ההצטרפות בספארי ומקבלים קוד חדש.',
+ already:'הטלפון הזה כבר חבר בטיול הזה.',
+ linkBad:'זה לא נראה כמו קישור הצטרפות. הדביקו את הקישור מהווטסאפ או את 8 התווים שבסופו.',
+ handled:'הבקשה כבר טופלה',
+ notManager:'רק מנהלים יכולים לאשר',
+ nameFixed:'השם שלך בטיול נקבע לפי החברות בקבוצה'
+};
+let api=null;   /* set by the gate: {endpoint, approveEndpoint, key, client(), uid(), ensureSession(), withTimeout, timeoutMs, enterTrip(), started(), tripId(), role()} */
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
+function online(){return navigator.onLine!==false}
+function onReady(fn){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fn,{once:true});else fn()}
+let toastEl=null,toastT=null;
+function toast(msg,host){
+ if(!toastEl){toastEl=document.createElement('div');toastEl.className='pt5-toast';toastEl.id='ptF05Toast';toastEl.setAttribute('role','status');toastEl.setAttribute('aria-live','polite')}
+ const h=host||$('ptGate')||document.body;if(toastEl.parentNode!==h)h.appendChild(toastEl);
+ toastEl.textContent=msg;toastEl.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('on'),3200);
+}
+async function callFn(url,body){
+ const c=api.client();if(!c)throw Object.assign(new Error('no client'),{code:'offline'});
+ const g=await c.auth.getSession();const tok=g&&g.data&&g.data.session&&g.data.session.access_token;
+ if(!tok)throw Object.assign(new Error('no session'),{code:'unauthorized'});
+ const ac=typeof AbortController!=='undefined'?new AbortController():null;
+ const t=setTimeout(()=>{try{ac&&ac.abort()}catch{}},CALL_TIMEOUT_MS);
+ let r;
+ try{r=await fetch(url,{method:'POST',headers:{'content-type':'application/json',apikey:api.key,authorization:'Bearer '+tok},body:JSON.stringify(body),signal:ac?ac.signal:undefined})}
+ catch{throw Object.assign(new Error('network'),{code:online()?'network':'offline'})}
+ finally{clearTimeout(t)}
+ let j={};try{j=await r.json()}catch{}
+ if(!r.ok||j.error)throw Object.assign(new Error(j.error||'http_'+r.status),{code:j.error||'server_error'});
+ return j;
+}
+function errText(e){const c=e&&e.code;return c==='offline'?TX.offline:c==='rate_limited'?TX.rate:TX.generic}
+function loadFlow(){
+ return new Promise((res,rej)=>{
+  if(window.LPJoin){res();return}
+  const s=document.createElement('script');s.src=FLOW_JS;s.onload=()=>window.LPJoin?res():rej(new Error('flow'));s.onerror=()=>rej(new Error('flow'));
+  document.head.appendChild(s);
+ });
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F05-GATE-02: the not-connected screen (artboard F05_Transfer)
+   --------------------------------------------------------------------------------------------------------- */
+function gateCard(g){
+ if(!api||!g||$('ptF05Transfer'))return;
+ g.classList.add('pt-gate-f05');
+ g.setAttribute('aria-labelledby','ptF05Title');
+ const sec=document.createElement('section');sec.className='card';sec.id='ptF05Transfer';
+ let boxes='';for(let i=0;i<6;i++)boxes+='<input class="pt5-otp" id="ptF05Otp'+i+'" inputmode="numeric" pattern="[0-9]*" autocomplete="'+(i?'off':'one-time-code')+'" aria-label="ספרה '+(i+1)+'">';
+ sec.innerHTML='<h2 id="ptF05Title">כמעט שם</h2>'+
+  '<p>הטלפון הזה עוד לא מחובר לטיול. הצטרפת בספארי? מקלידים את קוד ההעברה שקיבלת שם.</p>'+
+  '<span class="pt5-lbl" id="ptF05CodeLbl">קוד העברה</span>'+
+  '<div class="pt5-otp-row" role="group" aria-labelledby="ptF05CodeLbl">'+boxes+'</div>'+
+  '<p class="pt5-err" id="ptF05Err" role="alert" hidden></p>'+
+  '<p class="pt5-help">הדבקה ממלאת את כל התיבות. אם הקוד פג – פותחים שוב את קישור ההצטרפות בספארי ומקבלים קוד חדש.</p>'+
+  '<button type="button" class="pt5-btn" id="ptF05Claim" disabled>כניסה לטיול</button>';
+ const others=document.createElement('div');others.className='pt5-others';others.id='ptF05Others';others.textContent='דרכים אחרות';
+ const alt=document.createElement('section');alt.className='card';alt.id='ptF05Alt';
+ alt.innerHTML='<button type="button" class="pt5-alt" id="ptF05LinkBtn" aria-expanded="false" aria-controls="ptF05LinkBox">'+
+  '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>'+
+  '<span style="flex:1">יש לי קישור הצטרפות מווטסאפ<small>מדביקים אותו כאן ומצטרפים מתוך האפליקציה</small></span></button>'+
+  '<div id="ptF05LinkBox" hidden style="display:flex;flex-direction:column;gap:8px">'+
+  '<label class="pt5-lbl" for="ptF05LinkIn">הקישור או הקוד</label><input class="pt5-in" id="ptF05LinkIn" placeholder="…/join/#code=" autocomplete="off" autocapitalize="characters">'+
+  '<p class="pt5-err" id="ptF05LinkErr" role="alert" hidden></p><button type="button" class="pt5-btn out" id="ptF05LinkGo">המשך</button></div>';
+ g.insertBefore(sec,g.firstChild);
+ const inv=$('ptGateInvite');
+ if(inv&&inv.parentNode===g){g.insertBefore(others,inv);g.insertBefore(alt,inv)}
+ else{g.insertBefore(alt,sec.nextSibling);g.insertBefore(others,alt)}
+ /* the F02 device-code card goes last (unchanged; still used by admin_assign_device) */
+ const orig=g.querySelector('.pt-gate-card');if(orig&&orig.parentNode===g)g.appendChild(orig);
+ wireOtp();
+ $('ptF05Claim').onclick=claim;
+ $('ptF05LinkBtn').onclick=()=>{const box=$('ptF05LinkBox'),open=box.hidden;box.hidden=!open;$('ptF05LinkBtn').setAttribute('aria-expanded',String(open));if(open)setTimeout(()=>{try{$('ptF05LinkIn').focus()}catch{}},30)};
+ $('ptF05LinkGo').onclick=joinFromLink;
+ $('ptF05LinkIn').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();joinFromLink()}};
+}
+function otpInputs(){return[0,1,2,3,4,5].map(i=>$('ptF05Otp'+i)).filter(Boolean)}
+function otpValue(){return otpInputs().map(x=>x.value).join('')}
+function wireOtp(){
+ const ins=otpInputs();
+ const sync=()=>{const ok=/^\d{6}$/.test(otpValue());$('ptF05Claim').disabled=!ok;ins.forEach(x=>x.removeAttribute('aria-invalid'));const er=$('ptF05Err');er.hidden=true};
+ ins.forEach((inp,i)=>{
+  inp.addEventListener('input',()=>{
+   const d=inp.value.replace(/\D/g,'');
+   if(d.length>1){fill(d,i);return}
+   inp.value=d;if(d&&i<5)ins[i+1].focus();sync();
+  });
+  inp.addEventListener('keydown',e=>{
+   if(e.key==='Backspace'&&!inp.value&&i>0){ins[i-1].focus();ins[i-1].value='';e.preventDefault();sync()}
+   else if(e.key==='Enter'&&!$('ptF05Claim').disabled){e.preventDefault();claim()}
+  });
+  inp.addEventListener('paste',e=>{const t=(e.clipboardData||window.clipboardData).getData('text')||'';const d=t.replace(/\D/g,'');if(d){e.preventDefault();fill(d,0)}});
+ });
+ function fill(d,from){const s=d.slice(0,6-from);for(let k=0;k<s.length;k++)ins[from+k].value=s[k];ins[Math.min(5,from+s.length)].focus();sync()}
+}
+async function claim(){
+ const code=otpValue(),btn=$('ptF05Claim'),er=$('ptF05Err');
+ if(!/^\d{6}$/.test(code))return;
+ if(!online()){toast(TX.offline);return}
+ btn.disabled=true;btn.textContent='בודקים…';er.hidden=true;
+ try{
+  await api.ensureSession();
+  const r=await callFn(api.endpoint,{action:'claim_transfer',code});
+  btn.textContent='נכנסים…';
+  api.enterTrip(r.trip_id,r.role);
+ }catch(e){
+  const c=e&&e.code;
+  er.textContent=c==='transfer_invalid'?TX.transferBad:c==='already_member'?TX.already:errText(e);er.hidden=false;
+  otpInputs().forEach(x=>x.setAttribute('aria-invalid','true'));
+  btn.disabled=false;btn.textContent='כניסה לטיול';
+ }
+}
+let flowHandle=null;
+async function joinFromLink(){
+ const er=$('ptF05LinkErr'),raw=$('ptF05LinkIn').value;
+ er.hidden=true;
+ const m=/[#?&]code=([A-Za-z0-9-]+)/.exec(raw);const cand=String(m?m[1]:raw).replace(/[\s-]/g,'').toUpperCase();
+ if(!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(cand)){er.textContent=TX.linkBad;er.hidden=false;return}
+ if(!online()){toast(TX.offline);return}
+ const go=$('ptF05LinkGo');go.disabled=true;
+ try{await loadFlow()}catch{go.disabled=false;er.textContent=TX.generic;er.hidden=false;return}
+ go.disabled=false;
+ const g=$('ptGate');if(!g)return;
+ let host=$('ptF05Join');if(!host){host=document.createElement('div');host.id='ptF05Join';g.appendChild(host)}
+ g.classList.add('pt-f05-joining');
+ flowHandle=window.LPJoin.mount(host,{
+  getClient:async()=>{await api.ensureSession();return api.client()},
+  fnUrl:api.endpoint,apiKey:api.key,code:cand,inApp:true,
+  onEnter:(tripId,role)=>{api.enterTrip(tripId,role)},
+  onBack:()=>{try{flowHandle&&flowHandle.destroy()}catch{}flowHandle=null;host.remove();g.classList.remove('pt-f05-joining')}
+ });
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   After the trip started (gate start()): "מי אני", the members list, the managers' pending card
+   --------------------------------------------------------------------------------------------------------- */
+let started=false,tripIdNow=null,myName='',pend=[],chan=null,timer=null,busy=false,sel={},confirmFor=null;
+function tripId(){try{return api.tripId()||(window.__PT&&window.__PT.tripId)||null}catch{return null}}
+function isManager(){try{return(api.role()||(window.__PT&&window.__PT.role))==='manager'}catch{return false}}
+function nsGet(k){try{return localStorage.getItem(k)}catch{return null}}           /* namespaced by the gate (pt:<trip>:) */
+function nsSet(k,v){try{localStorage.setItem(k,v)}catch{}}
+function userKey(){try{return KEYS.user}catch{return null}}
+/* F05-NAME-01 */
+function applyName(n){
+ if(!n)return;myName=n;
+ const k=userKey();if(k&&nsGet(k)!==n)nsSet(k,n);
+ let cur='';try{cur=activeUser}catch{return}
+ if(cur!==n){try{activeUser=n}catch{}try{const um=$('userModal');if(um)um.classList.remove('open')}catch{}try{if(typeof render==='function')render()}catch{}}
+}
+function wrapUserModal(){
+ const orig=window.openUserModal;if(typeof orig!=='function'||orig.__f05)return;
+ const w=function(){
+  /* boot (setupUsers with no name yet): apply silently; a user action ("החלפת משתמש"): say why nothing opens */
+  let cur='';try{cur=activeUser}catch{}
+  if(myName){applyName(myName);if(cur)toast(TX.nameFixed+': '+myName,document.body)}else{loadMe().catch(()=>{})}
+ };
+ w.__f05=true;w.__orig=orig;window.openUserModal=w;
+}
+/* F05-MEMBERS-01 */
+function setUsers(names){
+ if(!Array.isArray(names)||!names.length)return;
+ try{if(typeof USERS==='undefined'||!Array.isArray(USERS))return;USERS.length=0;names.forEach(n=>USERS.push(String(n)))}catch{}
+}
+async function loadMe(){
+ const t=tripId(),c=api&&api.client(),uid=api&&api.uid();if(!t||!c||!uid||!online())return;
+ const{data,error}=await api.withTimeout(c.from('trip_members').select('display_name').eq('trip_id',t).eq('user_id',uid).eq('status','active').maybeSingle(),api.timeoutMs);
+ if(!error&&data&&data.display_name)applyName(data.display_name);
+}
+async function loadMembers(){
+ const t=tripId(),c=api&&api.client();if(!t||!c||!online())return;
+ const{data,error}=await api.withTimeout(c.from('trip_members').select('display_name,status,joined_at,id,role').eq('trip_id',t).in('status',['active','pending']).order('joined_at',{ascending:true}),api.timeoutMs);
+ if(error||!Array.isArray(data))return;
+ const act=data.filter(r=>r.status==='active').map(r=>r.display_name);
+ if(act.length){setUsers(act);nsSet('pt_members',JSON.stringify(act))}
+ pend=data.filter(r=>r.status==='pending').sort((a,b)=>String(b.joined_at||'').localeCompare(String(a.joined_at||'')));
+ paintPending();
+}
+/* F05-HOME-01 */
+function ago(iso){
+ const ms=Date.now()-Date.parse(iso||'');if(!isFinite(ms)||ms<0)return'עכשיו';
+ const m=Math.round(ms/60000);if(m<1)return'עכשיו';if(m<60)return'לפני '+m+' דק׳';
+ const h=Math.round(m/60);if(h<24)return h===1?'לפני שעה':'לפני '+h+' שעות';
+ const d=Math.round(h/24);return d===1?'אתמול':'לפני '+d+' ימים';
+}
+function homePanel(){return(typeof HOME_LAYOUT!=='undefined'&&HOME_LAYOUT==='v2')?$('homeV2'):$('home')}
+function paintPending(){
+ let card=$('ptF05Pending');
+ if(!isManager()||!pend.length){if(card)card.remove();return}
+ const panel=homePanel();if(!panel)return;
+ if(!card){
+  card=document.createElement('section');card.id='ptF05Pending';card.setAttribute('aria-labelledby','ptF05PTitle');
+  const fs=$('ptFirstSteps');
+  const anchor=(fs&&fs.parentNode===panel)?fs:(panel.querySelector('.hv2-map-hero')||(panel.querySelector('.topbar')&&panel.querySelector('.topbar').nextSibling)||panel.firstChild);
+  panel.insertBefore(card,anchor);
+ }
+ if(!pend.some(p=>p.id===sel.open))sel.open=pend[0].id;
+ const off=!online();
+ let h='<div class="pt5-ph"><b id="ptF05PTitle">ממתינים לאישור · '+pend.length+'</b><span>רק מנהלים רואים</span></div>';
+ pend.forEach((p,i)=>{
+  const open=p.id===sel.open,role=sel[p.id]||'editor',col=COLORS[i%COLORS.length];
+  h+='<div class="pt5-req" data-member="'+esc(p.id)+'"><div class="pt5-who"><div class="pt5-av" style="background:'+col+'" aria-hidden="true">'+esc(String(p.display_name||'?').charAt(0))+'</div>'+
+   '<div class="pt5-nm"><b>'+esc(p.display_name)+'</b><small>ביקש/ה להצטרף · '+esc(ago(p.joined_at))+'</small></div>'+
+   (open?'':'<button type="button" class="pt5-btn ghost pt5-open" data-open="'+esc(p.id)+'" aria-label="פתיחת הבקשה של '+esc(p.display_name)+'" style="background:#fff;color:#17211b;border:1px solid #e4e6df">פתיחה</button>')+'</div>';
+  if(open){
+   if(confirmFor===p.id){
+    h+='<p style="margin:0;font-size:13.5px;font-weight:700">לדחות את הבקשה של '+esc(p.display_name)+'?</p><div class="pt5-acts">'+
+     '<button type="button" class="pt5-btn danger pt5-grow" data-act="reject-yes"'+(off||busy?' disabled':'')+'>כן, לדחות</button>'+
+     '<button type="button" class="pt5-btn ghost" data-act="reject-no">ביטול</button></div>';
+   }else{
+    h+='<div class="pt5-seg" role="group" aria-label="תפקיד ל'+esc(p.display_name)+'">'+['viewer','editor','manager'].map(r=>'<button type="button" data-role="'+r+'" aria-pressed="'+(r===role)+'">'+ROLE[r]+'</button>').join('')+'</div>'+
+     '<div class="pt5-acts"><button type="button" class="pt5-btn pt5-grow" data-act="approve"'+(off||busy?' disabled':'')+'>אישור כ'+ROLE[role]+'</button>'+
+     '<button type="button" class="pt5-btn ghost" data-act="reject"'+(off||busy?' disabled':'')+'>דחייה</button></div>';
+   }
+  }
+  h+='</div>';
+ });
+ if(off)h+='<p class="pt5-off" role="status">אין חיבור – אפשר לאשר כשהרשת תחזור.</p>';
+ card.innerHTML=h;
+ card.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{sel.open=b.dataset.open;confirmFor=null;paintPending()});
+ card.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{const id=b.closest('.pt5-req').dataset.member;sel[id]=b.dataset.role;paintPending()});
+ card.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{const id=b.closest('.pt5-req').dataset.member,a=b.dataset.act;
+  if(a==='reject'){confirmFor=id;paintPending()}else if(a==='reject-no'){confirmFor=null;paintPending()}
+  else decide(id,a==='approve'?'approve':'reject')});
+}
+async function decide(memberId,decision){
+ if(busy)return;if(!online()){toast(TX.offline,document.body);return}
+ const p=pend.find(x=>x.id===memberId);if(!p)return;
+ busy=true;paintPending();
+ const role=sel[memberId]||'editor';
+ try{
+  const r=await callFn(api.approveEndpoint,decision==='approve'?{member_id:memberId,decision,role}:{member_id:memberId,decision});
+  toast(decision==='approve'?(p.display_name+' הצטרף/ה כ'+(ROLE[r.role]||ROLE[role])):'הבקשה נדחתה',document.body);
+ }catch(e){
+  const c=e&&e.code;
+  toast(c==='not_pending'?TX.handled:c==='not_manager'?TX.notManager:errText(e),document.body);
+ }finally{
+  busy=false;confirmFor=null;delete sel[memberId];
+  await loadMembers().catch(()=>{});paintPending();
+ }
+}
+function subscribe(){
+ const t=tripId(),c=api&&api.client();if(!t||!c||!c.channel||chan)return;
+ try{
+  chan=c.channel('pt5-members-'+t).on('postgres_changes',{event:'*',schema:'public',table:'trip_members',filter:'trip_id=eq.'+t},()=>{loadMembers().catch(()=>{})}).subscribe();
+ }catch(e){chan=null}
+}
+function onStarted(){
+ if(started||!api||!window.__PT||!window.__PT.started)return;
+ started=true;tripIdNow=tripId();
+ if(!tripIdNow||tripIdNow==='local')return;
+ /* synchronously, before the main script's async boot reaches setupUsers(): never open the picker in cloud mode */
+ wrapUserModal();
+ const k=userKey(),cachedName=k?nsGet(k):null;if(cachedName)myName=cachedName;
+ try{const m=JSON.parse(nsGet('pt_members')||'null');if(Array.isArray(m))setUsers(m)}catch{}
+ setTimeout(async()=>{
+  try{await loadMe()}catch{}
+  try{await loadMembers()}catch{}
+  subscribe();
+  timer=setInterval(()=>{if(document.visibilityState==='visible')loadMembers().catch(()=>{})},REFRESH_MS);
+ },0);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadMembers().catch(()=>{})});
+ window.addEventListener('online',()=>{loadMe().catch(()=>{});loadMembers().catch(()=>{})});
+ window.addEventListener('offline',()=>paintPending());
+ /* home re-renders may rebuild the panel content; keep the card in place */
+ try{const panel=homePanel();if(panel)new MutationObserver(()=>{if(pend.length&&isManager()&&!$('ptF05Pending'))paintPending()}).observe(panel,{childList:true})}catch{}
+}
+try{
+ /* microtask right after start() appended the main script (which ran synchronously) — before its async boot continues */
+ new MutationObserver(()=>{if(!started&&window.__PT&&window.__PT.started)onStarted()})
+  .observe(document.documentElement,{attributes:true,attributeFilter:['class']});
+}catch{}
+
+function attach(a){if(!api&&a&&typeof a==='object')api=a}
+try{Object.defineProperty(window,'__ptF05',{value:Object.freeze({version:F05_VERSION,attach,gateCard}),writable:false,configurable:false})}catch{}
+})();
+</script>
 <!-- CHANGE 2026-10-04 F02-GATE-01: the v2.15.2 GM-08 block (static supabase-js <script> tag + the inline IIFE that
      created a client for the old live project and defined window.storage on its key-value table) is REMOVED and
      replaced by this block. This replacement is unavoidable: that IIFE held the old project's URL/key, which must
@@ -2367,7 +2736,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.5.1'; /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.6'; /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -2579,6 +2948,9 @@ function showCard(){
    /* CHANGE 2026-10-12 F04-GATECARD-01: what changed from 3.0.0-alpha.3: a second card "קיבלת הזמנה לנהל טיול?" with the
       button "כניסה עם הזמנה" is appended below the unchanged card (only when the F04 block exists, i.e. WIZARD_FEATURE='on'). */
    if(window.__ptF04)window.__ptF04.gateCard(g);
+   /* CHANGE 2026-10-19 F05-GATECARD-01: what changed from 3.0.0-alpha.5.1: one new line — with JOIN_FEATURE='on' the F05 block
+      adds "כמעט שם" (transfer code) on top and "יש לי קישור הצטרפות" under it; the cards above stay, the device-code card last. */
+   if(window.__ptF05)window.__ptF05.gateCard(g);
   }
   const code=state.uid?String(state.uid).replace(/-/g,'').slice(0,8):'--------';
   document.getElementById('ptDeviceCode').textContent=code;
@@ -2663,6 +3035,21 @@ if(window.__ptF20&&STORAGE_BACKEND==='cloud'){
   enterTrip:(tripId,role)=>{writeCached({trip_id:String(tripId),role:role||null});if(state.started){location.reload();return}setTrip(tripId,role);installStorage();start()},
   started:()=>state.started,tripId:()=>state.tripId,role:()=>state.role,
   phase:p=>{if(!state.started)state.phase=String(p)}
+ });
+}
+
+/* CHANGE 2026-10-19 F05-GATE-01: new lines (no alpha.5.1 equivalent), additive — no existing statement changed. Placed before
+   the F03 bridge (which may leave this IIFE for the #invite= landing). Hands the F05 block (head, window.__ptF05; absent when
+   JOIN_FEATURE='off' or local-only) its two endpoints (join-trip, approve-member — spec §3), the client, uid, a way to create
+   the client and the (anonymous) session on demand, the timeout helper, and enterTrip() = the normal path
+   writeCached → setTrip → installStorage → start() (reload when a trip already runs). */
+if(window.__ptF05&&STORAGE_BACKEND==='cloud'){
+ window.__ptF05.attach({
+  endpoint:PT_SUPABASE_URL+'/functions/v1/join-trip',approveEndpoint:PT_SUPABASE_URL+'/functions/v1/approve-member',key:PT_SUPABASE_KEY,
+  withTimeout,timeoutMs:PT_TIMEOUT_MS,client:()=>sb,uid:()=>state.uid,
+  ensureSession:async()=>{if(!sb){if(!(await loadLib()))throw new Error('[pt] Supabase library not available');if(!sb)sb=makeClient()}const u=await ensureUser();if(!u)throw new Error('[pt] no session');state.uid=u.id;return u},
+  enterTrip:(tripId,role)=>{writeCached({trip_id:String(tripId),role:role||null});if(state.started){location.reload();return}setTrip(tripId,role);installStorage();start()},
+  started:()=>state.started,tripId:()=>state.tripId,role:()=>state.role
  });
 }
 
@@ -6965,7 +7352,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.5.1'; /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.6';/* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;
