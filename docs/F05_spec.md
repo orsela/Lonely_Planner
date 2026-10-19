@@ -1,5 +1,8 @@
 # F05 — A member joins from the group link, after manager approval · spec
 
+<!-- CHANGE 2026-10-19 F05-DOCS-02: §2 — the two new tables and the internal helpers live in a new schema `private` (closed to
+     clients, so `public` keeps exactly the 9 F01 tables and the F02–F04 catalog checks stay valid); business refusals are
+     returned as {"error":code} instead of raised, so rate-limit attempt rows survive. -->
 <!-- CHANGE 2026-10-19 F05-DOCS-01: new file (no previous version). -->
 
 Version target: **3.0.0-alpha.6** (app + `/join/` page), migration **0012_f05.sql** (+ QA harness **0013**), two new Edge
@@ -106,11 +109,13 @@ With `STORAGE_BACKEND==='cloud'` and `JOIN_FEATURE='on'`:
 
 ## 2. Data — migration 0012_f05.sql (Or runs it in the SQL Editor; Claude verifies by reading)
 
-1. `public.transfer_codes` — `id uuid pk`, `member_id uuid not null → trip_members(id) on delete cascade`, `code_hash text
+0. New schema `private` (no usage for anon/authenticated; not exposed by the API). Tables 1–2 and the internal helpers
+   (`private.f05_*`) live there; the six entry functions in item 3 live in `public`.
+1. `private.transfer_codes` — `id uuid pk`, `member_id uuid not null → trip_members(id) on delete cascade`, `code_hash text
    not null` (SHA-256 hex of the 6 digits + a server pepper is **not** needed: the table has no policies), `expires_at
    timestamptz not null`, `used_at timestamptz`, `created_at timestamptz default now()`. Partial unique index on
    `code_hash where used_at is null`. Index on `member_id`. RLS on, **no policies** (service role only).
-2. `public.join_attempts` — `id bigint identity pk`, `kind text check in ('preview','request','claim')`, `user_id uuid`,
+2. `private.join_attempts` — `id bigint identity pk`, `kind text check in ('preview','request','claim')`, `user_id uuid`,
    `trip_id uuid`, `ip_hash text`, `ok boolean`, `at timestamptz default now()`. Index `(kind, user_id, at)`, `(kind,
    ip_hash, at)`, `(trip_id, at)`. RLS on, no policies. Rows older than 7 days are deleted by the functions
    opportunistically (no cron).
@@ -120,8 +125,9 @@ With `STORAGE_BACKEND==='cloud'` and `JOIN_FEATURE='on'`:
      `issue_transfer(p_user, p_trip)` (returns the plain 6 digits once; voids earlier unused codes of that member),
      `claim_transfer(p_user, p_code)` (moves `trip_members.user_id` to `p_user`, marks used; fails with
      `already_member` if `p_user` already has a row in that trip), `approve_member(p_user, p_member, p_decision, p_role)`.
-   - Errors as `P0001` with fixed codes: `code_invalid`, `name_taken`, `name_invalid`, `rate_limited`,
-     `member_removed`, `transfer_invalid`, `already_member`, `not_manager`, `not_pending`, `role_invalid`.
+   - Refusals are **returned** as `{"error":<code>}` (not raised, so attempt rows are kept), fixed codes: `code_invalid`, `name_taken`, `name_invalid`, `rate_limited`,
+     `member_removed`, `transfer_invalid`, `already_member`, `not_manager`, `not_pending`, `not_member`, `role_invalid`,
+     `invalid_request`.
 4. Rate limits (D4), counted in `join_attempts`: preview ≤30/h per user and ≤60/h per ip_hash; request ≤3 per (user, trip)
    per 24 h and ≤10/h per ip_hash; claim ≤5 failed per user per hour and ≤20 failed per ip_hash per hour. A trip may hold
    at most 20 pending rows (`request` → `rate_limited` beyond that).
