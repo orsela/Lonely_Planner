@@ -1,5 +1,22 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.6 — S2 (F05 done, 2026-10-22)
+
+### F05 · A member joins from the group link, after manager approval — 2026-10-19 → 2026-10-22
+<!-- CHANGE 2026-10-22 F05-DOCS-05: new entry. -->
+- `/join/` (flag `JOIN_FEATURE`): trip preview → name → waiting screen that opens by itself (Realtime + 20 s poll) →
+  approved; iPhone Safari also gets a 6-digit transfer code for the home-screen app. Shared screens in `join/flow.js`.
+- App (3.0.0-alpha.6, flag `JOIN_FEATURE`): not-connected screen "כמעט שם" (transfer code, pasted join link inside the
+  app; F04 invite card kept); managers' home card "ממתינים לאישור" with role choice (editor preselected) and
+  approve / reject; "מי אני" = the member's display name (picker never opens in cloud mode); vault members = the trip's
+  active members. 3 existing lines changed (versions, F04 "בקרוב" join card). Protected functions byte-identical.
+- Edge Functions `join-trip`, `approve-member` (3.0.0-alpha.6.0, deployed 2026-10-19).
+- DB `0012_f05`: schema `private` (transfer_codes, join_attempts), six service-role functions, DB rate limits;
+  `0013_qa_f05_harness` (`qa.f05_run()`). Applied by Or 2026-10-19 / 2026-10-22.
+- QA (short, by Or's decision): qa.f05 120/120 + f01–f04 regression on the real project, dev DB 51/51, functions 14/14
+  (+ independent 11/12, finding: no version header), smoke 28/28, phone check passed. Full browser QA not run.
+  See docs/qa/F05_QA.md.
+
 ## 3.0.0-alpha.3.4 — S2 (F03 done, 2026-10-12)
 
 ### F03 · Super-admin invites a manager — 2026-10-05 → 2026-10-12
