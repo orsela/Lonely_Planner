@@ -12,14 +12,15 @@ records "last seen". Version **3.0.0-alpha.7.0**. Contract: `docs/F06_spec.md` �
 | `rename` | `member_id, display_name` | `member_rename` | `{member_id, trip_id, display_name, changed}` |
 | `remove` | `member_id` | `member_remove` | `{member_id, trip_id, status:'removed', display_name}` |
 | `leave` | `trip_id` | `member_leave` | `{ok:true, trip_id, member_id}` |
-| `rotate_link` | `trip_id` | `rotate_join_code` | `{code, code_version}` (the SQL `version`; `version` in the body is the function version) |
+| `rotate_link` | `trip_id` | `rotate_join_code` | `{code, link_version}` (spec clarification C4; `version` in the body is the function version) |
 | `touch` | `trip_id` | `member_touch` (≤ once / 10 min) | `{ok:true, touched}` |
 
 Every body carries `version` and every response the header `X-Function-Version: 3.0.0-alpha.7.0` (exposed via CORS).
 Errors `{error, version}`: 401 `unauthorized` · 400 `invalid_request` / `role_invalid` / `name_invalid` · 403 `not_manager`
 / `not_member` · 409 `not_active` / `name_taken` / `last_manager` · 405 · 500.
 
-All permission checks (active manager of that trip, last manager, name rules) are in the database functions. Logs: one
+Missing / null arguments → `invalid_request`; roles are lower case only (anything else → `role_invalid`); anonymous
+identities are accepted (spec clarifications C6, C11). All permission checks (active manager of that trip, last manager, name rules) are in the database functions. Logs: one
 JSON line per request with action, status and error code — never the JWT, ids, codes or names. Secrets: none beyond
 Supabase's own.
 

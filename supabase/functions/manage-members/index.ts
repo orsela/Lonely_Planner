@@ -10,8 +10,8 @@
 //   rename      {member_id, display_name}  → rpc member_rename    → {member_id, trip_id, display_name, changed}
 //   remove      {member_id}                → rpc member_remove    → {member_id, trip_id, status:'removed', display_name}
 //   leave       {trip_id}                  → rpc member_leave     → {ok:true, trip_id, member_id}
-//   rotate_link {trip_id}                  → rpc rotate_join_code → {code, code_version}  (SQL `version`; the body
-//                                                                   field `version` is reserved for FN_VERSION)
+//   rotate_link {trip_id}                  → rpc rotate_join_code → {code, link_version}  (spec clarification C4: the
+//                                                                   body field `version` is FN_VERSION)
 //   touch       {trip_id}                  → rpc member_touch     → {ok:true, touched}
 // Every success body also carries `version` (= FN_VERSION) and every response the header `X-Function-Version`
 // (closes F05 QA finding D1 for this function).
@@ -158,13 +158,14 @@ async function call(name: string, args: Record<string, unknown>): Promise<Record
 async function act(action: Action, uid: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
   switch (action) {
     case "set_role": {
-      if (!isUuid(body.member_id)) throw new HttpError("invalid_request");
+      // C6: missing / null → invalid_request; any other value outside the lower-case list → role_invalid
+      if (!isUuid(body.member_id) || body.role == null) throw new HttpError("invalid_request");
       if (typeof body.role !== "string" || !ROLES.includes(body.role)) throw new HttpError("role_invalid");
       const d = await call("member_set_role", { p_user: uid, p_member: body.member_id, p_role: body.role });
       return pick(d, ["member_id", "trip_id", "role", "display_name", "changed"]);
     }
     case "rename": {
-      if (!isUuid(body.member_id)) throw new HttpError("invalid_request");
+      if (!isUuid(body.member_id) || body.display_name == null) throw new HttpError("invalid_request");   // C6
       if (typeof body.display_name !== "string") throw new HttpError("name_invalid");
       const d = await call("member_rename", { p_user: uid, p_member: body.member_id, p_name: body.display_name.slice(0, 200) });
       return pick(d, ["member_id", "trip_id", "display_name", "changed"]);
@@ -183,8 +184,8 @@ async function act(action: Action, uid: string, body: Record<string, unknown>): 
       if (!isUuid(body.trip_id)) throw new HttpError("invalid_request");
       const d = await call("rotate_join_code", { p_user: uid, p_trip: body.trip_id });
       if (typeof d.code !== "string" || !/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(d.code)) throw new HttpError("server_error");
-      // the body field `version` is the function version (spec §3.1), so the join code's version is sent as `code_version`
-      return { code: d.code, code_version: d.version ?? null };
+      // C4: the link's version is `link_version`; `version` in the body stays the function version (spec §3.1)
+      return { code: d.code, link_version: d.link_version ?? null };
     }
     case "touch": {
       if (!isUuid(body.trip_id)) throw new HttpError("invalid_request");

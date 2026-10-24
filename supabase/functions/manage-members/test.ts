@@ -68,7 +68,11 @@ Deno.test("auth + validation: no rpc call for bad input", async () => {
   eq((await call({ action: "nope" })).j.error, "invalid_request");
   eq((await call({ action: "set_role", member_id: "x", role: "viewer" })).j.error, "invalid_request");
   eq((await call({ action: "set_role", member_id: MEMBER, role: "boss" })).j.error, "role_invalid");
-  eq((await call({ action: "set_role", member_id: MEMBER })).j.error, "role_invalid");
+  eq((await call({ action: "set_role", member_id: MEMBER })).j.error, "invalid_request");              // C6 missing
+  eq((await call({ action: "set_role", member_id: MEMBER, role: "Viewer" })).j.error, "role_invalid");   // C6 case
+  eq((await call({ action: "set_role", member_id: MEMBER, role: 3 })).j.error, "role_invalid");
+  eq((await call({ action: "rename", member_id: MEMBER })).j.error, "invalid_request");                  // C6 missing
+  eq((await call({ action: "remove" })).j.error, "invalid_request");
   eq((await call({ action: "rename", member_id: MEMBER, display_name: 5 })).j.error, "name_invalid");
   eq((await call({ action: "rename", member_id: "x", display_name: "a" })).j.error, "invalid_request");
   eq((await call({ action: "remove", member_id: 1 })).j.error, "invalid_request");
@@ -90,7 +94,7 @@ Deno.test("each action → its SQL function with the caller's uid", async () => 
     [{ action: "leave", trip_id: TRIP }, "member_leave", { p_user: MGR.id, p_trip: TRIP },
       { ok: true, trip_id: TRIP, member_id: MEMBER }, { ok: true, trip_id: TRIP, member_id: MEMBER }],
     [{ action: "rotate_link", trip_id: TRIP }, "rotate_join_code", { p_user: MGR.id, p_trip: TRIP },
-      { code: "K7M2Q9XA", version: 2 }, { code: "K7M2Q9XA", code_version: 2 }],
+      { code: "K7M2Q9XA", link_version: 2 }, { code: "K7M2Q9XA", link_version: 2 }],
     [{ action: "touch", trip_id: TRIP }, "member_touch", { p_user: MGR.id, p_trip: TRIP },
       { ok: true, touched: false }, { ok: true, touched: false }],
   ];
@@ -124,7 +128,7 @@ Deno.test("rpc error / bad rotate payload / thrown getUser → 500", async () =>
   resetDeps();
   setDeps({ getUser: () => Promise.resolve(MGR), rpc: () => Promise.resolve({ data: null, error: { message: "boom" } }) });
   eq((await call({ action: "touch", trip_id: TRIP })).status, 500);
-  mock({ code: "lower123", version: 2 });
+  mock({ code: "lower123", link_version: 2 });
   eq((await call({ action: "rotate_link", trip_id: TRIP })).j.error, "server_error");
   resetDeps();
   setDeps({ getUser: () => Promise.reject(new Error("auth down")), rpc: () => Promise.resolve({ data: {}, error: null }) });
@@ -138,7 +142,7 @@ Deno.test("logs: one JSON line, no JWT, ids, codes or names", async () => {
   try {
     mock({ member_id: MEMBER, trip_id: TRIP, display_name: "איתי", changed: true });
     await call({ action: "rename", member_id: MEMBER, display_name: "איתי" });
-    mock({ code: "K7M2Q9XA", version: 2 });
+    mock({ code: "K7M2Q9XA", link_version: 2 });
     await call({ action: "rotate_link", trip_id: TRIP });
     mock({ error: "name_taken" });
     await call({ action: "rename", member_id: MEMBER, display_name: "איתי" }, "jwt-ok");

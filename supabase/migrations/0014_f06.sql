@@ -5,7 +5,7 @@
 --     public.member_rename(p_user uuid, p_member uuid, p_name text)     returns jsonb   (spec §2.2)
 --     public.member_remove(p_user uuid, p_member uuid)                  returns jsonb   (spec §2.3)
 --     public.member_leave(p_user uuid, p_trip uuid)                     returns jsonb   (spec §2.4)
---     public.rotate_join_code(p_user uuid, p_trip uuid)                 returns jsonb   (spec §2.5)
+--     public.rotate_join_code(p_user uuid, p_trip uuid)                 returns jsonb   (spec §2.5; {code, link_version})
 --     public.member_touch(p_user uuid, p_trip uuid)                     returns jsonb   (spec §2.8)
 --   4 new internal helpers in `private` (closed to clients): f06_is_manager, f06_other_managers, f06_new_join_code and the
 --   trigger function f06_tripname_sync + trigger `trip_kv_tripname_sync` on public.trip_kv (spec §2.7, D4).
@@ -24,7 +24,9 @@
 --
 -- Error contract (F05 pattern, deliberately NOT raised): refusals are RETURNED as {"error":"<code>"}. Codes:
 --   not_manager · not_member · not_active · role_invalid · name_invalid · name_taken · last_manager · invalid_request
--- An unknown p_member is reported as `not_active` (there is no active member with that id).
+-- An unknown p_member is reported as `not_active` (there is no active member with that id). Null / missing arguments →
+-- invalid_request; roles are case-sensitive lower case ('Viewer' → role_invalid). Spec clarifications C4, C6, C7, C11
+-- (architect, 2026-10-22): rotate returns `link_version`; remove / leave also delete the member's open relink_tokens.
 
 -- ===========================================================================
 -- 1. Internal helpers (not callable by clients)
@@ -88,10 +90,10 @@ as $$
 declare
   m record;
 begin
-  if p_user is null or p_member is null then
+  if p_user is null or p_member is null or p_role is null then
     return private.f05_err('invalid_request');
   end if;
-  if coalesce(p_role, '') not in ('manager', 'editor', 'viewer') then
+  if p_role not in ('manager', 'editor', 'viewer') then
     return private.f05_err('role_invalid');
   end if;
   select mm.id, mm.trip_id into m from public.trip_members mm where mm.id = p_member;
@@ -142,7 +144,7 @@ declare
   m      record;
   v_name text := private.f05_clean_name(p_name);
 begin
-  if p_user is null or p_member is null then
+  if p_user is null or p_member is null or p_name is null then
     return private.f05_err('invalid_request');
   end if;
   select mm.id, mm.trip_id into m from public.trip_members mm where mm.id = p_member;
@@ -219,6 +221,7 @@ begin
     raise;
   end;
   delete from private.transfer_codes c where c.member_id = m.id and c.used_at is null;
+  delete from public.relink_tokens r where r.member_id = m.id and r.used_at is null;   -- C11
   return pg_catalog.jsonb_build_object('member_id', m.id, 'trip_id', m.trip_id, 'status', 'removed',
                                        'display_name', m.display_name);
 end;
@@ -258,13 +261,14 @@ begin
     raise;
   end;
   delete from private.transfer_codes c where c.member_id = m.id and c.used_at is null;
+  delete from public.relink_tokens r where r.member_id = m.id and r.used_at is null;   -- C11
   return pg_catalog.jsonb_build_object('ok', true, 'trip_id', p_trip, 'member_id', m.id);
 end;
 $$;
 
 -- ===========================================================================
 -- 6. rotate_join_code — an active manager replaces the trip's join code (spec §2.5, D3)
---    Pending rows and transfer codes are not touched.
+--    Pending rows and transfer codes are not touched. Returns {code, link_version} (C4).
 -- ===========================================================================
 create or replace function public.rotate_join_code(p_user uuid, p_trip uuid)
 returns jsonb
@@ -295,7 +299,7 @@ begin
         -- a trip without a code row (not created by F04): create it
         insert into public.trip_join_codes (trip_id, code) values (p_trip, v_code) returning version into v_ver;
       end if;
-      return pg_catalog.jsonb_build_object('code', v_code, 'version', v_ver);
+      return pg_catalog.jsonb_build_object('code', v_code, 'link_version', v_ver);   -- C4: `version` is the function's
     exception when unique_violation then
       v_ver := null;   -- the same code exists for another trip: try another
     end;

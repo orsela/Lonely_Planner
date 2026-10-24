@@ -73,7 +73,15 @@ begin
   res := public.member_set_role(mgr, ma, 'boss');
   insert into r(name,pass,detail) values ('set_role bad role → role_invalid', res='{"error":"role_invalid"}', res::text);
   res := public.member_set_role(mgr, ma, null);
-  insert into r(name,pass,detail) values ('set_role null role → role_invalid', res='{"error":"role_invalid"}', res::text);
+  insert into r(name,pass,detail) values ('C6 set_role null role → invalid_request', res='{"error":"invalid_request"}', res::text);
+  res := public.member_set_role(mgr, ma, 'Viewer');
+  insert into r(name,pass,detail) values ('C6 set_role ''Viewer'' (case) → role_invalid', res='{"error":"role_invalid"}', res::text);
+  res := public.member_rename(mgr, ma, null);
+  insert into r(name,pass,detail) values ('C6 rename null name → invalid_request', res='{"error":"invalid_request"}', res::text);
+  res := public.member_remove(mgr, null);
+  insert into r(name,pass,detail) values ('C6 remove null member → invalid_request', res='{"error":"invalid_request"}', res::text);
+  res := public.rotate_join_code(mgr, null);
+  insert into r(name,pass,detail) values ('C6 rotate null trip → invalid_request', res='{"error":"invalid_request"}', res::text);
   res := public.member_set_role(a, mb, 'editor');
   insert into r(name,pass,detail) values ('set_role by an editor → not_manager', res='{"error":"not_manager"}', res::text);
   res := public.member_set_role(mg2, mb, 'editor');
@@ -128,8 +136,10 @@ begin
 
   -- ================= §2.3 member_remove =================
   perform public.issue_transfer(b, t);
+  insert into public.relink_tokens(member_id, token_hash, expires_at) values (mb, 'rt-open-b', now() + interval '1 day');
+  insert into public.relink_tokens(member_id, token_hash, expires_at, used_at) values (mb, 'rt-used-b', now() + interval '1 day', now());
   select count(*) into n from private.transfer_codes where member_id=mb and used_at is null;
-  insert into r(name,pass,detail) values ('setup: b has an open transfer code', n=1, n::text);
+  insert into r(name,pass,detail) values ('setup: b has an open transfer code and an open relink token', n=1, n::text);
   res := public.member_remove(c, mb);
   insert into r(name,pass,detail) values ('remove by an editor → not_manager', res='{"error":"not_manager"}', res::text);
   res := public.member_remove(mg2, mb);
@@ -140,6 +150,8 @@ begin
   select status into v from public.trip_members where id=mb;
   select count(*) into n from private.transfer_codes where member_id=mb and used_at is null;
   insert into r(name,pass,detail) values ('remove: status removed, row kept, open transfer codes deleted', res->>'status'='removed' and v='removed' and n=0, res::text||' codes='||n);
+  select string_agg(token_hash, ',' order by token_hash) into v from public.relink_tokens where member_id=mb;
+  insert into r(name,pass,detail) values ('C11 remove: open relink_tokens deleted, used ones kept', v='rt-used-b', coalesce(v,'∅'));
   res := public.member_remove(mgr, mb);
   insert into r(name,pass,detail) values ('remove again → not_active', res='{"error":"not_active"}', res::text);
   res := public.member_set_role(mgr, mb, 'editor');
@@ -159,9 +171,12 @@ begin
   -- the F01 trigger backstop are exercised through member_set_role / member_leave and the direct-write row at the end.
 
   -- ================= §2.4 member_leave =================
+  insert into public.relink_tokens(member_id, token_hash, expires_at) values (mc, 'rt-open-c', now() + interval '1 day');
   res := public.member_leave(c, t);
   select status into v from public.trip_members where id=mc;
   insert into r(name,pass,detail) values ('leave: own row removed', res->>'ok'='true' and v='removed', res::text);
+  select count(*) into n from public.relink_tokens where member_id=mc;
+  insert into r(name,pass,detail) values ('C11 leave: open relink_tokens deleted', n=0, n::text);
   res := public.member_leave(c, t);
   insert into r(name,pass,detail) values ('leave again → not_member', res='{"error":"not_member"}', res::text);
   res := public.member_leave(ed, t);
@@ -181,6 +196,7 @@ begin
   -- b is removed. preview: me=null (form); request: same row → pending with the new name and the default role
   res := public.join_preview(b, code, 'ipB2');
   insert into r(name,pass,detail) values ('D2 preview by a removed identity: me=null (form)', res->'me'='null'::jsonb and res->>'name' is not null, res::text);
+  update public.trip_members set last_seen_at = '2026-10-01T10:00:00Z' where id=mb;
   update public.trips set default_role='viewer' where id=t;
   res := public.join_request(b, code, 'איתי חדש', 'ipB2');
   select status||'/'||role||'/'||display_name||'/'||(approved_at is null)::text||'/'||(joined_at > now() - interval '1 minute')::text into v from public.trip_members where id=mb;
@@ -188,6 +204,7 @@ begin
     (res->>'member_id')::uuid=mb and res->>'status'='pending' and res->>'role'='viewer' and (res->>'created')::boolean and v='pending/viewer/איתי חדש/true/true', res::text||' row='||v);
   select count(*) into n from public.trip_members where trip_id=t and user_id=b;
   insert into r(name,pass,detail) values ('D2 still one row for (trip, user)', n=1, n::text);
+  insert into r(name,pass,detail) values ('C11 re-requested row keeps last_seen_at', (select last_seen_at from public.trip_members where id=mb)='2026-10-01T10:00:00Z'::timestamptz, '');
   res := public.join_preview(b, code, 'ipB2');
   insert into r(name,pass,detail) values ('D2 preview after re-request: me=pending', res->'me'->>'status'='pending', res::text);
   res := public.approve_member(mgr, mb, 'approve', null);
@@ -249,7 +266,7 @@ begin
   res := public.rotate_join_code(mgr, t);
   select jc.code into v from public.trip_join_codes jc where jc.trip_id=t;
   insert into r(name,pass,detail) values ('rotate: new 8-char code from the alphabet, version+1, stored',
-    res->>'code' ~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$' and res->>'code'<>oldcode and (res->>'version')::int=oldver+1 and v=res->>'code', res::text);
+    res->>'code' ~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$' and res->>'code'<>oldcode and (res->>'link_version')::int=oldver+1 and v=res->>'code' and not res ? 'version', res::text);
   insert into r(name,pass,detail) values ('rotate: rotated_at = now', (select rotated_at > now() - interval '1 minute' from public.trip_join_codes where trip_id=t), '');
   res := public.join_preview(c, oldcode, 'ipR');
   insert into r(name,pass,detail) values ('old code → code_invalid', res='{"error":"code_invalid"}', res::text);
@@ -260,7 +277,7 @@ begin
   res := public.claim_transfer(c, tc, 'ipR');
   insert into r(name,pass,detail) values ('rotate: earlier transfer code still claimable (D3)', (res->>'trip_id')::uuid=t, res::text);
   res := public.rotate_join_code(mgr, t); res := public.rotate_join_code(mgr, t);
-  insert into r(name,pass,detail) values ('rotate twice more → version+3', (res->>'version')::int=oldver+3, res::text);
+  insert into r(name,pass,detail) values ('rotate twice more → link_version+3', (res->>'link_version')::int=oldver+3, res::text);
 
   -- ================= §2.8 member_touch =================
   res := public.member_touch(mgr, t);
@@ -298,10 +315,10 @@ end $t$;
 
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',true);
-update public.trip_kv set value = '  יפן   2028 ' where trip_id = current_setting('qa.t')::uuid and key = 'tripname';
+update public.trip_kv set value = E'  יפן \t\n 2028 ' where trip_id = current_setting('qa.t')::uuid and key = 'tripname';
 reset role;
-insert into r(name,pass,detail) select 'trigger: manager kv write → trips.name cleaned', name='יפן 2028', name from public.trips where id=current_setting('qa.t')::uuid;
-insert into r(name,pass,detail) select 'trigger: kv value itself unchanged', value='  יפן   2028 ', value from public.trip_kv where trip_id=current_setting('qa.t')::uuid and key='tripname';
+insert into r(name,pass,detail) select 'trigger: manager kv write → trips.name cleaned (C7: trim + any whitespace run → one space)', name='יפן 2028', name from public.trips where id=current_setting('qa.t')::uuid;
+insert into r(name,pass,detail) select 'trigger: kv value itself unchanged', value=E'  יפן \t\n 2028 ', value from public.trip_kv where trip_id=current_setting('qa.t')::uuid and key='tripname';
 
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}',true);
