@@ -51,7 +51,7 @@ function mock(out: unknown, user: unknown = ANON) {
 }
 
 Deno.test("version + status map", () => {
-  assert(/^3\.0\.0-alpha\.7/.test(FN_VERSION));
+  assert(/^3\.0\.0-alpha\.7/.test(FN_VERSION)); // CHANGE 2026-10-22 F06-FN-08: was the alpha.6 pin
   eq([statusFor("code_invalid"), statusFor("name_taken"), statusFor("rate_limited"), statusFor("member_removed"), statusFor("x")],
     [404, 409, 429, 403, 500]);
 });
