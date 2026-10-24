@@ -1,4 +1,6 @@
-/* Lonely Planner · join flow · version 3.0.0-alpha.6 · F05
+/* Lonely Planner · join flow · version 3.0.0-alpha.7 · F05
+   CHANGE 2026-10-22 F06-JOIN-02: version only (VERSION 'alpha.6' → 'alpha.7'); no logic change. With the F06 server (D2) a
+   removed identity gets me=null / a new pending row, so the 'removed' screen below is no longer reached (kept for alpha.6).
    CHANGE 2026-10-19 F05-JOIN-02: new file (no previous version). The member-join screens of docs/F05_spec.md §1.1–1.3 and
    §1.6 (artboards F05_Join, F05_Pending, F05_Approved, F05_Invalid), shared by the /join/ page (outside the PWA scope) and
    the app's not-connected screen ("יש לי קישור הצטרפות", §1.4), which loads this file on demand.
@@ -19,7 +21,7 @@
 (function(){
 'use strict';
 if(window.LPJoin)return;
-const VERSION='3.0.0-alpha.6';
+const VERSION='3.0.0-alpha.7'; /* CHANGE 2026-10-22 F06-JOIN-02: was '3.0.0-alpha.6' */
 const POLL_MS=20000,CALL_TIMEOUT_MS=15000;
 const ROLE={manager:'מנהל',editor:'עורך',viewer:'צופה'};
 const TX={

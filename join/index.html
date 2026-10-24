@@ -8,7 +8,13 @@
 <meta name="theme-color" content="#0f5c43">
 <title>הצטרפות לטיול · Lonely Planner</title>
 <!-- CHANGE 2026-10-12 F04-NAME-01: display name Plan_Travel → Lonely Planner (title + brand). -->
-<!-- Lonely Planner join page · version 3.0.0-alpha.6 · F05
+<!-- Lonely Planner join page · version 3.0.0-alpha.7 · F06
+     CHANGE 2026-10-22 F06-JOIN-01: what changed from 3.0.0-alpha.6: new flag MEMBERS_FEATURE ('on' default). With it on,
+     "פתיחת הטיול" also keeps the join code in the trip's device namespace (pt:<trip>:lp_join_code) so that the app can offer
+     "בקשה להצטרף שוב" if this member is removed later (docs/F06_spec.md §1.8b); it is deleted with the trip's other device keys.
+     A removed identity now gets the normal form from the server (F06 D2), so flow.js's "הוסרת מהטיול" screen is no longer
+     reached (kept for MEMBERS_FEATURE='off' / an alpha.6 server). 'off' = alpha.6 exactly.
+     Lonely Planner join page · version 3.0.0-alpha.6 · F05
      CHANGE 2026-10-19 F05-JOIN-01: what changed from 3.0.0-alpha.4 (F04-JOIN-01): with JOIN_FEATURE='on' (default) this page
      runs the F05 join flow (docs/F05_spec.md §1.1–1.3, §1.6): it reads the 8-char code from #code=…, keeps it only in
      sessionStorage 'lp:join_code' (so a reload works), removes the hash from the address bar at once (as before), signs the
@@ -49,6 +55,8 @@ p{margin:0;font-size:14px;line-height:1.6;color:#3a443d}
 <script>
 /* CHANGE 2026-10-19 F05-JOIN-01: flag. 'on' = the F05 join flow; 'off' = the F04 page above, no network, code never read. */
 const JOIN_FEATURE='on';
+/* CHANGE 2026-10-22 F06-JOIN-01: new flag (no alpha.6 equivalent). 'on' = keep the join code for a later "בקשה להצטרף שוב"; 'off' = alpha.6. */
+const MEMBERS_FEATURE='on';
 (function(){
 'use strict';
 const SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
@@ -81,6 +89,8 @@ async function getClient(){
 }
 function enter(tripId,role){
  try{localStorage.setItem('pt:_device:active_trip',JSON.stringify({trip_id:String(tripId),role:role||null}))}catch(e){}
+ /* CHANGE 2026-10-22 F06-JOIN-01: new line — the join code goes with the trip's device keys (read by the app only for screen 1.8b) */
+ if(MEMBERS_FEATURE==='on'&&code&&window.LPJoin){const c=window.LPJoin.normCode(code);if(c)try{localStorage.setItem('pt:'+String(tripId)+':lp_join_code',c)}catch(e){}}
  try{sessionStorage.removeItem(CODE_KEY)}catch(e){}
  location.href='../app/';
 }
