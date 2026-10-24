@@ -133,11 +133,12 @@ class F06Backend(f05.F05Backend):
                 uid = self.tokens.get(token) if token else None
                 vals = req.get("values")
                 vals = vals if isinstance(vals, list) else [vals]
+                flt = {f.get("col"): f.get("val") for f in req.get("filters") or [] if f.get("op") == "eq"}
                 for v in vals:
-                    if not isinstance(v, dict) or v.get("key") != "tripname" and not (req.get("action") == "update" and "value" in v):
+                    if not isinstance(v, dict) or "value" not in v:
                         continue
-                    tid = v.get("trip_id") or next((f["val"] for f in req.get("filters") or [] if f.get("col") == "trip_id"), None)
-                    key = v.get("key") or next((f["val"] for f in req.get("filters") or [] if f.get("col") == "key"), None)
+                    tid = v.get("trip_id") or flt.get("trip_id")
+                    key = v.get("key") or flt.get("key")
                     if key != "tripname" or not tid or (tid,) not in self.rows["trips"]:
                         continue
                     if uid and tid in self.active_trips(uid, ("manager",)):
@@ -156,16 +157,14 @@ class F06Backend(f05.F05Backend):
             me = self.member_of(tid, uid) if tid else None
             if me and me["status"] == "removed":
                 if act == "preview":
-                    me["status"] = "__hidden__"
+                    # §2.6: answer as for a new identity (me = null) — hide the removed row for the duration of the call
+                    self.rows["trip_members"].pop((me["id"],), None)
                     try:
                         return super()._join_trip(uid, b)
                     finally:
-                        me["status"] = "removed"
+                        self.rows["trip_members"][(me["id"],)] = me
                 return self._rerequest(uid, tid, me, b)
         return super()._join_trip(uid, b)
-
-    def _join_trip_preview_hidden(self):
-        return None
 
     def _rerequest(self, uid, tid, me, b):
         now = self.tnow()
@@ -201,7 +200,9 @@ class F06Backend(f05.F05Backend):
                 status, resp = MM_STATUS.get(code, 500), {"error": code}
             else:
                 status, resp = self._mm(uid, act, body)
-            resp = dict(resp, version=FN_VERSION) if act != "rotate_link" or status != 200 else dict(resp, version=FN_VERSION)
+            if act == "rotate_link" and status == 200:
+                resp = dict(resp, link_version=resp.get("version"))   # see README A-FN-1
+            resp = dict(resp, version=FN_VERSION)
             self.mm_calls.append({"device": device, "via": via, "action": act, "body": copy.deepcopy(body), "uid": uid,
                                   "status": status, "resp": copy.deepcopy(resp)})
             return status, resp
