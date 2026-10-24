@@ -3,7 +3,7 @@
 <!-- CHANGE 2026-10-19 F05-FN-07: new file (no previous version). -->
 
 A device joins a trip from the group link, waits for the manager, and (iPhone) moves its membership to the installed app
-with a transfer code. Version **3.0.0-alpha.6.0**. Contract: `docs/F05_spec.md` §3. `verify_jwt=false`; the function
+with a transfer code. Version **3.0.0-alpha.7.0** <!-- CHANGE 2026-10-22 F06-FN-07: was 3.0.0-alpha.6.0; + header `X-Function-Version`; F06 D2: `member_removed` is no longer produced by the database -->. Contract: `docs/F05_spec.md` §3. `verify_jwt=false`; the function
 verifies the bearer JWT itself (`auth.getUser`). Any signed-in identity, **anonymous included**.
 
 | action | input | success (200) |

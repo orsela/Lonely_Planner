@@ -1,4 +1,7 @@
-// Lonely Planner (Plan_Travel) Edge Function `join-trip` · version 3.0.0-alpha.6.0 · F05
+// Lonely Planner (Plan_Travel) Edge Function `join-trip` · version 3.0.0-alpha.7.0 · F05 (+F06)
+// CHANGE 2026-10-22 F06-FN-07: what changed from 3.0.0-alpha.6.0: version only (FN_VERSION) plus the response header
+//   `X-Function-Version` (closes F05 QA finding D1). No logic change: F06 D2 (a removed member may ask again) comes from the
+//   SQL in 0014_f06.sql — `member_removed` stays in the code list but the database no longer produces it.
 // CHANGE 2026-10-19 F05-FN-01: new file (no previous version). A device joins a trip from the group link, waits for the
 //   manager, and (iPhone, D1) moves its membership to the installed app with a transfer code (docs/F05_spec.md §3).
 //   Runs with the service role; verify_jwt is OFF for this function — it verifies the caller's JWT itself with
@@ -22,7 +25,7 @@
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 
-export const FN_VERSION = "3.0.0-alpha.6.0";
+export const FN_VERSION = "3.0.0-alpha.7.0"; // CHANGE 2026-10-22 F06-FN-07: was "3.0.0-alpha.6.0"
 export const ACTIONS = ["preview", "request", "cancel", "issue_transfer", "claim_transfer"] as const;
 export type Action = typeof ACTIONS[number];
 
@@ -158,7 +161,8 @@ function log(fields: Record<string, unknown>): void {
 function json(origin: string | null, status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders(origin), "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
+    // CHANGE 2026-10-22 F06-FN-07: + X-Function-Version (was: no version header)
+    headers: { ...corsHeaders(origin), "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Function-Version": FN_VERSION },
   });
 }
 

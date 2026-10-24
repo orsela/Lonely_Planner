@@ -1,4 +1,5 @@
-// Lonely Planner · join-trip unit tests · version 3.0.0-alpha.6.0 · F05
+// Lonely Planner · join-trip unit tests · version 3.0.0-alpha.7.0 · F05
+// CHANGE 2026-10-22 F06-FN-08: version pin alpha.6 → alpha.7 and the X-Function-Version header check (was: alpha.6 pin only).
 // CHANGE 2026-10-19 F05-FN-05: new file (no previous version). Dev self-tests for docs/F05_spec.md §3 with mocked
 //   getUser / rpc through setDeps() (no network, no database). The QA team's own suite is separate (tests/f05/).
 //
@@ -50,7 +51,7 @@ function mock(out: unknown, user: unknown = ANON) {
 }
 
 Deno.test("version + status map", () => {
-  assert(/^3\.0\.0-alpha\.6/.test(FN_VERSION));
+  assert(/^3\.0\.0-alpha\.7/.test(FN_VERSION));
   eq([statusFor("code_invalid"), statusFor("name_taken"), statusFor("rate_limited"), statusFor("member_removed"), statusFor("x")],
     [404, 409, 429, 403, 500]);
 });
@@ -160,4 +161,13 @@ Deno.test("claim_transfer", async () => {
   }
   r = await call({ action: "claim_transfer" });
   eq([r.status, r.j.error], [409, "transfer_invalid"]);
+});
+
+// CHANGE 2026-10-22 F06-FN-08: new test (no previous version) — the X-Function-Version header on success and on errors.
+Deno.test("X-Function-Version header (alpha.7.0)", async () => {
+  mock({ trip_id: TRIP, name: "t", me: null });
+  const ok = await call({ action: "preview", code: "X7K2M9QP" });
+  eq(ok.r.headers.get("X-Function-Version"), FN_VERSION);
+  const bad = await call({ action: "preview", code: "x" }, { jwt: null });
+  eq([bad.status, bad.r.headers.get("X-Function-Version")], [401, FN_VERSION]);
 });
