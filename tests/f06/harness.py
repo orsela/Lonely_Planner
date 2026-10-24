@@ -1,4 +1,5 @@
-"""Lonely Planner F06 QA · browser harness (fake backend, devices, helpers) · version 1.0.0
+"""Lonely Planner F06 QA · browser harness (fake backend, devices, helpers) · version 1.0.1
+CHANGE 2026-10-24 F06-QA-FIX-05: 1.0.0 → 1.0.1 — ls_page() reads raw localStorage keys (see the function).
 CHANGE 2026-10-22 F06-QA-03: first version (no previous version). Reuses the F05 harness (tests/f05/harness.py → F20 → F04 →
 F03 → F02) for the GitHub-Pages-like server, the PostgREST-like query engine with the F01 RLS model, anonymous sign-in, the
 F05 fake supabase-js with Realtime (tests/f05/fake_supabase.js — used unchanged: it already routes any
@@ -434,8 +435,11 @@ def to_background_and_back(page, hidden_ms=500):
 def ls_page(dev):
     """localStorage read through the app page itself (same origin) — works while the device is offline, unlike the F02 raw
     page (which has to navigate to a blank page first)."""
+    # CHANGE 2026-10-24 F06-QA-FIX-05: read the RAW keys. In the app page localStorage.key()/getItem() go through the F02
+    #   namespacing layer (only the current trip's keys, prefix stripped), so f02.RAW_LS_DUMP never returned a `pt:<trip>:` or
+    #   `pt:_device:` key there (queue() was always [], ls_trip() always {}). Object.keys + named-property access bypass it.
     try:
-        return dev.page.evaluate(f02.RAW_LS_DUMP)
+        return dev.page.evaluate("()=>{const o={};for(const k of Object.keys(localStorage))o[k]=localStorage[k];return o}")
     except PWError:
         return dev.ls()
 

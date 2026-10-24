@@ -1,4 +1,6 @@
-"""Lonely Planner F06 QA · Playwright black-box suite · version 1.0.0
+"""Lonely Planner F06 QA · Playwright black-box suite · version 1.0.1
+CHANGE 2026-10-24 F06-QA-FIX-00: 1.0.0 → 1.0.1 — test-side fixes after the dev triage (F06-QA-FIX-01…NN below); no assertion
+  about behaviour was weakened.
 CHANGE 2026-10-22 F06-QA-04: first version (no previous version).
 
 Black-box browser tests for docs/F06_spec.md §1, §3.3–§3.4 and §4 criteria 1–3, 5, 8, 10, 12–14, 18–19 (+ client side of 9, 11,
@@ -78,7 +80,9 @@ TXT = {
     "leave_yes": "יציאה",
     # 1.8
     "changed": "ההרשאה שלך השתנתה ל",
-    "changed_by": "שינה/תה את התפקיד שלך.",
+    # CHANGE 2026-10-24 F06-QA-FIX-01: architect ruling C3 — 1.8a names no manager (nothing records who changed the role).
+    #   Was "שינה/תה את התפקיד שלך." (the "<manager> שינה/תה …" of spec §1.8a, superseded by C3).
+    "changed_by": "מנהל הטיול שינה את התפקיד שלך.",
     "viewer_line": "אפשר לראות הכול, אבל לא לשנות.",
     "got_it": "הבנתי",
     "removed_title": 'כבר אינך חבר/ה ב"{trip}"',
@@ -88,7 +92,8 @@ TXT = {
     "my_trips": "הטיולים שלי",
     "dropped_re": r"(\d+)\s*שינויים[^\n]*לא נשמרו",
     # D10
-    "viewer_toast": "צופה בלבד – השינוי לא נשמר",
+    # CHANGE 2026-10-24 F06-QA-FIX-02: the D10 text is "צפייה בלבד – השינוי לא נשמר" (spec §0 D10); was a typo "צופה בלבד".
+    "viewer_toast": "צפייה בלבד – השינוי לא נשמר",
     "viewer_tag": "צופה",
     # F05 (unchanged)
     "f05_removed": "הוסרת מהטיול",
@@ -261,12 +266,25 @@ def add_waypoint_try(page, name):
 
 def add_checkin_try(page, note):
     """The check-in save path of alpha.6 (ciSave) with a fixed position — the sheet's geolocation UI is not under test."""
+    # CHANGE 2026-10-24 F06-QA-FIX-04: a check-in always starts with the user's tap ("צ'ק-אין"); the tap is simulated (a key
+    #   press = a user gesture) before the programmatic ciSave, so the save counts as user-initiated like the other three ACTS.
+    page.keyboard.press("Shift")
     page.evaluate("(n)=>{try{return ciSave({lat:21.0285,lng:105.8542,acc:10},null,n)}catch(e){return String(e)}}", note)
     page.wait_for_timeout(1200)
 
 
+KV_WRITE = ("upsert", "insert", "update", "delete")
+
+
 def kv_writes(env, device, since=0):
-    return [c for c in env.backend.queries("trip_kv", ("upsert", "insert", "update", "delete"))[since:] if c["device"] == device]
+    return [c for c in env.backend.queries("trip_kv", KV_WRITE)[since:] if c["device"] == device]
+
+
+def kv_mark(env):
+    # CHANGE 2026-10-24 F06-QA-FIX-06: the start index for kv_writes() — it slices the WRITE-only list, so the mark must
+    #   count writes only. Was len(queries("trip_kv")) (selects too), which skipped the new writes: a03 missed the alpha.6
+    #   upsert and h01's "no trip_kv write" check could never fail.
+    return len(env.backend.queries("trip_kv", KV_WRITE))
 
 
 def text_in_trip_ls(dev, tid, text):
@@ -321,7 +339,7 @@ def test_a03_flag_off_viewer_write_as_alpha6(env):
     H.serve_members_off(env)
     tid, code, dev = boot_one(env, role="viewer", me="חבר")
     page = dev.page
-    n0 = len(env.backend.queries("trip_kv"))
+    n0 = kv_mark(env)   # CHANGE 2026-10-24 F06-QA-FIX-06
     add_expense_try(page, "QA F06 off viewer")
     P = []
     if not kv_writes(env, dev.name, n0):
@@ -438,7 +456,9 @@ def test_c01_list_order_counts(env):
     want = ["דנה"] + mgrs + rest
     if [re.sub(r"\s*\(את/ה\)$", "", n) for n in names] != want:
         P.append("order %r, want %r" % (names, want))
-    if any(n in btext(page) for n in ("ממתין", "הוסר")):
+    # CHANGE 2026-10-24 F06-QA-FIX-03: look for the pending / removed member among the listed members (the "⋯" buttons), not
+    #   in the whole page text — the D9 shortcut "1 ממתינים לאישור" required on this very screen contains "ממתין". Same assertion.
+    if any(re.sub(r"\s*\(את/ה\)$", "", n) in ("ממתין", "הוסר") for n in names):
         P.append("pending / removed member listed")
     if not has(page, TXT["count"].format(n=len(act))) or not has(page, TXT["mgrs"].format(m=3)):
         P.append("counts: want %r and %r" % (TXT["count"].format(n=len(act)), TXT["mgrs"].format(m=3)))
@@ -988,7 +1008,7 @@ def test_h01_viewer_guard(env, what):
     be = env.backend
     tid, code, dev = boot_one(env, role="viewer", me="חבר")
     page = dev.page
-    n0 = len(be.queries("trip_kv"))
+    n0 = kv_mark(env)   # CHANGE 2026-10-24 F06-QA-FIX-06
     label = "QA F06 guard " + what
     ACTS[what](page, label)
     page.wait_for_timeout(1500)
@@ -1153,7 +1173,12 @@ def test_l01_layout_390(env, scr):
         assert wait_until(lambda: is_removed_screen(page), 6, page)
     page.wait_for_timeout(500)
     # the alpha.6 FX pill (#globalFxBtn, 63×31) is a pre-existing global element, not an F06 artboard control
-    P = [p for p in layout_problems(page, None, scr) if "⇄" not in p]
+    # CHANGE 2026-10-24 F06-QA-FIX-07: on the 'changed' screen (= home) the touch-size check is scoped to the 1.8a card
+    #   #ptF06Changed (dev-notes §4 id) — the F06_Changed artboard; the rest of home is alpha.6 content that the card pushes into
+    #   view (⚙️ .menuic 22×28, .ui-more 40×40, the 38 px shortcut chips), unchanged by F06. Scroll width / RTL stay page-wide
+    #   (layout_problems measures them on the document). Was: the whole page, so 'changed' failed on alpha.6 controls.
+    scope = "#ptF06Changed" if scr == "changed" else None
+    P = [p for p in layout_problems(page, scope, scr) if "⇄" not in p]
     if scr == "members":
         st = url_style(page)
         if not st or st[0]["dir"] != "ltr":
