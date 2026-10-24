@@ -2830,7 +2830,7 @@ if(typeof JOIN_FEATURE==='undefined'||JOIN_FEATURE!=='on')return;               
 if(typeof STORAGE_BACKEND!=='undefined'&&STORAGE_BACKEND!=='cloud')return;       /* local-only: no members */
 
 const F06_VERSION='3.0.0-alpha.7';
-const CALL_TIMEOUT_MS=15000,WATCH_MS=60000,TOUCH_MS=600000,TOAST_GAP_MS=5000;
+const CALL_TIMEOUT_MS=15000,WATCH_MS=60000,TOAST_GAP_MS=5000;   /* CHANGE 2026-10-24 F06-TOUCH-02: TOUCH_MS removed (no client throttle) */
 const JOIN_BASE='https://orsela.github.io/Lonely_Planner/join/';   /* = F04 JOIN_BASE (the shared link) */
 const REJOIN_URL='../join/#code=';                                 /* relative: same site as this app */
 const REMOVED_KEY='removed';                                        /* raw pt:_device:removed */
@@ -2966,7 +2966,9 @@ function paintMore(){
  }
  const only=onlyManager();
  sec.innerHTML='<div class="pt6-sec">אני בטיול</div><button type="button" class="listitem pt6-row" id="ptF06LeaveRow"><div class="ic" style="background:#fff4f2" aria-hidden="true">🚪</div><div class="lbl"><span class="pt6-red">יציאה מהטיול</span><span class="pt6-sub" id="ptF06LeaveSub">'+(only?'את/ה המנהל/ת היחיד/ה – קודם ממנים מנהל':'כל חבר יכול לצאת בעצמו')+'</span></div><div class="chev">‹</div></button>';
- $('ptF06LeaveRow').onclick=()=>{if(onlyManager())openSheet(myMember());else openLeave()};
+ /* CHANGE 2026-10-24 F06-MORE-03: what changed from the first F06 version: offline, the row answers with the offline toast at
+    once (criterion 19: leaving is impossible offline). Was: the dialog opened and "יציאה" gave the toast. */
+ $('ptF06LeaveRow').onclick=()=>{if(onlyManager()){openSheet(myMember());return}if(!online()){toast(TX.offlineAct);return}openLeave()};
  /* "ניהול ← משתמשים" is replaced in cloud mode (D1); "הגדרות מסע" says the name updates for the whole group (D4) */
  const mu=$('mgmtUsers');if(mu)mu.style.display='none';
  const mt=$('mgmtTrip');
@@ -3026,7 +3028,11 @@ function paintMembers(){
  const wa=$('ptF06Wa');wa.addEventListener('click',e=>{if(!joinUrl()||!online()){e.preventDefault();toast(online()?TX.linkLoad:TX.offlineAct)}});
  $('ptF06Copy').onclick=async()=>{const x=joinUrl();if(!x)return;toast(await copyText(x)?TX.copied:TX.copyFail)};
  $('ptF06Rotate').onclick=openRotate;
- const th=$('ptF06ToHome');if(th)th.onclick=()=>go('home');
+ const th=$('ptF06ToHome');if(th)th.onclick=()=>{go('home');
+  /* CHANGE 2026-10-24 F06-MEMBERS-02: what changed from the first F06 version: on arrival the F05 card is refreshed at once
+     through its existing 'visible' refresh (the F05 code is unchanged), so the requests counted here are on home (D9). Was:
+     go('home') only — the F05 card could lag up to its 60 s poll. */
+  try{if(document.visibilityState==='visible')document.dispatchEvent(new Event('visibilitychange'))}catch{}};
  $('ptF06List').querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{const m=(members||[]).find(x=>x.id===b.dataset.act);if(m)openSheet(m)});
 }
 
@@ -3161,7 +3167,7 @@ function openRotate(){
  };
 }
 async function openLeave(){
- await refreshName();
+ if(!tripNameNow)await refreshName();else refreshName();   /* CHANGE 2026-10-24 F06-MORE-03: no wait on the network when the name is known */
  openLayer('alert','ptF06LeaveT','<h2 id="ptF06LeaveT">לצאת מ"'+esc(tripNameNow||'הטיול')+'"?</h2><div class="pt6-pts">'+
   '<div class="pt6-pt">הטיול יימחק מהטלפון שלך.</div><div class="pt6-pt">מה שהוספת נשאר אצל הקבוצה.</div>'+
   '<div class="pt6-pt">כדי לחזור – פותחים שוב את קישור ההצטרפות, והמנהל מאשר.</div></div>'+
@@ -3191,9 +3197,12 @@ function guarded(k){k=String(k);return k.indexOf('planner:')===0&&DEVICE_ONLY.in
 function viewerNow(){return myRole()==='viewer'}
 let lastGesture=0,lastGuardToast=0,reloadT=null;
 ['pointerdown','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{lastGesture=Date.now()},{capture:true,passive:true}));
+/* CHANGE 2026-10-24 F06-GUARD-02: what changed from the first F06 version: the toast is silent only for writes made before the
+   user's first tap / key in this trip (the boot-time defaults, e.g. ensureDefaultLodgingBudget). Was: silent unless a gesture
+   happened in the last 4 s — that silenced user writes that finish later (a check-in waiting for the GPS position). */
+let guardSince=0;
 function blocked(){
- /* a write the user just caused: toast (once per 5 s) and show the cloud state again; a background write: silent */
- if(Date.now()-lastGesture>4000)return;
+ if(lastGesture<=guardSince)return;
  if(Date.now()-lastGuardToast>TOAST_GAP_MS){lastGuardToast=Date.now();toast(TX.viewer)}
  clearTimeout(reloadT);
  if(!online())return;                               /* C11: offline the guard still blocks and toasts, without a reload */
@@ -3228,7 +3237,18 @@ function installStorageWrap(){
    --------------------------------------------------------------------------------------------------------- */
 const QKEY='planner:__queue__';
 function queueLen(){try{const q=JSON.parse(nsGet(QKEY)||'[]');return Array.isArray(q)?q.length:0}catch{return 0}}
-function dropQueue(){const n=queueLen();if(n){nsSet(QKEY,'[]');try{updateSyncBadge()}catch{}}return n}
+/* CHANGE 2026-10-24 F06-WATCH-02: what changed from the first F06 version: a flushQueue() already running when the demotion is
+   seen puts the ops it could not send back into the queue; the queue is cleared once more when that flush ends (the ops are
+   the same ones, so N is unchanged). Was: cleared once, so the in-flight flush could restore them. */
+function dropQueue(){
+ const n=queueLen();
+ if(n){nsSet(QKEY,'[]');try{updateSyncBadge()}catch{}}
+ let tries=0;
+ (function again(){let busyNow=false;try{busyNow=typeof flushing!=='undefined'&&flushing}catch{}
+  if(busyNow&&tries++<100){setTimeout(again,100);return}
+  if(viewerNow()&&queueLen()){nsSet(QKEY,'[]');try{updateSyncBadge()}catch{}}})();
+ return n;
+}
 let checking=false,checkT=null;
 function checkSoon(){clearTimeout(checkT);checkT=setTimeout(()=>{fetchMyMembership()},300)}
 async function fetchMyMembership(){
@@ -3372,10 +3392,14 @@ async function bootCheck(cachedAtAttach){
 /* ---------------------------------------------------------------------------------------------------------
    F06-TOUCH-01 + start hook
    --------------------------------------------------------------------------------------------------------- */
+/* CHANGE 2026-10-24 F06-TOUCH-02: what changed from the first F06 version: no client-side 10-minute throttle — §2.8 / C9 put
+   the limit in member_touch; the client calls on start and on every return to the app (one call in flight at a time).
+   Was: skipped when the last call was < 10 min ago, so a return to the app sent nothing. */
+let touchBusy=false;
 function touch(){
- if(!online()||Date.now()-lastTouch<TOUCH_MS||!tripId())return;
- lastTouch=Date.now();
- callFn({action:'touch',trip_id:tripId()}).catch(()=>{lastTouch=0});
+ if(!online()||touchBusy||!tripId())return;
+ touchBusy=true;lastTouch=Date.now();
+ callFn({action:'touch',trip_id:tripId()}).catch(()=>{}).finally(()=>{touchBusy=false});
 }
 function onStarted(){
  if(started||!api||!api.started())return;
@@ -3383,7 +3407,7 @@ function onStarted(){
  started=true;
  /* synchronously (microtask right after the main script ran, before its async boot continues): the guard is in place
     before the first trip-data write */
- installGuard();installStorageWrap();
+ installGuard();installStorageWrap();guardSince=Date.now();   /* CHANGE 2026-10-24 F06-GUARD-02 */
  cacheLoad();keepJoinCode();
  setTimeout(async()=>{
   const seenRole=nsGet('pt6_role_seen');
@@ -3811,7 +3835,10 @@ if(window.__ptF06&&STORAGE_BACKEND==='cloud'){
    ks.forEach(k=>rDel(k));
    try{indexedDB.deleteDatabase('pt-vault-'+String(t))}catch{}
   },
-  stopTrip:()=>{NS=null},
+  /* CHANGE 2026-10-24 F06-GATE-02: what changed from the first F06 version: stopTrip() also clears TRIP and the reported trip /
+     role (window.__PT.tripId = null, phase 'removed'), so the removed trip no longer counts as running and every further
+     trip_kv call fails fast (was: only NS=null). */
+  stopTrip:()=>{NS=null;TRIP=null;state.tripId=null;state.role=null;state.phase='removed'},
   activeTrips:async()=>(sb&&state.uid)?fetchTrips(state.uid):[],
   enterTrip:(tripId,role)=>{writeCached({trip_id:String(tripId),role:role||null});if(state.started){location.reload();return}setTrip(tripId,role);installStorage();start()},
   started:()=>state.started,phase:()=>state.phase

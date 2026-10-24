@@ -433,11 +433,11 @@ def main():
         ip2.wait_for_selector("#ptF06LeaveRow")
         check("C10 manager-only toast text is defined", "רק מנהלים יכולים לנהל חברים'" in app_html)
         ip2.context.set_offline(True)
-        ip2.click("#ptF06LeaveRow")
-        ip2.click("#ptF06LeaveYes")
+        ip2.click("#ptF06LeaveRow")   # CHANGE 2026-10-24 F06-DEVSMOKE-02: offline the row itself answers with the toast (F06-MORE-03)
         ip2.wait_for_function("document.getElementById('ptF06Toast')&&document.getElementById('ptF06Toast').classList.contains('on')")
-        check("C10 offline leave → toast 'אין חיבור – אפשר לשנות כשהרשת תחזור.', still a member",
-              ip2.inner_text("#ptF06Toast") == "אין חיבור – אפשר לשנות כשהרשת תחזור." and shira["status"] == "active")
+        check("C10 offline leave → toast 'אין חיבור – אפשר לשנות כשהרשת תחזור.', no dialog, still a member",
+              ip2.inner_text("#ptF06Toast") == "אין חיבור – אפשר לשנות כשהרשת תחזור." and ip2.query_selector("#ptF06LeaveT") is None
+              and shira["status"] == "active")
         ip2.context.close()
 
         check("no page errors", not [e for e in errors if "google" not in e.lower()], errors)
