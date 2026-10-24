@@ -35,6 +35,22 @@ on `f06` until the migration and functions are deployed. The live project `vietn
 Out of scope: "חיבור מחדש למכשיר חדש" (F07, removed from the member sheet), a full read-only UI for viewers, member avatars
 / colours beyond F05.
 
+### 0.1 Clarifications (architect, 2026-10-24, after the independent QA review) — they override the text below where they differ
+<!-- CHANGE 2026-10-24 F06-DOCS-02: added §0.1 (rulings C1–C11 on gaps found by the QA team); nothing else in the spec changed. -->
+| # | Ruling |
+|---|---|
+| C1 | The D2 server change applies regardless of the flag; with `MEMBERS_FEATURE='off'` a removed member gets the join form. The one documented exception to criterion 1. |
+| C2 | A removed member's own-row Realtime UPDATE also triggers 1.8b at once; the 60 s poll is the backstop (D11 corrected: the F01 policy lets a member read its own row). |
+| C3 | 1.8a names no manager: "מנהל הטיול שינה את התפקיד שלך." |
+| C4 | `rotate_join_code` / `rotate_link` return the link version as `link_version`; the body field `version` stays the function version. |
+| C5 | Joining via `/join/` or the in-app flow stores the code device-wide `pt:_device:join_code:<trip>`; 1.8b's "בקשה להצטרף שוב" uses it, else shows "בקשו מהמנהל את קישור ההצטרפות". |
+| C6 | Unknown member id → `not_active` (409); leave/touch by a non-active or foreign user → `not_member` (403); null/missing args → `invalid_request`; roles lowercase only, else `role_invalid`; touch within 10 min → `{ok:true, touched:false}`. Every success body has `ok:true`. |
+| C7 | tripname trigger only when `auth.uid()` is an active manager (no session → no change). Cleaning = trim + any whitespace run → one space; 1–80 checked after cleaning. |
+| C8 | 1.8b stays until a button is tapped or the app closes; at the next boot it shows once more from `pt:_device:removed`, then the record is cleared and boot continues. A "סגירה" button is shown when there is no other trip. |
+| C9 | touch on start and on `visibilitychange`→visible; the 10-minute limit is enforced by the server only. |
+| C10 | Texts: non-manager on the members screen "רק מנהלים יכולים לנהל חברים"; offline actions "אין חיבור – אפשר לשנות כשהרשת תחזור."; dropped changes N=1 "שינוי אחד שעשית בלי רשת לא נשמר.", N>1 "N שינויים שעשית בלי רשת לא נשמרו."; last_manager "בטיול חייב להישאר מנהל אחד"; not_manager "רק מנהלים יכולים לשנות"; other "משהו השתבש. נסו שוב."; name errors as F05 1.6b. |
+| C11 | `manage-members` accepts anonymous identities; a re-requested row keeps `last_seen_at`; remove/leave also delete open `relink_tokens`; the viewer guard is the same offline (no reload while offline); managers ordered by `joined_at`. |
+
 ## 1. Screens (Hebrew, RTL, 390px, touch ≥44px, existing `pt-*` / `pt5-*` styles)
 
 Flag: `MEMBERS_FEATURE='on'|'off'` in the app (next to `JOIN_FEATURE`) and in `/join/`. `'off'` = alpha.6 exactly
