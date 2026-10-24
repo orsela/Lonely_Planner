@@ -162,18 +162,18 @@ async function act(action: Action, uid: string, body: Record<string, unknown>): 
       if (!isUuid(body.member_id) || body.role == null) throw new HttpError("invalid_request");
       if (typeof body.role !== "string" || !ROLES.includes(body.role)) throw new HttpError("role_invalid");
       const d = await call("member_set_role", { p_user: uid, p_member: body.member_id, p_role: body.role });
-      return pick(d, ["member_id", "trip_id", "role", "display_name", "changed"]);
+      return { ok: true, ...pick(d, ["member_id", "trip_id", "role", "display_name", "changed"]) };   // CHANGE 2026-10-24 F06-FN-09: ok:true on every success body (was missing on set_role/rename/remove)
     }
     case "rename": {
       if (!isUuid(body.member_id) || body.display_name == null) throw new HttpError("invalid_request");   // C6
       if (typeof body.display_name !== "string") throw new HttpError("name_invalid");
       const d = await call("member_rename", { p_user: uid, p_member: body.member_id, p_name: body.display_name.slice(0, 200) });
-      return pick(d, ["member_id", "trip_id", "display_name", "changed"]);
+      return { ok: true, ...pick(d, ["member_id", "trip_id", "display_name", "changed"]) };   // CHANGE 2026-10-24 F06-FN-09: ok:true on every success body (was missing on set_role/rename/remove)
     }
     case "remove": {
       if (!isUuid(body.member_id)) throw new HttpError("invalid_request");
       const d = await call("member_remove", { p_user: uid, p_member: body.member_id });
-      return pick(d, ["member_id", "trip_id", "status", "display_name"]);
+      return { ok: true, ...pick(d, ["member_id", "trip_id", "status", "display_name"]) };   // CHANGE 2026-10-24 F06-FN-09: ok:true on every success body (was missing on set_role/rename/remove)
     }
     case "leave": {
       if (!isUuid(body.trip_id)) throw new HttpError("invalid_request");
@@ -185,7 +185,7 @@ async function act(action: Action, uid: string, body: Record<string, unknown>): 
       const d = await call("rotate_join_code", { p_user: uid, p_trip: body.trip_id });
       if (typeof d.code !== "string" || !/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(d.code)) throw new HttpError("server_error");
       // C4: the link's version is `link_version`; `version` in the body stays the function version (spec §3.1)
-      return { code: d.code, link_version: d.link_version ?? null };
+      return { ok: true, code: d.code, link_version: d.link_version ?? null };   // CHANGE 2026-10-24 F06-FN-09: + ok:true
     }
     case "touch": {
       if (!isUuid(body.trip_id)) throw new HttpError("invalid_request");

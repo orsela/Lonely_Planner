@@ -92,11 +92,11 @@ Deno.test("each action → its SQL function with the caller's uid", async () => 
       { member_id: MEMBER, trip_id: TRIP, status: "removed", display_name: "איתי" },
       { member_id: MEMBER, trip_id: TRIP, status: "removed", display_name: "איתי" }],
     [{ action: "leave", trip_id: TRIP }, "member_leave", { p_user: MGR.id, p_trip: TRIP },
-      { ok: true, trip_id: TRIP, member_id: MEMBER }, { ok: true, trip_id: TRIP, member_id: MEMBER }],
+      { ok: true, trip_id: TRIP, member_id: MEMBER }, { trip_id: TRIP, member_id: MEMBER }],
     [{ action: "rotate_link", trip_id: TRIP }, "rotate_join_code", { p_user: MGR.id, p_trip: TRIP },
       { code: "K7M2Q9XA", link_version: 2 }, { code: "K7M2Q9XA", link_version: 2 }],
     [{ action: "touch", trip_id: TRIP }, "member_touch", { p_user: MGR.id, p_trip: TRIP },
-      { ok: true, touched: false }, { ok: true, touched: false }],
+      { ok: true, touched: false }, { touched: false }],
   ];
   for (const [body, fn, args, out, expect] of cases) {
     const calls = mock(out);
@@ -104,7 +104,8 @@ Deno.test("each action → its SQL function with the caller's uid", async () => 
     eq(r.status, 200, String(body.action));
     eq(calls.map((c) => c.name), [fn]);
     eq(calls[0].args, args, fn);
-    const { version: _v, ...rest } = r.j;
+    const { version: _v, ok: _ok, ...rest } = r.j;   // CHANGE 2026-10-24 F06-FN-09: every success body now has ok:true
+    eq(_ok, true, String(body.action) + " ok");
     eq(rest, expect, fn);
   }
 });
