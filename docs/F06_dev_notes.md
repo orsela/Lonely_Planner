@@ -1,5 +1,6 @@
 # F06 · dev notes — a manager changes roles, removes members and resets the link (v3.0.0-alpha.7)
 
+<!-- CHANGE 2026-10-24 F06-DOCS-03: + §9 QA-suite triage (2026-10-24); §2 guard / touch notes updated. -->
 <!-- CHANGE 2026-10-22 F06-DOCS-02: new file (no previous version). -->
 
 Contract: `docs/F06_spec.md` (mockup approved 2026-10-22, canvas row 8, artboards `F06_More` … `F06_Changed`) plus the
@@ -34,8 +35,9 @@ header comment's version line); `join/flow.js`: 2 (header comment version line, 
   `openUserModal` wrap), before its async boot writes anything. The main-script function bodies are unchanged (0 lines).
   With role `viewer` a guarded key never reaches `localStorage`, the queue or `trip_kv`; `SS.set/del` return `false`.
   Toast "צפייה בלבד – השינוי לא נשמר" at most once per 5 s, then `loadState(); fillSelects(); updateDates(); render()`
-  (debounced 400 ms). Toast + reload only when the write follows a user gesture within 4 s (a background write at boot, e.g.
-  `ensureDefaultLodgingBudget`, is blocked silently). Offline: blocked + toast, no reload (C11).
+  (debounced 400 ms). Toast + reload for every blocked write after the user's first tap / key in the trip (F06-GUARD-02); a
+  background write before any interaction (boot defaults, e.g. `ensureDefaultLodgingBudget`) is blocked silently. Offline:
+  blocked + toast, no reload (C11).
 - **Guarded key set**: every key written through `SS.set` / `SS.del` / `window.storage.set|delete` that starts with
   `planner:` — today: `planner:trip`, `planner:expenses`, `planner:budget`, `planner:reservations`, `planner:googlephotoslink`,
   `planner:timeline`, `planner:checkins`, `planner:catbudgets`, `planner:personalbudget:<user>`, `planner:fxrates`,
@@ -162,3 +164,22 @@ open `relink_tokens`; the guard works the same offline (no reload); managers amo
    60 s); harmless (approve would return `not_manager`).
 3. `0015_qa_f06_harness.sql` is for the QA team; `f06_db_check.py` applies and runs it automatically when present.
 4. `pt:_device:join_code:<trip>` is never deleted (it is what "בקשה להצטרף שוב" needs); confirm that is acceptable.
+
+## 9. QA browser suite triage (2026-10-24, `tests/f06/test_f06.py` 46/70 → 70/70)
+
+| Failure | Category | Change |
+|---|---|---|
+| a03 flag-off viewer write | test | `kv_writes()` start index counted selects too (F06-QA-FIX-06); "local copy" via the raw-key harness fix (FIX-05) |
+| c01 list | test | "ממתין" matched the required D9 shortcut text; now checks the listed members (FIX-03) |
+| c04[2] shortcut → home | bug | the F05 card is refreshed on arrival (F06-MEMBERS-02) |
+| f01 ×3, f03 removed while open | bug + test | after a live removal `__PT.tripId` still named the trip (F06-GATE-02: `stopTrip()` clears TRIP / tripId / role); harness read localStorage through the namespacing layer (FIX-05) |
+| f05 removed with queue | test | harness `ls_page` raw keys (FIX-05) |
+| g01 ×4, g02 ×2, g03, l01[changed] (card) | test | 1.8a text per ruling C3 (FIX-01) |
+| g04 demotion drops queue | bug + test | an in-flight `flushQueue` restored the dropped ops (F06-WATCH-02); C3 text, raw keys |
+| h01 ×4, h02 viewer toast | test + bug | toast text typo vs D10 (FIX-02); the 4 s gesture window could silence a real user write that finishes late, e.g. a GPS check-in (F06-GUARD-02); the programmatic check-in now starts with a key press like a tap (FIX-04) |
+| h05 touch on return | bug | client 10-min throttle removed, the server limits (F06-TOUCH-02, C9) |
+| j02 offline leave | bug | offline, "יציאה מהטיול" answers with the toast at once (F06-MORE-03) |
+| l01[changed] touch sizes | test | scoped to `#ptF06Changed`; the rest of home is alpha.6 (FIX-07) |
+
+After the fixes: browser suite **70/70**, QA function tests 19/19, `qa.f06_run()` 171/171 (local), dev DB check 92/92, smoke
+49/49, static ALL OK, F05 checks green. No genuine spec ambiguity left open by the suite (C3 / D10 texts were test-side).
