@@ -10,10 +10,11 @@
 <!-- CHANGE 2026-10-12 F04-NAME-01: display name Plan_Travel → Lonely Planner (title + brand). -->
 <!-- Lonely Planner join page · version 3.0.0-alpha.7 · F06
      CHANGE 2026-10-22 F06-JOIN-01: what changed from 3.0.0-alpha.6: new flag MEMBERS_FEATURE ('on' default). With it on,
-     "פתיחת הטיול" also keeps the join code in the trip's device namespace (pt:<trip>:lp_join_code) so that the app can offer
-     "בקשה להצטרף שוב" if this member is removed later (docs/F06_spec.md §1.8b); it is deleted with the trip's other device keys.
+     "פתיחת הטיול" also keeps the join code device-wide (pt:_device:join_code:<trip>, spec clarification C5) so that the app can
+     offer "בקשה להצטרף שוב" if this member is removed later (docs/F06_spec.md §1.8b).
      A removed identity now gets the normal form from the server (F06 D2), so flow.js's "הוסרת מהטיול" screen is no longer
-     reached (kept for MEMBERS_FEATURE='off' / an alpha.6 server). 'off' = alpha.6 exactly.
+     reached (kept for an alpha.6 server). D2 is server-side and applies regardless of this flag (spec clarification C1).
+     'off' = no code kept (alpha.6).
      Lonely Planner join page · version 3.0.0-alpha.6 · F05
      CHANGE 2026-10-19 F05-JOIN-01: what changed from 3.0.0-alpha.4 (F04-JOIN-01): with JOIN_FEATURE='on' (default) this page
      runs the F05 join flow (docs/F05_spec.md §1.1–1.3, §1.6): it reads the 8-char code from #code=…, keeps it only in
@@ -89,8 +90,9 @@ async function getClient(){
 }
 function enter(tripId,role){
  try{localStorage.setItem('pt:_device:active_trip',JSON.stringify({trip_id:String(tripId),role:role||null}))}catch(e){}
- /* CHANGE 2026-10-22 F06-JOIN-01: new line — the join code goes with the trip's device keys (read by the app only for screen 1.8b) */
- if(MEMBERS_FEATURE==='on'&&code&&window.LPJoin){const c=window.LPJoin.normCode(code);if(c)try{localStorage.setItem('pt:'+String(tripId)+':lp_join_code',c)}catch(e){}}
+ /* CHANGE 2026-10-22 F06-JOIN-01: new line — the join code is kept device-wide as pt:_device:join_code:<trip> (spec clarification
+    C5), read by the app only for "בקשה להצטרף שוב" on screen 1.8b */
+ if(MEMBERS_FEATURE==='on'&&code&&window.LPJoin){const c=window.LPJoin.normCode(code);if(c)try{localStorage.setItem('pt:_device:join_code:'+String(tripId),c)}catch(e){}}
  try{sessionStorage.removeItem(CODE_KEY)}catch(e){}
  location.href='../app/';
 }

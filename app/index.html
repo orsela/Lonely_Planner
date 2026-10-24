@@ -2819,8 +2819,10 @@ html body>div#ptF06Removed#ptF06Removed{display:flex!important;visibility:visibl
 /* CHANGE 2026-10-22 F06-UI-01 (3.0.0-alpha.7): new script (no alpha.6 equivalent). One IIFE; exposes only the frozen,
    read-only object window.__ptF06 {version, attach} used by the gate (F06-GATE-01) and, by its mere presence, by the F04
    "עוד" row hook (F06-MORE-02). Stores on the device: the members cache 'pt6_members', 'pt6_role_seen', 'pt6_changed' and the
-   join code 'lp_join_code' (namespaced trip keys, removed with the trip), and the raw device record pt:_device:removed
-   ({trip_id, name, n_dropped, join_code?}) only for screen 1.8b. Never logs ids, names or codes. */
+   managers' cached join code 'pt6_join_code' (namespaced trip keys, removed with the trip), the raw device keys
+   pt:_device:join_code:<trip> (the code this device joined with — /join/ or the in-app join flow, spec clarification C5) and
+   pt:_device:removed ({trip_id, name, n_dropped, join_code?}) only for screen 1.8b. Never logs ids, names or codes.
+   Spec clarifications C1–C11 (architect, 2026-10-22) are applied here; see docs/F06_dev_notes.md §7. */
 (function(){
 'use strict';
 if(typeof MEMBERS_FEATURE==='undefined'||MEMBERS_FEATURE!=='on')return;          /* off: nothing at all (alpha.6) */
@@ -2836,15 +2838,15 @@ const ROLE={viewer:'צופה',editor:'עורך',manager:'מנהל'};
 const COLORS=['#0369a1','#b42318','#7c3aed','#0f766e','#be185d','#15803d','#b45309'];   /* = F05 */
 const TX={
  offline:'אין חיבור. נסו שוב כשהרשת תחזור.',
- offlineAct:'אין חיבור – אפשר לשנות כשהרשת תחזור.',
+ offlineAct:'אין חיבור – אפשר לשנות כשהרשת תחזור.',   /* C10: also the toast for every offline action */
  generic:'משהו השתבש. נסו שוב.',
  viewer:'צפייה בלבד – השינוי לא נשמר',
- notManager:'רק מנהלים יכולים לנהל חברים וקישור',
+ notManager:'רק מנהלים יכולים לנהל חברים',          /* C10 */
+ notManagerAct:'רק מנהלים יכולים לשנות',            /* C10: member-sheet not_manager */
  nameInvalid:'כתבו שם של עד 40 תווים.',
  copied:'הקישור הועתק',
  copyFail:'ההעתקה לא הצליחה. אפשר לסמן את הקישור ולהעתיק.',
- lastMgr:'בטיול תמיד יש לפחות מנהל אחד. קודם ממנים מנהל נוסף.',
- notActive:'החבר כבר לא פעיל בטיול',
+ lastMgr:'בטיול חייב להישאר מנהל אחד',               /* C10 */
  linkLoad:'לא הצלחנו לטעון את הקישור.'
 };
 let api=null;   /* set by the gate: {endpoint,key,client(),uid(),withTimeout,timeoutMs,tripId(),role(),setRole(),cached(),clearCached(),dev{get,set,del},rawGet(),purge(),stopTrip(),activeTrips(),enterTrip(),started(),phase()} */
@@ -2898,7 +2900,7 @@ async function callFn(body){
  if(!r.ok||j.error)throw Object.assign(new Error(j.error||'http_'+r.status),{code:j.error||'server_error'});
  return j;
 }
-function errText(e){const c=e&&e.code;return c==='offline'?TX.offline:c==='last_manager'?TX.lastMgr:c==='not_manager'?TX.notManager:c==='not_active'?TX.notActive:TX.generic}
+function errText(e){const c=e&&e.code;return c==='offline'?TX.offlineAct:c==='last_manager'?TX.lastMgr:c==='not_manager'?TX.notManagerAct:TX.generic}   /* C10 */
 
 /* ---------------------------------------------------------------------------------------------------------
    members of the trip (one select; cached per trip for offline)
@@ -2927,7 +2929,7 @@ async function loadCode(){
  const t=tripId(),c=api&&api.client();if(!t||!c||!online()||!isManager())return;
  try{
   const{data,error}=await api.withTimeout(c.from('trip_join_codes').select('code').eq('trip_id',t).maybeSingle(),api.timeoutMs);
-  if(!error&&data&&data.code){joinCode=data.code;nsSet('lp_join_code',data.code)}
+  if(!error&&data&&data.code){joinCode=data.code;nsSet('pt6_join_code',data.code)}
  }catch{}
 }
 function joinUrl(){return joinCode?JOIN_BASE+'#code='+joinCode:''}
@@ -2993,7 +2995,7 @@ async function openMembers(){
  document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x===p));
  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.panel==='more'));
  try{window.scrollTo(0,0)}catch{}
- if(!joinCode)joinCode=nsGet('lp_join_code');
+ if(!joinCode)joinCode=nsGet('pt6_join_code');
  paintMembers();
  await Promise.all([loadMembers(),loadCode(),refreshName()]);
  if(panelOpen())paintMembers();
@@ -3016,12 +3018,12 @@ function paintMembers(){
   h+='<div class="pt6-mrow" data-member="'+esc(m.id)+'"><div class="pt5-av" style="background:'+colorOf(m)+'" aria-hidden="true">'+esc(letter(m.display_name))+'</div>'+
    '<div class="pt6-nm"><b>'+esc(m.display_name)+(me?' <span class="pt6-me">(את/ה)</span>':'')+'</b><span class="pt6-muted">'+(me?'המכשיר הזה':esc(seen(m.last_seen_at)))+'</span></div>'+
    '<span class="pt6-badge '+(m.role==='manager'?'mgr':'role')+'">'+esc(ROLE[m.role]||m.role)+'</span>'+
-   '<button type="button" class="pt6-more" data-act="'+esc(m.id)+'" aria-label="פעולות על '+esc(m.display_name)+'"'+dis+'><svg width="20" height="20" viewBox="0 0 24 24" fill="#6b746d" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>';
+   '<button type="button" class="pt6-more" id="ptF06Act-'+esc(m.id)+'" data-act="'+esc(m.id)+'" aria-label="פעולות על '+esc(m.display_name)+'"'+dis+'><svg width="20" height="20" viewBox="0 0 24 24" fill="#6b746d" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>';
  });
  h+='</div></section><p class="pt6-foot">שינוי תפקיד או הסרה נכנסים לתוקף מיד, גם בטלפון של החבר.</p>';
  if(off)h+='<p class="pt6-off" role="status" id="ptF06Offline">'+TX.offlineAct+'</p>';
  $('ptF06Body').innerHTML=h;
- const wa=$('ptF06Wa');wa.addEventListener('click',e=>{if(!joinUrl()||!online()){e.preventDefault();toast(online()?TX.linkLoad:TX.offline)}});
+ const wa=$('ptF06Wa');wa.addEventListener('click',e=>{if(!joinUrl()||!online()){e.preventDefault();toast(online()?TX.linkLoad:TX.offlineAct)}});
  $('ptF06Copy').onclick=async()=>{const x=joinUrl();if(!x)return;toast(await copyText(x)?TX.copied:TX.copyFail)};
  $('ptF06Rotate').onclick=openRotate;
  const th=$('ptF06ToHome');if(th)th.onclick=()=>go('home');
@@ -3064,9 +3066,9 @@ function openSheet(m){
  const nm=m.display_name||'';
  let h='<div class="pt6-handle" aria-hidden="true"></div><div class="pt6-shead"><div class="pt5-av" style="background:'+colorOf(m)+';width:44px;height:44px;font-size:17px" aria-hidden="true">'+esc(letter(nm))+'</div>'+
   '<div class="pt6-nm"><b id="ptF06SheetName">'+esc(nm)+(me?' <span class="pt6-me" style="font-size:14px">(את/ה)</span>':'')+'</b><span class="pt6-muted">'+(m.joined_at?'הצטרף/ה ב-'+esc(dmy(m.joined_at))+' · ':'')+esc(me?'המכשיר הזה':seen(m.last_seen_at))+'</span></div>'+
-  '<button type="button" class="pt6-x" data-f06-close aria-label="סגירה">×</button></div>';
+  '<button type="button" class="pt6-x" id="ptF06SheetClose" data-f06-close aria-label="סגירה">×</button></div>';
  h+='<div><span class="pt6-lbl" id="ptF06RoleLbl">תפקיד</span><div class="pt5-seg pt6-seg" role="group" aria-labelledby="ptF06RoleLbl" id="ptF06Roles">'+
-  ['viewer','editor','manager'].map(r=>'<button type="button" data-role="'+r+'" aria-pressed="'+(m.role===r)+'"'+((only&&r!=='manager')||off?' disabled':'')+'>'+ROLE[r]+'</button>').join('')+'</div>'+
+  ['viewer','editor','manager'].map(r=>'<button type="button" id="ptF06Role-'+r+'" data-role="'+r+'" aria-pressed="'+(m.role===r)+'"'+((only&&r!=='manager')||off?' disabled':'')+'>'+ROLE[r]+'</button>').join('')+'</div>'+
   (only?'':'<p class="pt6-help">צופה: רואה הכול, לא משנה. עורך: מסלול, הוצאות, מסמכים. מנהל: גם חברים, קישור והגדרות.</p>')+'</div>';
  h+='<div><label class="pt6-lbl" for="ptF06NameIn">'+(me?'השם שלי בקבוצה':'השם בקבוצה')+'</label><div class="pt6-namerow"><input class="pt6-in" id="ptF06NameIn" maxlength="40" autocomplete="off" value="'+esc(nm)+'" aria-describedby="ptF06NameHelp">'+
   '<button type="button" class="pt6-btn out" id="ptF06NameSave"'+(off?' disabled':'')+'>שמירה</button></div><p class="pt6-help" id="ptF06NameHelp">1–40 תווים, שם שלא קיים כבר בטיול.</p><p class="pt6-err" id="ptF06NameErr" role="alert" hidden></p></div>';
@@ -3087,7 +3089,7 @@ function openSheet(m){
 }
 async function setRole(m,role){
  if(busy||m.role===role)return;
- if(!online()){toast(TX.offline);return}
+ if(!online()){toast(TX.offlineAct);return}
  busy=true;
  try{
   await callFn({action:'set_role',member_id:m.id,role});
@@ -3106,7 +3108,7 @@ async function rename(m){
  er.hidden=true;inp.removeAttribute('aria-invalid');inp.setAttribute('aria-describedby','ptF06NameHelp');
  if(!name||name.length>40){bad(TX.nameInvalid);return}
  if(name===m.display_name){closeLayer();return}
- if(!online()){toast(TX.offline);return}
+ if(!online()){toast(TX.offlineAct);return}
  busy=true;
  try{
   const r=await callFn({action:'rename',member_id:m.id,display_name:name});
@@ -3131,7 +3133,7 @@ function openRemove(m){
   '<div class="pt6-pt">אם יפתח/תפתח שוב את קישור ההצטרפות, תקבל/י בקשה חדשה לאישור.</div></div>'+
   '<div class="pt6-2"><button type="button" class="pt6-btn red" id="ptF06RemoveYes">הסרה</button><button type="button" class="pt6-btn out" id="ptF06RemoveNo" data-f06-close>ביטול</button></div>');
  $('ptF06RemoveYes').onclick=async()=>{
-  if(busy)return;if(!online()){toast(TX.offline);return}
+  if(busy)return;if(!online()){toast(TX.offlineAct);return}
   busy=true;$('ptF06RemoveYes').disabled=true;
   try{await callFn({action:'remove',member_id:m.id});closeLayer();toast(nm+' הוסר/ה מהטיול');await loadMembers()}
   catch(e){closeLayer();toast(errText(e));loadMembers()}
@@ -3139,7 +3141,7 @@ function openRemove(m){
  };
 }
 function openRotate(){
- if(!online()){toast(TX.offline);return}
+ if(!online()){toast(TX.offlineAct);return}
  const n=(members||[]).length;
  openLayer('alert','ptF06RotateT','<h2 id="ptF06RotateT">לאפס את קישור ההצטרפות?</h2><div class="pt6-pts">'+
   '<div class="pt6-pt">הקישור הנוכחי מפסיק לעבוד מיד. מי שיפתח אותו יראה "הקישור כבר לא פעיל".</div>'+
@@ -3148,11 +3150,11 @@ function openRotate(){
   '<div class="pt6-pt">אחרי האיפוס שולחים את הקישור החדש לקבוצה.</div></div>'+
   '<div class="pt6-2"><button type="button" class="pt6-btn red" id="ptF06RotateYes">איפוס הקישור</button><button type="button" class="pt6-btn out" id="ptF06RotateNo" data-f06-close>ביטול</button></div>');
  $('ptF06RotateYes').onclick=async()=>{
-  if(busy)return;if(!online()){toast(TX.offline);return}
+  if(busy)return;if(!online()){toast(TX.offlineAct);return}
   busy=true;$('ptF06RotateYes').disabled=true;
   try{
    const r=await callFn({action:'rotate_link',trip_id:tripId()});
-   joinCode=r.code;nsSet('lp_join_code',r.code);closeLayer();paintMembers();
+   joinCode=r.code;nsSet('pt6_join_code',r.code);closeLayer();paintMembers();
    toast('נוצר קישור חדש',{label:'שליחה בווטסאפ',href:waUrl(tripNameNow||'',joinUrl())});
   }catch(e){closeLayer();toast(errText(e))}
   finally{busy=false}
@@ -3165,7 +3167,7 @@ async function openLeave(){
   '<div class="pt6-pt">כדי לחזור – פותחים שוב את קישור ההצטרפות, והמנהל מאשר.</div></div>'+
   '<div class="pt6-2"><button type="button" class="pt6-btn red" id="ptF06LeaveYes">יציאה</button><button type="button" class="pt6-btn out" id="ptF06LeaveNo" data-f06-close>ביטול</button></div>');
  $('ptF06LeaveYes').onclick=async()=>{
-  if(busy)return;if(!online()){toast(TX.offline);return}
+  if(busy)return;if(!online()){toast(TX.offlineAct);return}
   busy=true;$('ptF06LeaveYes').disabled=true;
   const t=tripId();
   try{
@@ -3194,6 +3196,7 @@ function blocked(){
  if(Date.now()-lastGesture>4000)return;
  if(Date.now()-lastGuardToast>TOAST_GAP_MS){lastGuardToast=Date.now();toast(TX.viewer)}
  clearTimeout(reloadT);
+ if(!online())return;                               /* C11: offline the guard still blocks and toasts, without a reload */
  reloadT=setTimeout(async()=>{try{await loadState();fillSelects();updateDates();render()}catch{}},400);
 }
 function installGuard(){
@@ -3247,8 +3250,7 @@ function applyMyRole(role,o){
  if(o&&o.self){paintAll();if(!isManager()&&panelOpen())go('more');return}   /* my own change in the sheet: no 1.8a */
  const dropped=role==='viewer'?dropQueue():0;
  if(prev&&prev!==role){
-  const mg=managers().find(m=>m.user_id!==api.uid());
-  nsSet('pt6_changed',JSON.stringify({role,by:mg?mg.display_name:'',dropped}));
+  nsSet('pt6_changed',JSON.stringify({role,dropped}));
  }
  paintAll();
  if(!isManager()){closeLayer();if(panelOpen()){toast(TX.notManager);go('more')}}
@@ -3267,7 +3269,7 @@ function paintChanged(){
   panel.insertBefore(card,anchor);
  }
  card.innerHTML='<b id="ptF06ChangedTitle">ההרשאה שלך השתנתה ל'+esc(ROLE[c.role]||c.role)+'</b>'+
-  '<p>'+(c.by?esc(c.by)+' שינה/תה':'מנהל הטיול שינה')+' את התפקיד שלך.'+(c.role==='viewer'?' אפשר לראות הכול, אבל לא לשנות.':'')+'</p>'+
+  '<p>מנהל הטיול שינה את התפקיד שלך.'+(c.role==='viewer'?' אפשר לראות הכול, אבל לא לשנות.':'')+'</p>'+   /* C3: no manager name */
   (c.dropped>0?'<p class="pt6-drop" id="ptF06Dropped">'+esc(dropLine(c.dropped))+'</p>':'')+
   '<button type="button" class="pt6-btn out" id="ptF06Ack">הבנתי</button>';
  $('ptF06Ack').onclick=()=>{nsDel('pt6_changed');card.remove()};
@@ -3278,7 +3280,7 @@ function paintViewerTag(){
   const old=$(id);
   if(!show){if(old)old.remove();return}
   const h=host();if(!h||old)return;
-  h.insertAdjacentHTML('beforeend','<span class="pt6-viewer-tag" id="'+id+'">צופה</span>');
+  h.insertAdjacentHTML('afterend','<span class="pt6-viewer-tag" id="'+id+'">צופה</span>');   /* beside the title: its text stays the trip name */
  });
 }
 function unsubscribe(){
@@ -3292,7 +3294,11 @@ function subscribeTrip(){
 }
 function subscribeMe(mid){
  const c=api&&api.client();if(!mid||!c||!c.channel||chanMe)return;
- try{chanMe=c.channel('pt6-me-'+mid).on('postgres_changes',{event:'*',schema:'public',table:'trip_members',filter:'id=eq.'+mid},()=>{fetchMyMembership()}).subscribe()}catch{chanMe=null}
+ try{chanMe=c.channel('pt6-me-'+mid).on('postgres_changes',{event:'*',schema:'public',table:'trip_members',filter:'id=eq.'+mid},ev=>{
+  /* C2: an UPDATE to status≠active (or a DELETE) on my own row → 1.8b at once; anything else → re-read my row */
+  const nw=ev&&ev.new,t=tripId();
+  if(t&&ev&&((ev.eventType==='DELETE')||(nw&&nw.status&&nw.status!=='active'))){removedLive(t);return}
+  fetchMyMembership()}).subscribe()}catch{chanMe=null}
 }
 /* removed / left: every pt:<trip>: device key goes (data, queue, members cache), the vault database too */
 function cleanTrip(t){
@@ -3303,7 +3309,8 @@ function cleanTrip(t){
 let removedShown=false;
 async function removedLive(t){
  if(removedShown)return;
- const name=tripNameNow||nsGet('planner:tripname')||'',n=queueLen(),code=nsGet('lp_join_code');
+ let code=null;try{code=api.dev.get('join_code:'+t)}catch{}   /* C5: the code this device joined with, if any */
+ const name=tripNameNow||nsGet('planner:tripname')||'',n=queueLen();
  const rec={trip_id:t,name,n_dropped:n};if(code)rec.join_code=code;
  cleanTrip(t);try{api.stopTrip()}catch{}
  try{api.dev.set(REMOVED_KEY,JSON.stringify(rec))}catch{}
@@ -3341,7 +3348,8 @@ async function showRemoved(rec,live){
    an active membership (removed while the app was closed) → clean-up + 1.8b */
 async function bootCheck(cachedAtAttach){
  const rec=readRecord();
- if(rec){await showRemoved(rec,false);return}
+ /* C8: the record shows once more at the next boot, then it is cleared; boot continues underneath (next trip / card) */
+ if(rec){try{api.dev.del(REMOVED_KEY)}catch{}await showRemoved(rec,false);return}
  if(!cachedAtAttach||!cachedAtAttach.trip_id)return;
  const t0=Date.now();
  while(api.phase()==='booting'&&Date.now()-t0<30000)await new Promise(r=>setTimeout(r,300));
@@ -3354,11 +3362,10 @@ async function bootCheck(cachedAtAttach){
   if(data&&data.status==='pending')return;
   const raw=k=>{try{return api.rawGet('pt:'+t+':'+k)}catch{return null}};
   let n=0;try{const q=JSON.parse(raw(QKEY)||'[]');n=Array.isArray(q)?q.length:0}catch{}
-  const rec2={trip_id:t,name:raw('planner:tripname')||'',n_dropped:n};const code=raw('lp_join_code');if(code)rec2.join_code=code;
+  const rec2={trip_id:t,name:raw('planner:tripname')||'',n_dropped:n};let code=null;try{code=api.dev.get('join_code:'+t)}catch{}if(code)rec2.join_code=code;
   try{api.purge(t)}catch{}
   try{const cc=api.cached();if(cc&&cc.trip_id===t)api.clearCached()}catch{}
-  try{api.dev.set(REMOVED_KEY,JSON.stringify(rec2))}catch{}
-  await showRemoved(rec2,false);
+  await showRemoved(rec2,false);                     /* C8: detected at this boot = shown now; no record for later */
  }catch{}
 }
 
@@ -3377,7 +3384,7 @@ function onStarted(){
  /* synchronously (microtask right after the main script ran, before its async boot continues): the guard is in place
     before the first trip-data write */
  installGuard();installStorageWrap();
- cacheLoad();
+ cacheLoad();keepJoinCode();
  setTimeout(async()=>{
   const seenRole=nsGet('pt6_role_seen');
   await refreshName();
@@ -3406,6 +3413,20 @@ try{
   .observe(document.documentElement,{attributes:true,attributeFilter:['class']});
 }catch{}
 
+/* C5: the in-app join flow (F05 "יש לי קישור הצטרפות") — remember the pasted code; when the trip it opens starts, keep it
+   device-wide as pt:_device:join_code:<trip> (the /join/ page writes the same key itself) */
+document.addEventListener('click',e=>{
+ const go=e.target&&e.target.closest&&e.target.closest('#ptF05LinkGo,#lpjBack');if(!go||!api)return;
+ try{
+  if(go.id==='lpjBack'){api.dev.del('join_code_pending');return}
+  const raw=($('ptF05LinkIn')&&$('ptF05LinkIn').value)||'',m=/[#?&]code=([A-Za-z0-9-]+)/.exec(raw);
+  const c=String(m?m[1]:raw).replace(/[\s-]/g,'').toUpperCase();
+  if(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(c))api.dev.set('join_code_pending',c);
+ }catch{}
+},true);
+function keepJoinCode(){
+ try{const c=api.dev.get('join_code_pending'),t=tripId();if(c&&t){api.dev.set('join_code:'+t,c);api.dev.del('join_code_pending')}}catch{}
+}
 function attach(a){
  if(api||!a||typeof a!=='object')return;
  api=a;

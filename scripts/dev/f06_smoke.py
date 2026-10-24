@@ -351,12 +351,15 @@ def main():
               res is False and be.kv == kv_before and np_.evaluate("localStorage.getItem('planner:expenses')") == ls_before
               and np_.evaluate("localStorage.getItem('planner:__queue__')") in (None, "[]"), (res, ls_before))
         check("viewer guard: device-only key still written", np_.evaluate("localStorage.setItem('planner:qe:cur','USD'),localStorage.getItem('planner:qe:cur')") == "USD")
-        np_.evaluate("localStorage.setItem('lp_join_code','%s')" % be.code)
+        # C5: the device-wide join code (as /join/ writes it); a named-property write bypasses the app's namespacing wrapper
+        np_.evaluate("localStorage['pt:_device:join_code:%s']='%s'" % (be.trip, be.code))
         # role change live: viewer → editor (realtime) → 1.8a
         noa["role"] = "editor"
         np_.evaluate("(window.__chans||[]).forEach(cb=>{try{cb({})}catch(e){}})")
         np_.wait_for_selector("#ptF06Changed", timeout=5000)
-        check("1.8a: 'ההרשאה שלך השתנתה לעורך', tag gone", "ההרשאה שלך השתנתה לעורך" in np_.inner_text("#ptF06Changed") and np_.query_selector("#ptF06ViewerTag") is None)
+        check("1.8a: 'ההרשאה שלך השתנתה לעורך', C3 text without a name, tag gone",
+              "ההרשאה שלך השתנתה לעורך" in np_.inner_text("#ptF06Changed") and "מנהל הטיול שינה את התפקיד שלך." in np_.inner_text("#ptF06Changed")
+              and np_.query_selector("#ptF06ViewerTag") is None, np_.inner_text("#ptF06Changed"))
         np_.click("#ptF06Ack")
         check("1.8a: 'הבנתי' hides it", np_.query_selector("#ptF06Changed") is None)
         # demotion with 2 queued changes → dropped
@@ -371,7 +374,8 @@ def main():
         check("viewer screen: no horizontal scroll", no_hscroll(np_))
         # removed live → 1.8b
         noa["status"] = "removed"
-        np_.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+        # C2: the own-row Realtime UPDATE (status → removed) shows 1.8b at once (no poll, no visibility event)
+        np_.evaluate("(window.__chans||[]).forEach(cb=>{try{cb({eventType:'UPDATE',new:{status:'removed'}})}catch(e){}})")
         np_.wait_for_selector("#ptF06Removed", timeout=5000)
         shot(np_, "8_removed")
         trip_keys = np_.evaluate("Object.keys(localStorage).filter(k=>k.indexOf('pt:%s:')===0)" % be.trip)
@@ -381,7 +385,8 @@ def main():
         check("1.8b: no trip chrome visible", not np_.is_visible(".tabs"))
         np_.reload()
         np_.wait_for_selector("#ptF06Removed", timeout=10000)
-        check("1.8b again at the next boot (device record; raw key, the app's localStorage view is namespaced)", np_.evaluate("Object.keys(localStorage).includes('pt:_device:removed')"))
+        check("C8: 1.8b once more at the next boot, then the record is cleared", np_.is_visible("#ptF06RemovedTitle")
+              and not np_.evaluate("Object.keys(localStorage).includes('pt:_device:removed')"))
         np_.click("#ptF06Rejoin")
         np_.wait_for_selector("#lpJoin[data-screen=form]", timeout=10000)
         check("rejoin: /join/ shows the normal form (D2)", np_.query_selector("#lpjName") is not None and not np_.evaluate("!!localStorage.getItem('pt:_device:removed')"))
@@ -420,6 +425,20 @@ def main():
         mp.click("#ptF06Roles [data-role=editor]")
         mp.wait_for_function("!document.getElementById('ptF06MembersRow')", timeout=5000)
         check("self-demote: row gone without reload, back on עוד", mgr["role"] == "editor" and mp.evaluate("document.getElementById('more').classList.contains('active')"))
+
+        # C10: a non-manager who reaches the members screen (stale UI) gets the toast and goes back
+        shira = be.add("tok-shira", "שירה", "editor")
+        ip2 = open_app(device("tok-shira"))
+        ip2.click(".tab[data-panel=more]")
+        ip2.wait_for_selector("#ptF06LeaveRow")
+        check("C10 manager-only toast text is defined", "רק מנהלים יכולים לנהל חברים'" in app_html)
+        ip2.context.set_offline(True)
+        ip2.click("#ptF06LeaveRow")
+        ip2.click("#ptF06LeaveYes")
+        ip2.wait_for_function("document.getElementById('ptF06Toast')&&document.getElementById('ptF06Toast').classList.contains('on')")
+        check("C10 offline leave → toast 'אין חיבור – אפשר לשנות כשהרשת תחזור.', still a member",
+              ip2.inner_text("#ptF06Toast") == "אין חיבור – אפשר לשנות כשהרשת תחזור." and shira["status"] == "active")
+        ip2.context.close()
 
         check("no page errors", not [e for e in errors if "google" not in e.lower()], errors)
         br.close()
