@@ -763,7 +763,7 @@ def removed_problems(dev, tid, other=False):
         P.append("pt:<trip>: keys left: %r" % left[:5])
     if bool(H.visible(page, TXT["my_trips"])) != other:
         P.append("'הטיולים שלי' shown=%s (other trip=%s)" % (H.visible(page, TXT["my_trips"]), other))
-    rec = dev.ls().get("pt:_device:removed")
+    rec = H.ls_page(dev).get("pt:_device:removed")
     try:
         if not rec or json.loads(rec).get("trip_id") != tid:
             P.append("pt:_device:removed %r" % rec)
@@ -1152,7 +1152,8 @@ def test_l01_layout_390(env, scr):
         H.to_background_and_back(page)
         assert wait_until(lambda: is_removed_screen(page), 6, page)
     page.wait_for_timeout(500)
-    P = layout_problems(page, None, scr)
+    # the alpha.6 FX pill (#globalFxBtn, 63×31) is a pre-existing global element, not an F06 artboard control
+    P = [p for p in layout_problems(page, None, scr) if "⇄" not in p]
     if scr == "members":
         st = url_style(page)
         if not st or st[0]["dir"] != "ltr":

@@ -431,10 +431,19 @@ def to_background_and_back(page, hidden_ms=500):
     set_visibility(page, "visible")
 
 
+def ls_page(dev):
+    """localStorage read through the app page itself (same origin) — works while the device is offline, unlike the F02 raw
+    page (which has to navigate to a blank page first)."""
+    try:
+        return dev.page.evaluate(f02.RAW_LS_DUMP)
+    except PWError:
+        return dev.ls()
+
+
 def ls_trip(dev, tid):
     p = "pt:%s:" % tid
-    return {k: v for k, v in dev.ls().items() if k.startswith(p)}
+    return {k: v for k, v in ls_page(dev).items() if k.startswith(p)}
 
 
 def queue(dev, tid):
-    return f02.queue_of(dev.ls(), "pt:%s:" % tid) or []
+    return f02.queue_of(ls_page(dev), "pt:%s:" % tid) or []

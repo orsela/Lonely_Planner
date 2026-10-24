@@ -48,8 +48,11 @@ viewer header tag) should switch to the ids in `docs/F06_dev_notes.md` once it e
   behaviour row fails as it must); 0 rows left behind.
 - `function_test.ts`: 19/19 against a throw-away, spec-shaped handler in the scratchpad (not committed), to prove the file
   runs on the Node runner.
-- `test_f06.py`: collects 70 cases; against alpha.6 (main) the F06 cases fail on the missing F06 UI, and the alpha.6
-  baselines (editors / managers write, the F04 row exists) pass — see the report for the run.
+- `test_f06.py`: collects 70 cases. Run against alpha.6 (main, 2026-10-24, 8.5 min): 7 pass / 63 fail. Every failure is
+  "F06 UI / behaviour missing" or "MEMBERS_FEATURE not declared" (no harness error after fixing the offline localStorage
+  read). The passes are the cases whose expected outcome is the same in alpha.6 as in alpha.7: b02[0] (no badge),
+  b03[2] (no only-manager sub), h03[editor/manager] (writes reach trip_kv, no toast), h04[editor] (no viewer tag),
+  l01[more] (layout of "עוד"; it gains the F06 rows once they exist).
 
 ## Criteria → tests matrix (`docs/F06_spec.md` §4)
 
