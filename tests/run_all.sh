@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Lonely Planner · full regression runner (every QA suite, one summary table) · version 1.0.0
+# Lonely Planner · full regression runner (every QA suite, one summary table) · version 1.0.1
+# CHANGE 2026-10-26 FIX-RUN-01: 1.0.0 → 1.0.1: the 'static' job runs the dev check of the latest release (hotfix 3.0.0-alpha.7.2).
 # CHANGE 2026-10-26 QA-DEBT-11: new file (no previous version). Replaces running tests/f0x/run.sh one by one for the full
 #   regression. Offline: no Supabase, no network (the v2.15.2 protected-function baseline is read from git, tests/qa_refs.py).
 #
@@ -157,9 +158,9 @@ run_job() {
     f04h) pyjob f04h "$REPO" tests/f04home test_f04home.py "";;
     static)
       local log="$OUT/static.txt"
-      (cd "$REPO" && $PY scripts/dev/f04home_static_check.py ee5c723) >"$log" 2>&1
+      (cd "$REPO" && $PY scripts/dev/fix772_static_check.py d148d74) >"$log" 2>&1  # CHANGE 2026-10-26 FIX-RUN-01: dev check of the latest release (was f04home_static_check.py ee5c723, which pins alpha.7.1 and F04H-only markers)
       local rc=$?
-      echo "$([ $rc = 0 ] && echo PASS || echo FAIL)|1|$([ $rc = 0 ] && echo 1 || echo 0)|$([ $rc = 0 ] && echo 0 || echo 1)|0|0|0|f04home_static_check.py ee5c723" >"$OUT/static.res";;
+      echo "$([ $rc = 0 ] && echo PASS || echo FAIL)|1|$([ $rc = 0 ] && echo 1 || echo 0)|$([ $rc = 0 ] && echo 0 || echo 1)|0|0|0|fix772_static_check.py d148d74" >"$OUT/static.res";;
     fn)
       local log="$OUT/fn.txt" P=0 F=0 X=0 rc=0
       : >"$log"

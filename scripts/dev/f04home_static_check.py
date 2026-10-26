@@ -6,7 +6,7 @@
 #   3 lines above it); flag-off sanity: every existing line that was changed is replaced by a hunk that is gated
 #   (HOMEI / HOME_INSTALL_FEATURE) or is a version / exported-object line; the resume key is never written with a code/token.
 # usage: python3 scripts/dev/f04home_static_check.py [base_ref=origin/main]
-import re
+import re, json, os
 import subprocess
 import sys
 from collections import Counter
@@ -55,7 +55,8 @@ def main():
     vers = [v for v in re.findall(r"const (?:PT|APP)_VERSION='([^']+)'", new["app/index.html"]) if v[:1].isdigit()]
     iv = re.search(r"invite page · version (\S+)", new["invite/index.html"])
     print("versions: app", vers, "· invite comment", iv and iv.group(1))
-    ok &= vers == ["3.0.0-alpha.7.1", "3.0.0-alpha.7.1"] and bool(iv) and iv.group(1) == "3.0.0-alpha.7.1"
+    EXP = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tests", "qa_versions.json")))["app"]  # CHANGE 2026-10-26 FIX-VER-05: expected version from tests/qa_versions.json (was the literal 3.0.0-alpha.7.1)
+    ok &= vers == [EXP, EXP] and bool(iv) and iv.group(1) == EXP
 
     fl = [len(re.findall(r"const HOME_INSTALL_FEATURE='on';", new[f])) for f in FILES]
     near = re.search(r"const MEMBERS_FEATURE='on';\n(?:/\*[\s\S]*?\*/\n)?const HOME_INSTALL_FEATURE='on';", new["app/index.html"])

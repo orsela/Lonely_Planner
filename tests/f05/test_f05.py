@@ -1,4 +1,6 @@
-"""Plan_Travel F05 QA · Playwright black-box suite · version 1.1.0
+"""Plan_Travel F05 QA · Playwright black-box suite · version 1.1.1
+CHANGE 2026-10-26 FIX-04-QA: 1.1.0 → 1.1.1: new runtime test test_s02_join_fatal_single_title; the static duplicate-id check accepts the
+  source-level #joinTitle twice once fatal() removes #m (3.0.0-alpha.7.2).
 CHANGE 2026-10-19 F05-QA-03: first version (no previous version).
 CHANGE 2026-10-26 QA-DEBT-06: 1.0.0 → 1.1.0 (static part; behavioural changes are listed under QA-DEBT-07 below):
   - MAIN_REF defaults to the alpha.5.1 commit from tests/qa_refs.py (4bd04e4 = parent of the F05 client commit 59ebf13; was
@@ -309,6 +311,18 @@ def test_a01_join_off_is_coming_soon(env):
     if ext or env.backend.fn_calls or exists(dev.page, "#lpJoin"):
         P.append("'off' page loads Supabase / calls functions / mounts the join flow: %r" % ext[:3])
     assert not P, "\n".join(P)
+
+
+def test_s02_join_fatal_single_title(env):
+    """CHANGE 2026-10-26 FIX-04-QA: new test (QA-DEBT-BUG-04). /join/ whose flow script cannot load shows the error screen
+    "לא הצלחנו לטעון את הדף" with exactly ONE #joinTitle in the DOM (since 3.0.0-alpha.7.2 fatal() removes the hidden #m)."""
+    tid, code = new_trip(env)
+    dev = env.new_device("J")
+    dev.page.route("**/join/flow.js*", lambda route: route.abort())
+    dev.page.goto(env.server.origin + H.JOIN + "#code=" + code, wait_until="domcontentloaded")
+    assert wait_has(dev.page, "לא הצלחנו לטעון את הדף", 10), "error screen missing (text=%r)" % btext(dev.page)[:200]
+    n = dev.page.evaluate("()=>document.querySelectorAll('#joinTitle').length")
+    assert n == 1, "#joinTitle count on the error screen = %r" % n
 
 
 def test_a02_app_off_is_alpha51(env):
@@ -1439,6 +1453,10 @@ def test_s01_static(check, tmp_path):
             return {k for k, v in c.items() if v > 1}
         assert not (dups(html) - dups(main_html())), "new duplicate ids %r" % sorted(dups(html) - dups(main_html()))
         if dups(jhtml) == {"joinTitle"}:  # CHANGE 2026-10-26 QA-DEBT-07: only the known fatal() duplicate → xfail
+            # CHANGE 2026-10-26 FIX-04-QA: the id is written twice in the SOURCE (hidden F04 #m + fatal()), but since 3.0.0-alpha.7.2
+            # fatal() removes #m first, so the DOM never holds two (checked at runtime by test_s02_join_fatal_single_title).
+            if "getElementById('m');if(old)old.remove()" in jhtml:
+                return
             assert_or_known_bug(["duplicate ids in /join/: {'joinTitle'}"], "QA-DEBT-BUG-04", "joinTitle")
         assert not dups(jhtml), "duplicate ids in /join/: %r" % dups(jhtml)
     elif check == "no_live_project_ref":
