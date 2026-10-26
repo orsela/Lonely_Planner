@@ -1,0 +1,18 @@
+# Failures of the existing suites on ee5c723 (alpha.7, F04-HOME not implemented), recorded 2026-10-26 by run.sh --only off.
+# They pre-date F04-HOME (F06 changed the 'עוד' sheet; F05's suite pins alpha.5.1-era behaviour). run.sh --only off reports only failures NOT in this list.
+f04 test_f04.py::test_c15_more_join_link_row[manager]
+f04 test_f04.py::test_n01_no_old_name_rendered[more_sheet]
+f04 test_f04.py::test_n03_whatsapp_text_name_and_url[sheet]
+f05 test_f05.py::test_b10_name_taken[pending_spaces]
+f05 test_f05.py::test_b13_known_identity[removed]
+f05 test_f05.py::test_c03_claim_moves_membership_and_starts_trip
+f05 test_f05.py::test_d05_reject_inline_confirm
+f05 test_f05.py::test_d09_not_manager_hides_card
+f05 test_f05.py::test_d10_card_on_every_home_layout_with_global_elements[v2_min]
+f05 test_f05.py::test_d10_card_on_every_home_layout_with_global_elements[v2]
+f05 test_f05.py::test_d10_card_on_every_home_layout_with_global_elements[v1]
+f05 test_f05.py::test_l01_layout_390[home_manager]
+f05 test_f05.py::test_s01_static[app_version]
+f05 test_f05.py::test_s01_static[pt_version]
+f05 test_f05.py::test_s01_static[node_check]
+f05 test_f05.py::test_s01_static[no_new_duplicate_ids]
