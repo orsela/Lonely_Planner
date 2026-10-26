@@ -7,7 +7,17 @@
 <meta name="theme-color" content="#0f6b4f">
 <title>הזמנה · Lonely Planner</title>
 <!-- CHANGE 2026-10-12 F04-NAME-01: display name Plan_Travel → Lonely Planner (title + brand). -->
-<!-- Plan_Travel invite page · version 3.0.0-alpha.4 · F04
+<!-- Plan_Travel invite page · version 3.0.0-alpha.7.1 · F04 + F04-HOME
+     CHANGE 2026-10-26 F04H-INV-VER: version comment 3.0.0-alpha.4 → 3.0.0-alpha.7.1 (F04-HOME, docs/F04-HOME_spec.md).
+     CHANGE 2026-10-26 F04H-INV-01: what changed from 3.0.0-alpha.7 (this page last changed in alpha.4): new flag
+     HOME_INSTALL_FEATURE ('on'). With it on and a VALID token: (1) inside a mail app's in-app browser (§3.1) the page shows
+     "פותחים בדפדפן הרגיל" — iPhone: "פתיחה בספארי" (x-safari-https://, on tap only) + manual steps; Android: one automatic
+     intent:// hop to Chrome per load (the token travels as ?t= for that hop only and is read like #invite=) + the fallback
+     button "לא נפתח? פתיחה ב-Chrome"; (2) iPhone Safari (not in-app): the valid card shrinks to one row and the card "קודם
+     מוסיפים את האפליקציה למסך הבית" (3 steps, info line, "הוספתי – מה עכשיו?" sheet, "להמשיך בדפדפן בלי להתקין" = today's
+     link); (3) Android: one-row card + today's steps and button + "בסוף ההקמה תוכלו להתקין את האפליקציה" (C2); (4) desktop:
+     today's page; (5) the installed-app note names "כניסה עם המייל". Invalid / no-connection states are unchanged and never
+     hop. The token is still never stored or logged. 'off' = exactly the alpha.7 page (?t= ignored).
      CHANGE 2026-10-12 F04-INV-01: what changed from 3.0.0-alpha.3.6: the VALID card now leads into the app's setup wizard
      (artboard F04_Landing): copy "…הזמין אותך לנהל את הקבוצה "<draft>". ההקמה לוקחת כ-3 דקות.", an expiry line instead of
      the amber "wizard not available" note, steps "מה יקרה עכשיו" (1 = the app sends a 6-digit code), an ENABLED link-button
@@ -47,6 +57,28 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
 .exp{font-size:12px;color:#5f6861}
 .inst{display:flex;gap:8px;align-items:flex-start;background:#fff;border:1px solid #e4e6df;border-radius:14px;padding:10px 12px;font-size:12px;color:#3a443d;line-height:1.5}
 .inst svg{flex-shrink:0;margin-top:2px}
+/* CHANGE 2026-10-26 F04H-INV-02: new rules for the F04-HOME variants (new class names only: h-*) */
+.h-row1{display:flex;gap:12px;align-items:center;padding:12px 14px}
+.h-row1 .ring{width:40px;height:40px;flex-shrink:0}
+.h-row1 .ring svg{width:22px;height:22px}
+.h-row1 h1{font-size:16px}
+.h-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.h-main span{font-size:12.5px;color:#5f6861;overflow-wrap:anywhere}
+.h-col{display:flex;flex-direction:column;gap:12px}
+.h-col h2,.steps h2{margin:0;font-size:17px;line-height:1.35}
+.steps h2{padding-bottom:8px}
+.h-tiny{font-size:12px;color:#5f6861;line-height:1.55;margin:0}
+.h-tiny b{color:#3a443d}
+.h-ol{margin:4px 0 0;padding:0 18px 0 0;font-size:12.5px;color:#3a443d;line-height:1.6}
+.btn.h-out{background:#fff;color:#0f6b4f;border:1.5px solid #0f6b4f;box-shadow:none}
+.h-skip{display:flex;align-items:center;justify-content:center;min-height:44px;color:#0f6b4f;font-size:14px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.h-c2{text-align:center}
+.h-share{display:inline-block;vertical-align:-3px;margin:0 2px}
+.h-layer{position:fixed;inset:0;z-index:10;display:flex;align-items:flex-end;justify-content:center}
+.h-layer[hidden]{display:none}
+.h-scrim{position:absolute;inset:0;background:#0f172a66}
+.h-sheet{position:relative;width:100%;max-width:520px;background:#fff;border-radius:20px 20px 0 0;padding:18px 18px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;box-shadow:0 -8px 28px #00000020}
+.h-sheet h2{margin:0;font-size:17px}
 .spin{width:28px;height:28px;border:3px solid #e4e6df;border-top-color:#0f6b4f;border-radius:50%;animation:s 1s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
@@ -55,6 +87,9 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
 <body>
 <main id="m" aria-live="polite"><div class="brand">Lonely Planner</div><section class="card center" aria-busy="true"><div class="spin" aria-hidden="true"></div><h1 style="font-size:17px">בודקים את ההזמנה…</h1></section></main>
 <script>
+/* CHANGE 2026-10-26 F04H-INV-FLAG: new flag (no alpha.7 equivalent), same name as the app's. 'on' = F04-HOME variants
+   (F04H-INV-01); 'off' = exactly the alpha.7 page. */
+const HOME_INSTALL_FEATURE='on';
 (function(){
   'use strict';
   var ENDPOINT='https://zwufpxnioqaweobnvffs.supabase.co/functions/v1/invite-manager';
@@ -72,6 +107,9 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
   function dmy(ts){var d=new Date(ts);return isNaN(d)?'':pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()}
   function net(msg){return BRAND+'<section class="card center"><div class="ring">'+ICON_WIFI+'</div><h1>'+esc(msg)+'</h1><button type="button" class="btn" id="retry">נסו שוב</button></section>'}
   /* CHANGE 2026-10-12 F04-INV-01: valid card per artboard F04_Landing (was: amber note + disabled "התחלת הקמה · בקרוב") */
+  /* CHANGE 2026-10-26 F04H-INV-04: the installed-app note names the app's gate button; with HOME_INSTALL_FEATURE='on' it is
+     "כניסה עם המייל" (C1), 'off' "כניסה עם הזמנה" as in alpha.7. */
+  var NOTE_BTN=HOME_INSTALL_FEATURE==='on'?'כניסה עם המייל':'כניסה עם הזמנה';
   var ICON_PHONE='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>';
   function valid(j){
     var who=esc(j.inviter_name||'מנהל המערכת');
@@ -85,7 +123,76 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
       '<div class="step"><span class="num">3</span><span>מדינות ומטבעות</span></div>'+
       '<div class="step"><span class="num">4</span><span>קישור הצטרפות לשליחה בווטסאפ</span></div></section>'+
       '<a class="btn" id="open" href="'+esc(APP_LINK+token)+'">פתיחה באפליקציה והקמת הטיול</a>'+
-      '<div class="inst">'+ICON_PHONE+'<span>האפליקציה כבר מותקנת אצלך במסך הבית? אפשר לפתוח אותה משם ולבחור "כניסה עם הזמנה".</span></div>';
+      '<div class="inst">'+ICON_PHONE+'<span>האפליקציה כבר מותקנת אצלך במסך הבית? אפשר לפתוח אותה משם ולבחור "'+NOTE_BTN+'".</span></div>';
+  }
+  /* CHANGE 2026-10-26 F04H-INV-03: new lines (no alpha.7 equivalent) — platform detection (§3.1) and the three F04-HOME variants.
+     inApp: Gmail/Google app (GSA), Facebook, Instagram, LINE, LinkedIn, Outlook, any Android WebView ("; wv)"), and any iOS
+     browser without the "Safari/" token (WKWebView in Gmail/Outlook). SFSafariViewController cannot be detected (covered by
+     the small line on the iPhone install card). */
+  var HOMEI=HOME_INSTALL_FEATURE==='on';
+  var UA=String(navigator.userAgent||'');
+  var IS_IOS=/iPhone|iPad|iPod/i.test(UA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  var IS_ANDROID=/Android/i.test(UA);
+  var IN_APP=/\b(GSA|FBAN|FBAV|Instagram|Line|LinkedInApp|Outlook|; wv\))/i.test(UA)||(IS_IOS&&!/Safari\//.test(UA));
+  var hopped=false;   /* the automatic Android hop runs once per page load */
+  var ICON_SHARE='<svg class="h-share" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="שיתוף" role="img"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>';
+  var ICON_INFO='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>';
+  function row1(j){
+    var exp=dmy(j.expires_at);
+    return '<section class="card h-row1"><div class="ring ok">'+ICON_OK+'</div><div class="h-main"><h1>ההזמנה שלך אומתה</h1><span>'+
+      (j.draft_name?'<bdi>'+esc(j.draft_name)+'</bdi>':'קבוצה חדשה')+(exp?' · בתוקף עד '+esc(exp):'')+'</span></div></section>';
+  }
+  function here(){return location.host+location.pathname}
+  function safariUrl(){return 'x-safari-https://'+here()+'#invite='+token}
+  function intentUrl(){return 'intent://'+here()+'?t='+token+'#Intent;scheme=https;package=com.android.chrome;end'}
+  var FOOT='<p class="small" style="text-align:center">ההזמנה עצמה בתוקף. אם הדף נסגר – לוחצים שוב על הכפתור במייל.</p>';
+  function inAppPage(j){
+    var b=IS_IOS?'ספארי':'Chrome';
+    return BRAND+row1(j)+'<section class="card h-col"><h2>פותחים בדפדפן הרגיל</h2>'+
+      '<p>הדף נפתח בתוך אפליקציית המייל, ושם ההקמה לא נשמרת. ממשיכים ב'+(IS_IOS?'ספארי':'-Chrome')+' – זה לוקח שנייה.</p>'+
+      (IS_IOS?'<button type="button" class="btn" id="hSafari">פתיחה בספארי</button>'+
+        '<p class="h-tiny"><b>הכפתור לא עבד?</b></p><ol class="h-ol"><li>לוחצים על ⋯ בפינת המסך</li><li>בוחרים "פתיחה בספארי"</li></ol>'
+      :'<p class="h-tiny">אם '+b+' לא נפתח לבד:</p><button type="button" class="btn" id="hChrome">לא נפתח? פתיחה ב-Chrome</button>')+
+      '</section>'+FOOT;
+  }
+  function iosPage(j){
+    return BRAND+row1(j)+'<section class="card steps go"><h2>קודם מוסיפים את האפליקציה למסך הבית</h2>'+
+      '<div class="step"><span class="num">1</span><span>לוחצים על סמל השיתוף '+ICON_SHARE+' בסרגל של ספארי</span></div>'+
+      '<div class="step"><span class="num">2</span><span>בוחרים "הוספה למסך הבית"</span></div>'+
+      '<div class="step"><span class="num">3</span><span>פותחים את Lonely Planner ממסך הבית ולוחצים "כניסה עם המייל"</span></div>'+
+      '<p class="h-tiny" style="padding-top:6px">לא רואים \'הוספה למסך הבית\'? פותחים את הדף בספארי</p></section>'+
+      '<div class="inst">'+ICON_INFO+'<span>באפליקציה נשלח קוד בן 6 ספרות למייל שאליו נשלחה ההזמנה. הקוד מופיע בכותרת המייל – רואים אותו בהתראה.</span></div>'+
+      '<button type="button" class="btn" id="hAdded" aria-haspopup="dialog">הוספתי – מה עכשיו?</button>'+
+      '<a class="h-skip" id="hSkip" href="'+esc(APP_LINK+token)+'">להמשיך בדפדפן בלי להתקין</a>'+
+      '<div class="h-layer" id="hLayer" hidden><div class="h-scrim" id="hScrim"></div><section class="h-sheet" role="dialog" aria-modal="true" aria-labelledby="hSheetT">'+
+      '<h2 id="hSheetT">עכשיו פותחים את האפליקציה</h2><div class="step" style="border:0;padding:0"><span class="num" style="background:#edf8f3;color:#0b5841">3</span><span>פותחים את Lonely Planner ממסך הבית ולוחצים "כניסה עם המייל"</span></div>'+
+      '<p class="h-tiny">נשלח קוד בן 6 ספרות למייל שאליו נשלחה ההזמנה – רואים אותו בהתראה של המייל.</p>'+
+      '<button type="button" class="btn" id="hSheetOk">הבנתי</button></section></div>';
+  }
+  function androidPage(j){
+    /* today's valid page (valid() unchanged) with its first card replaced by the one-row card, + the C2 line under the button */
+    var v=valid(j),i=v.indexOf('<section class="card steps go">');
+    return BRAND+row1(j)+v.slice(i).replace('</a>','</a><p class="small h-c2">בסוף ההקמה תוכלו להתקין את האפליקציה</p>');
+  }
+  function renderHome(j){
+    if(IN_APP&&(IS_IOS||IS_ANDROID)){
+      render(inAppPage(j));
+      var sf=document.getElementById('hSafari');if(sf)sf.onclick=function(){location.href=safariUrl()};
+      var ch=document.getElementById('hChrome');if(ch)ch.onclick=function(){location.href=intentUrl()};
+      if(IS_ANDROID&&!hopped){hopped=true;location.href=intentUrl()}
+      return;
+    }
+    if(IS_IOS&&navigator.standalone!==true){
+      render(iosPage(j));
+      var L=document.getElementById('hLayer'),ret=null;
+      var close=function(){L.hidden=true;if(ret)try{ret.focus()}catch(e){}};
+      document.getElementById('hAdded').onclick=function(){ret=this;L.hidden=false;try{document.getElementById('hSheetOk').focus()}catch(e){}};
+      document.getElementById('hSheetOk').onclick=close;
+      document.getElementById('hScrim').onclick=close;
+      document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!L.hidden)close()});
+      return;
+    }
+    render(IS_ANDROID?androidPage(j):valid(j));
   }
   var m=document.getElementById('m');
   function render(html){m.innerHTML=html;var r=document.getElementById('retry');if(r)r.onclick=check}
@@ -93,6 +200,10 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
   try{d=decodeURIComponent(h)}catch(e){}
   var mm=/^#invite=([A-Za-z0-9_-]{43})\s*$/.exec(d);
   var token=mm?mm[1]:'';
+  /* CHANGE 2026-10-26 F04H-INV-05: new lines (no alpha.7 equivalent): with HOME_INSTALL_FEATURE='on' a token that arrived as
+     ?t= (the Android intent:// hop, which cannot carry a #fragment) is read like #invite= — into memory only; the
+     replaceState below removes it from the address bar together with the hash. 'off': ?t= is ignored (alpha.7). */
+  if(HOME_INSTALL_FEATURE==='on'&&!token){var tq='';try{tq=new URLSearchParams(location.search).get('t')||''}catch(e){}if(TOKEN_RE.test(tq))token=tq}
   try{history.replaceState(null,'',location.pathname)}catch(e){}
   function check(){
     render(LOADING);
@@ -102,7 +213,7 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
     var t=setTimeout(function(){if(ctl)ctl.abort()},10000);
     fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({action:'check',token:token}),signal:ctl?ctl.signal:undefined,cache:'no-store'})
       .then(function(r){clearTimeout(t);return r.json().then(function(j){return{ok:r.ok,j:j}},function(){return{ok:false,j:null}})})
-      .then(function(x){if(!x.ok||!x.j){render(net('לא הצלחנו לבדוק את ההזמנה. נסו שוב'));return}render(x.j.valid===true?valid(x.j):INVALID)})
+      .then(function(x){if(!x.ok||!x.j){render(net('לא הצלחנו לבדוק את ההזמנה. נסו שוב'));return}if(x.j.valid===true&&HOMEI){renderHome(x.j);return}/* CHANGE 2026-10-26 F04H-INV-06: valid + flag on → the F04-HOME variant (F04H-INV-03); otherwise as before */render(x.j.valid===true?valid(x.j):INVALID)})
       ['catch'](function(){clearTimeout(t);render(net('אין חיבור. נסו שוב'))});
   }
   check();

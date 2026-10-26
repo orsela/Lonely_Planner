@@ -67,6 +67,12 @@ const JOIN_FEATURE='on';
    live. The /join/ page has its own MEMBERS_FEATURE. 'off' = exactly the 3.0.0-alpha.6 behaviour: the F06 block returns on its
    first line and every F06 hook line (gate F06-GATE-01, F04 F06-MORE-02) is a no-op. Needs JOIN_FEATURE='on' and cloud. */
 const MEMBERS_FEATURE='on';
+/* CHANGE 2026-10-26 F04H-FLAG-01: new flag (no alpha.7 equivalent). 'on' = F04-HOME (docs/F04-HOME_spec.md): the gate's F04
+   card becomes "מנהל/ת טיול" → "כניסה עם המייל" on top of the gate, the wizard's code screen survives a reload / reopen for 10
+   minutes without a new send (+ "איפה הקוד?" card), a verified manager with no open invite but active trips is booted into the
+   trip (C3), and "הטיול נוצר" offers to add the app to the home screen when not standalone. The /invite/ page has its own
+   HOME_INSTALL_FEATURE. 'off' = exactly the 3.0.0-alpha.7 behaviour: every F04H line is a no-op. Needs WIZARD_FEATURE='on'. */
+const HOME_INSTALL_FEATURE='on';
 </script>
 <!-- CHANGE 2026-10-05 F03-UI-01: NEW block (no 3.0.0-alpha.2 equivalent) — F03 "super-admin invites a manager"
      (docs/F03_spec.md). Style + one classic script, placed after the flags script and BEFORE the F02 gate block so it
@@ -909,6 +915,33 @@ button.listitem#ptJoinRow{width:100%;text-align:right;font:inherit;color:inherit
 .pt-cur-chk{width:22px;height:22px;border-radius:6px;border:1.5px solid #c9ccc3;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px}
 .pt-cur-opt[aria-checked="true"] .pt-cur-chk{background:var(--primary);border-color:var(--primary)}
 .pt-cur-opt[disabled][aria-checked="true"] .pt-cur-chk{background:#c9ccc3;border-color:#c9ccc3}
+/* CHANGE 2026-10-26 F04H-UI-01: F04-HOME styles (no alpha.7 equivalent). Only new class names (pt-f04h-*, pt-gate-f04h); they
+   match nothing while HOME_INSTALL_FEATURE='off'. Gate: the "מנהל/ת טיול" card on top (artboard H_Gate). Code screen: resume
+   banner + "איפה הקוד?" card (H_Code). Done screen: install card (H_Done). */
+#ptGate.pt-gate-f04h>#ptGateInvite{margin:auto 0 0}
+#ptGate.pt-gate-f04h>:last-child{margin-bottom:auto}
+#ptGate.pt-gate-f04h.pt-gate-f05>#ptGateInvite{margin-top:auto!important}
+#ptGate.pt-gate-f04h.pt-gate-f05>#ptF05Transfer{margin-top:0!important}
+.pt-f04h-gh{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pt-f04h-bul{margin:0;padding:0 18px 0 0;font-size:12.5px;color:#3a443d;line-height:1.55;display:flex;flex-direction:column;gap:4px}
+.pt-f04h-resume{background:#edf8f3;border:1px solid #cfe1d7;color:#0b5841;border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5;margin:14px 0 0}
+.pt-f04h-resume[hidden]{display:none}
+.pt-f04h-where{display:flex;flex-direction:column;gap:10px}
+.pt-f04h-where b{font-size:14px}
+.pt-f04h-where p{margin:0;font-size:12.5px;color:#3a443d;line-height:1.55}
+.pt-f04h-notif{display:flex;gap:10px;align-items:flex-start;background:#f1f0ea;border-radius:14px;padding:10px 12px;min-width:0}
+.pt-f04h-appic{width:34px;height:34px;border-radius:9px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pt-f04h-notif .pt-main{flex:1;min-width:0;font-size:12px;line-height:1.45;color:#3a443d}
+.pt-f04h-notif .pt-main b{display:block;font-size:12.5px;color:var(--text)}
+.pt-f04h-subj{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pt-f04h-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:800;background:#fff;border-radius:6px;padding:0 4px;letter-spacing:2px}
+.pt-f04h-inst{display:flex;flex-direction:column;gap:10px;border-color:#cfe1d7}
+.pt-f04h-inst b.pt-f04h-t{font-size:14.5px}
+.pt-f04h-tick{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5;color:#3a443d}
+.pt-f04h-tick svg{margin-top:2px}
+.pt-f04h-tick .pt-main{flex:1;min-width:0;overflow-wrap:anywhere}
+.pt-f04h-hint{margin:0;font-size:12.5px;color:#3a443d;line-height:1.6}
+.pt-f04h-ok{background:#eaf7ef;color:#146c43;border-radius:12px;padding:10px 12px;font-size:13px;font-weight:700;line-height:1.5;margin:0}
 </style>
 <script>
 /* CHANGE 2026-10-12 F04-UI-01 (3.0.0-alpha.4): new script (no alpha.3 equivalent). One IIFE; exposes only the frozen,
@@ -947,6 +980,51 @@ const TX={
  noDays:'אין ימים בטיול'
 };
 let api=null;   /* set by the gate: {endpoint,key,client(),uid(),withTimeout,timeoutMs,ensureSession(),activeTrips(),cacheTrip(),firstSteps,enterTrip(),started(),tripId(),role()} */
+/* CHANGE 2026-10-26 F04H-CORE-01: new lines (no alpha.7 equivalent). HOMEI = HOME_INSTALL_FEATURE is 'on' (every F04H line
+   checks it; 'off' = alpha.7). RAWLS = the browser's own localStorage methods, captured HERE, before the F02 gate wraps
+   Storage.prototype (namespacing), so the device-level resume key `pt:_device:wz_resume` is read/written raw (spec §2).
+   The resume entry is {email, sentAt, kind, origin, v:1}: never the code, never the invite token (C4). TTL 10 minutes. */
+const HOMEI=typeof HOME_INSTALL_FEATURE!=='undefined'&&HOME_INSTALL_FEATURE==='on';
+const RESUME_KEY='pt:_device:wz_resume',RESUME_TTL_MS=600000;
+const RAWLS=(()=>{try{const ls=window.localStorage,P=Storage.prototype,g=P.getItem,s=P.setItem,d=P.removeItem;
+ return{get:k=>{try{return g.call(ls,k)}catch{return null}},set:(k,v)=>{try{s.call(ls,k,v)}catch{}},del:k=>{try{d.call(ls,k)}catch{}}}}catch{return null}})();
+function readResume(){
+ if(!HOMEI||!RAWLS)return null;
+ let r=null;try{r=JSON.parse(RAWLS.get(RESUME_KEY)||'null')}catch{r=null}
+ if(!r)return null;
+ const age=Date.now()-Number(r.sentAt);
+ if(r.v!==1||typeof r.email!=='string'||!validEmail(normEmail(r.email))||!(age>=0&&age<RESUME_TTL_MS)||(r.kind!=='signin'&&r.kind!=='change')||typeof r.origin!=='string'){RAWLS.del(RESUME_KEY);return null}
+ return{email:normEmail(r.email),sentAt:Number(r.sentAt),kind:r.kind,origin:r.origin};
+}
+function writeResume(){
+ if(!HOMEI||!RAWLS||!wz.email||!wz.sentAt)return;
+ RAWLS.set(RESUME_KEY,JSON.stringify({email:wz.email,sentAt:wz.sentAt,kind:wz.sendKind==='signin'?'signin':'change',origin:wz.origin,v:1}));
+ /* origin 'invite': keep the token-free marker ?invite=1 in the address bar, so a reload comes back here (§3.3 "boot with ?invite=1") */
+ if(wz.origin==='invite'&&!/[?&]invite=1(&|$)/.test(location.search)){try{history.replaceState(history.state,'',location.pathname+'?invite=1')}catch{}}
+}
+function clearResume(){
+ if(!HOMEI)return;
+ wz.resumed=false;
+ if(RAWLS)RAWLS.del(RESUME_KEY);
+ if(/[?&]invite=1(&|$)/.test(location.search)){try{history.replaceState(history.state,'',location.pathname)}catch{}}
+}
+/* §3.3: wizard open (any origin) with a valid entry of the same origin → code screen with that email, no send */
+function resumeInto(origin,email){
+ const r=readResume();
+ if(!r||r.origin!==origin||(email&&normEmail(email)!==r.email))return;
+ wz.email=r.email;wz.sendKind=r.kind;wz.sentAt=r.sentAt;wz.resumed=true;
+}
+/* CHANGE 2026-10-26 F04H-DONE-01: new lines (no alpha.7 equivalent). Android/Chrome offers installation only through
+   `beforeinstallprompt`, fired once early in the page's life: the listener is registered here, at script start (before the
+   gate boots), and the event is kept for the "התקנת האפליקציה" button on "הטיול נוצר". preventDefault() is NOT called, so
+   Chrome's own install UI behaves exactly as in alpha.7. `appinstalled` turns the card into the "installed" line. */
+let bip=null,appInstalled=false;
+if(HOMEI){
+ window.addEventListener('beforeinstallprompt',e=>{bip=e});
+ window.addEventListener('appinstalled',()=>{bip=null;appInstalled=true;try{paintInstall()}catch{}});
+}
+function isStandalone(){let m=false;try{m=!!(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)}catch{}return m||navigator.standalone===true}
+function isIOS(){const ua=String(navigator.userAgent||'');return/iPhone|iPad|iPod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)}
 
 /* ---------------------------------------------------------------------------------------------------------
    small helpers
@@ -997,6 +1075,7 @@ const ICON={
 const wz={
  open:false,origin:'gate',mode:'entry',email:'',screen:'',savedCls:[],
  sendKind:'change',sentAt:0,cooldownUntil:0,timer:null,busy:false,verifying:false,
+ resumed:false,                     /* CHANGE 2026-10-26 F04H-RES-01: new field — the code screen was restored from pt:_device:wz_resume (no send) */
  invite:null,                       /* lookup result {draft_name, inviter_name, expires_at} */
  f:{name:'',me:'',from:'',to:'',home:'ILS',role:'editor'},
  sel:[],dest:[],added:[],note:'',q:'',
@@ -1020,10 +1099,17 @@ function openWizard(origin,mode,email){
  const inv=$('ptInvite');if(inv)inv.remove();
  wz.open=true;wz.origin=origin;wz.mode=mode;wz.email=email||'';wz.sendKind='change';wz.sentAt=0;wz.cooldownUntil=0;
  wz.invite=null;wz.result=null;wz.creating=false;wz.busy=false;
+ /* CHANGE 2026-10-26 F04H-RES-02: new lines (no alpha.7 equivalent): with HOME_INSTALL_FEATURE='on' a valid resume entry of
+    this origin (sent < 10 min ago) restores email + send kind + sentAt, and begin() opens the code screen without sending. */
+ wz.resumed=false;
+ if(HOMEI)resumeInto(origin,email);
  root();
  begin();
 }
 function closeWizard(){
+ /* CHANGE 2026-10-26 F04H-RES-03: new line (no alpha.7 equivalent): leaving the wizard (exit, done → trip, C3) clears the
+    resume entry (§3.3). 'off': no-op. */
+ clearResume();
  stopTimer();closeSheet();
  const el=$('ptWizard');if(el)el.remove();
  document.documentElement.classList.remove('pt-wizard');
@@ -1061,6 +1147,8 @@ function netPaint(){
  const el=$('ptWizard');if(!el)return;
  const off=!online();
  const n=$('ptWzOff');if(n)n.hidden=!off;
+ /* CHANGE 2026-10-26 F04H-RES-07: new line (no alpha.7 equivalent): the resume banner hides while offline (AC 12). */
+ const rb=$('ptWzResume');if(rb)rb.hidden=off;
  el.querySelectorAll('[data-net]').forEach(b=>{if(off){b.disabled=true}else if(!b.hasAttribute('data-hold')){b.disabled=false}});
  if(!off&&wz.screen==='code'){paintCooldown();paintVerify()}
 }
@@ -1092,6 +1180,9 @@ async function begin(){
  if(wz.email){
   if(cur&&cur===wz.email){afterVerified();return}                     /* already verified with the invite email: no code */
   if(cur){cardScreen('d6','המכשיר הזה כבר מקושר למייל אחר ('+maskEmail(cur)+').',TX.d6P,'חזרה',exitWizard,ICON.phone);return}   /* D6: no auth call */
+  /* CHANGE 2026-10-26 F04H-RES-04: what changed from alpha.7: a resumed wizard (F04H-RES-02) shows the code screen WITHOUT
+     send(); the resend cooldown continues from the stored sentAt. Not resumed (and always with 'off'): codeScreen();send() as before. */
+  if(wz.resumed){codeScreen();resumeCooldown();return}
   codeScreen();send();
   return;
  }
@@ -1099,7 +1190,9 @@ async function begin(){
  emailScreen();
 }
 function emailScreen(){
- paint('email',head('אימות מייל')+h1('כניסה עם הזמנה')+'<p class="pt-wz-sub">נשלח קוד בן 6 ספרות למייל שאליו נשלחה ההזמנה.</p>'+
+ /* CHANGE 2026-10-26 F04H-GATE-03: what changed from alpha.7: with HOME_INSTALL_FEATURE='on' the email step's title is
+    "כניסה עם המייל" (the gate button's new name, C1); 'off': "כניסה עם הזמנה" as before. Nothing else on this screen changed. */
+ paint('email',head('אימות מייל')+h1(HOMEI?'כניסה עם המייל':'כניסה עם הזמנה')+'<p class="pt-wz-sub">נשלח קוד בן 6 ספרות למייל שאליו נשלחה ההזמנה.</p>'+
   '<div class="pt-wz-form"><div><label class="pt-lbl" for="ptWzEmail">המייל שאליו נשלחה ההזמנה</label>'+
   '<input id="ptWzEmail" class="pt-in pt-ltr" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" value="'+esc(wz.email)+'"></div>'+
   errP()+privNote()+'</div>',
@@ -1163,8 +1256,41 @@ function codeScreen(){
  $('ptWzResend').onclick=()=>{if(Date.now()>=wz.cooldownUntil)send()};
  $('ptWzSpam').onclick=()=>{const h=$('ptWzSpamHint');h.hidden=!h.hidden;$('ptWzSpam').setAttribute('aria-expanded',String(!h.hidden))};
  const ch=$('ptWzChangeEmail');if(ch)ch.onclick=()=>{stopTimer();wz.sentAt=0;wz.cooldownUntil=0;wz.sendKind='change';emailScreen()};
+ /* CHANGE 2026-10-26 F04H-RES-05: new lines (no alpha.7 equivalent): "שינוי מייל" also clears the resume entry; the code screen
+    gets the resume banner (when restored) and the "איפה הקוד?" card (artboard H_Code). 'off': nothing added. */
+ if(HOMEI&&ch)ch.addEventListener('click',clearResume);
+ if(HOMEI)codeExtras();
  paintCooldown();
  try{ins[0].focus({preventScroll:true})}catch{}
+}
+/* CHANGE 2026-10-26 F04H-CODE-01: new function (no alpha.7 equivalent), HOMEI only. Banner (role=status) when the screen was
+   restored: "חזרת לדף – הקוד ששלחנו לפני N דקות עדיין תקף. לא נשלח קוד חדש." — hidden while offline (it never claims a code
+   is valid offline, AC 12). Card "איפה הקוד? בהתראה של המייל" with a notification illustration (sender + subject); the
+   illustration shows dots, not digits, so nobody types an example code. */
+function codeExtras(){
+ const sc=document.querySelector('#ptWizard .pt-wz-in');if(!sc)return;
+ const form=sc.querySelector('.pt-wz-form');
+ if(wz.resumed&&wz.sentAt){
+  const n=Math.max(1,Math.floor((Date.now()-wz.sentAt)/60000));
+  const b=document.createElement('p');b.className='pt-f04h-resume';b.id='ptWzResume';b.setAttribute('role','status');b.hidden=!online();
+  b.textContent='חזרת לדף – הקוד ששלחנו לפני '+n+' דקות עדיין תקף. לא נשלח קוד חדש.';
+  if(form)sc.insertBefore(b,form);else sc.appendChild(b);
+ }
+ const c=document.createElement('section');c.className='pt-wz-card pt-f04h-where';c.id='ptWzWhere';
+ c.innerHTML='<b>איפה הקוד? בהתראה של המייל</b>'+
+  '<div class="pt-f04h-notif" aria-hidden="true"><span class="pt-f04h-appic">'+ICON.mail.replace(/width="30" height="30"/,'width="18" height="18"').replace(/stroke="#4b524c"/,'stroke="#fff"')+'</span>'+
+  '<span class="pt-main"><b>Lonely Planner</b><span class="pt-f04h-subj"><span class="pt-f04h-code" dir="ltr">••••••</span> – קוד הכניסה ל-Lonely Planner</span></span></div>'+
+  '<p>רואים את הקוד בלי לצאת מהדף. באייפון עם אפליקציית Mail המקלדת מציעה אותו לבד. הדבקה ממלאת את כל התיבות.</p>';
+ const pv=form&&form.querySelector('.pt-wz-priv');
+ if(pv)form.insertBefore(c,pv);else if(form)form.appendChild(c);
+}
+/* CHANGE 2026-10-26 F04H-RES-06: new function (no alpha.7 equivalent): the resend cooldown of a restored code screen runs from
+   the stored sentAt (45 s), not from now. */
+function resumeCooldown(){
+ wz.cooldownUntil=wz.sentAt+RESEND_S*1000;
+ stopTimer();
+ if(wz.cooldownUntil>Date.now())wz.timer=setInterval(paintCooldown,1000);
+ paintCooldown();
 }
 function codeValue(){return[...document.querySelectorAll('#ptWizard .pt-otp')].map(x=>x.value).join('')}
 function clearCode(){const ins=[...document.querySelectorAll('#ptWizard .pt-otp')];ins.forEach(x=>{x.value=''});paintVerify();try{ins[0]&&ins[0].focus()}catch{}}
@@ -1225,6 +1351,9 @@ async function send(){
  if(wz.screen!=='code')return;
  if(err){setErr(authErrText(err,'send'));if(!wz.sentAt){wz.cooldownUntil=0}paintCooldown();return}
  wz.sentAt=Date.now();startCooldown();
+ /* CHANGE 2026-10-26 F04H-RES-08: new lines (no alpha.7 equivalent): a successful send writes the resume entry (email, sentAt,
+    kind, origin — never the code or the token); a new code also ends the "restored" banner. 'off': no-op. */
+ if(HOMEI){writeResume();if(wz.resumed){wz.resumed=false;const rb=$('ptWzResume');if(rb)rb.remove()}}
 }
 async function verify(){
  const token=codeValue();
@@ -1244,6 +1373,7 @@ async function verify(){
   return;
  }
  stopTimer();lastAuto='';
+ clearResume();   /* CHANGE 2026-10-26 F04H-RES-09: new statement (no alpha.7 equivalent): verified → the resume entry is gone. 'off': no-op. */
  try{await api.ensureSession()}catch{}      /* identity may have switched (signInWithOtp): refresh the gate's uid */
  afterVerified();
 }
@@ -1274,11 +1404,24 @@ async function afterVerified(){
   if(e.code==='rate_limited'){cardScreen('retry',TX.rate,'','נסו שוב',afterVerified,ICON.wifi);return}
   cardScreen('retry',TX.generic,'','נסו שוב',afterVerified,ICON.wifi);return;
  }
- if(!res||res.found!==true){noInviteCard();return}
+ /* CHANGE 2026-10-26 F04H-C3-01: what changed from alpha.7 (bug C3): with HOME_INSTALL_FEATURE='on', no open invite but ≥1
+    active membership for the (now verified) identity → reload into the trip (location.replace(location.pathname); the gate's
+    normal boot picks the cached / newest trip, F20 rules for a super-admin). The busy screen stays until the reload, so the
+    gate never flashes. No trips (or the lookup of trips fails) → today's "לא מצאנו הזמנה פעילה…" card. 'off': as before. */
+ if(!res||res.found!==true){if(HOMEI&&await bootIntoTrip())return;noInviteCard();return}
  wz.invite={draft_name:res.draft_name||'',inviter_name:res.inviter_name||'',expires_at:res.expires_at||null};
  if(!wz.f.name)wz.f.name=String(res.draft_name||'').slice(0,80);
  loadData();
  step1();
+}
+/* CHANGE 2026-10-26 F04H-C3-02: new function (no alpha.7 equivalent), see F04H-C3-01. */
+async function bootIntoTrip(){
+ let rows=null;try{rows=await api.activeTrips()}catch{rows=null}
+ if(!rows||!rows.length)return false;
+ clearResume();stopTimer();
+ busyScreen('פותחים את הטיול…');
+ try{location.replace(location.pathname)}catch{location.reload()}
+ return true;
 }
 
 /* ---------------------------------------------------------------------------------------------------------
@@ -1615,6 +1758,45 @@ function done(){
  $('ptWzWa').addEventListener('click',()=>markShared(r.trip_id));
  $('ptWzCopy').onclick=async()=>{const ok=await copyText(r.join_url);if(ok){markShared(r.trip_id);toast(TX.copied)}else toast('ההעתקה לא הצליחה. אפשר לסמן את הקישור ולהעתיק.')};
  $('ptWzEnter').onclick=()=>{const t=r.trip_id;closeWizard();try{api.enterTrip(t,'manager')}catch{location.reload()}};
+ /* CHANGE 2026-10-26 F04H-DONE-02: new line (no alpha.7 equivalent): with HOME_INSTALL_FEATURE='on' and NOT standalone, the
+    card "מוסיפים את האפליקציה למסך הבית" goes above the join-link card and the bottom button becomes the outline
+    "אחר כך – כניסה לטיול כאן" (same action). Standalone or 'off': the screen exactly as before. */
+ if(HOMEI&&!isStandalone())installCard();
+}
+/* CHANGE 2026-10-26 F04H-DONE-03: new functions (no alpha.7 equivalent), artboard H_Done. iPhone: 3 ticks (the installed app
+   signs in with the verified email — "כניסה עם המייל" → code → the trip opens, spec D14b). Elsewhere: "התקנת האפליקציה" when
+   Chrome's beforeinstallprompt was captured (F04H-DONE-01) → prompt(); after `appinstalled` → "האפליקציה הותקנה…"; without
+   the event: the 2-line manual hint. */
+function installCard(){
+ const link=$('ptWzLinkCard');if(!link||$('ptWzInstall'))return;
+ const c=document.createElement('section');c.className='pt-wz-card pt-f04h-inst';c.id='ptWzInstall';c.setAttribute('aria-labelledby','ptWzInstallT');
+ link.parentNode.insertBefore(c,link);
+ const b=$('ptWzEnter');if(b){b.textContent='אחר כך – כניסה לטיול כאן';b.classList.add('pt-out')}
+ paintInstall();
+}
+function paintInstall(){
+ const c=$('ptWzInstall');if(!c)return;
+ const T='<b class="pt-f04h-t" id="ptWzInstallT">מוסיפים את האפליקציה למסך הבית</b>';
+ const tick=h=>'<div class="pt-f04h-tick">'+ICON.check18+'<span class="pt-main">'+h+'</span></div>';
+ if(appInstalled){c.innerHTML=T+'<p class="pt-f04h-ok" role="status">האפליקציה הותקנה – אפשר לפתוח אותה ממסך הבית</p>';return}
+ if(isIOS()){
+  c.innerHTML=T+tick('בספארי: שיתוף ← "הוספה למסך הבית"')+tick('פותחים את Lonely Planner ממסך הבית')+
+   tick('"כניסה עם המייל" ← קוד ל-<bdi class="pt-iso" dir="ltr">'+esc(wz.email||'')+'</bdi> ← הטיול נפתח');
+  return;
+ }
+ if(bip){
+  c.innerHTML=T+'<p class="pt-f04h-hint">אפליקציה במסך הבית נפתחת מהר, בלי דפדפן.</p><button type="button" class="pt-btn" id="ptWzInstallBtn">התקנת האפליקציה</button>';
+  $('ptWzInstallBtn').onclick=async()=>{
+   const e=bip;if(!e)return;
+   let out='';
+   try{await e.prompt();const ch=await e.userChoice;out=ch&&ch.outcome||''}catch{}
+   bip=null;   /* an event can prompt once */
+   if(out==='accepted')appInstalled=true;
+   paintInstall();
+  };
+  return;
+ }
+ c.innerHTML=T+'<p class="pt-f04h-hint">בתפריט הדפדפן ⋮ בוחרים "התקנת אפליקציה"<br>או "הוספה למסך הבית".</p>';
 }
 
 /* ---------------------------------------------------------------------------------------------------------
@@ -1634,8 +1816,37 @@ function gateCard(g){
  g.classList.add('pt-gate-f04');
  const c=document.createElement('section');c.className='card';c.id='ptGateInvite';
  c.innerHTML='<b>קיבלת הזמנה לנהל טיול?</b><p>נאמת את המייל שאליו נשלחה ההזמנה, ותקים את הטיול מכאן.</p><button type="button" class="btn outline" id="ptGateInviteBtn">כניסה עם הזמנה</button>';
+ /* CHANGE 2026-10-26 F04H-GATE-01: what changed from alpha.7 (C1, artboard H_Gate): with HOME_INSTALL_FEATURE='on' the card is
+    "מנהל/ת טיול" + badge "חדש", the explanation, the PRIMARY button "כניסה עם המייל" (same id, same action) and two bullets;
+    gateTop() (called by the gate after the F05 cards) moves it to the top. 'off': the alpha.7 card above, unchanged. */
+ if(HOMEI){
+  const btn=c.querySelector('button');btn.className='pt-btn';btn.textContent='כניסה עם המייל';   /* the same element (id, action) */
+  c.innerHTML='<div class="pt-f04h-gh"><b>מנהל/ת טיול</b><span class="pt-badge ok">חדש</span></div>'+
+   '<p>קיבלת הזמנה במייל, או שכבר הקמת טיול בדפדפן? נשלח קוד למייל שלך, ותמשיך/י בדיוק מאיפה שעצרת.</p>';
+  c.appendChild(btn);
+  c.insertAdjacentHTML('beforeend','<ul class="pt-f04h-bul"><li>יש הזמנה פתוחה – ממשיכים להקמת הטיול</li><li>כבר הקמת טיול – הוא נפתח</li></ul>');
+ }
  g.appendChild(c);
  $('ptGateInviteBtn').onclick=()=>openWizard('gate','entry','');
+}
+/* CHANGE 2026-10-26 F04H-GATE-02: new function (no alpha.7 equivalent): the "מנהל/ת טיול" card goes first on the gate (C1);
+   the F05 cards follow unchanged and the F02 device-code card stays last. 'off': no-op. */
+function gateTop(g){
+ if(!HOMEI||!g)return;
+ const c=$('ptGateInvite');if(!c||c.parentNode!==g)return;
+ g.classList.add('pt-gate-f04h');
+ if(g.firstChild!==c)g.insertBefore(c,g.firstChild);
+}
+/* CHANGE 2026-10-26 F04H-RES-10: new function (no alpha.7 equivalent), called by the gate just before boot(): a page loaded
+   with ?invite=1 and no #invite= (a reload of the wizard that was opened from the invite link, F04H-RES-08 keeps the marker)
+   and a valid resume entry of origin 'invite' → the wizard opens on the code screen instead of the normal boot (§3.3).
+   Returns true when it took over. 'off', no marker or no valid entry: false (normal boot, as alpha.7). */
+function resumeBoot(){
+ if(!HOMEI||!api||!/[?&]invite=1(&|$)/.test(location.search))return false;
+ const r=readResume();
+ if(!r||r.origin!=='invite')return false;
+ onReady(()=>openWizard('invite','entry',r.email));
+ return true;
 }
 window.addEventListener('online',netPaint);
 window.addEventListener('offline',netPaint);
@@ -1803,7 +2014,9 @@ try{
 }catch{}
 
 function attach(a){if(!api&&a&&typeof a==='object')api=a}
-try{Object.defineProperty(window,'__ptF04',{value:Object.freeze({version:F04_VERSION,attach,fromInvite,gateCard,emptyTrip}),writable:false,configurable:false})}catch{}
+/* CHANGE 2026-10-26 F04H-CORE-02: what changed from alpha.7: two more read-only members, gateTop (F04H-GATE-02) and resumeBoot
+   (F04H-RES-10); both are no-ops with HOME_INSTALL_FEATURE='off'. */
+try{Object.defineProperty(window,'__ptF04',{value:Object.freeze({version:F04_VERSION,attach,fromInvite,gateCard,emptyTrip,gateTop,resumeBoot}),writable:false,configurable:false})}catch{}
 })();
 </script>
 <!-- CHANGE 2026-10-13 F20-UI-01: NEW block (no 3.0.0-alpha.4.2 equivalent) — F20 "the super-admin entry is separate from the
@@ -3496,7 +3709,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.7'; /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.7.1'; /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -3711,6 +3924,9 @@ function showCard(){
    /* CHANGE 2026-10-19 F05-GATECARD-01: what changed from 3.0.0-alpha.5.1: one new line — with JOIN_FEATURE='on' the F05 block
       adds "כמעט שם" (transfer code) on top and "יש לי קישור הצטרפות" under it; the cards above stay, the device-code card last. */
    if(window.__ptF05)window.__ptF05.gateCard(g);
+   /* CHANGE 2026-10-26 F04H-GATE-04: new line (no alpha.7 equivalent): with HOME_INSTALL_FEATURE='on' the F04 card
+      "מנהל/ת טיול" moves to the top, above the F05 cards (spec §1.3). 'off' (or no F04 block): no-op. */
+   if(window.__ptF04&&window.__ptF04.gateTop)window.__ptF04.gateTop(g);
   }
   const code=state.uid?String(state.uid).replace(/-/g,'').slice(0,8):'--------';
   document.getElementById('ptDeviceCode').textContent=code;
@@ -3856,6 +4072,10 @@ if(window.__ptF03&&STORAGE_BACKEND==='cloud'){
  if(window.__ptF03.takeOverBoot()){state.phase='invite-landing';return}
 }
 
+/* CHANGE 2026-10-26 F04H-RES-11: new line (no alpha.7 equivalent): with HOME_INSTALL_FEATURE='on' a reload of the wizard opened
+   from the invite link (?invite=1 + a valid resume entry, spec §3.3) goes back to the code screen instead of the trip boot.
+   'off' (or nothing to resume): no-op, boot() below as before. */
+if(window.__ptF04&&window.__ptF04.resumeBoot&&STORAGE_BACKEND==='cloud'&&window.__ptF04.resumeBoot()){state.phase='wizard';return}
 boot().catch(e=>{console.warn('[pt] boot failed',e);const c=readCached();if(c&&STORAGE_BACKEND==='cloud')startCached(c);else showCard()});
 })();
 </script>
@@ -8144,7 +8364,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.7';/* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.7.1';/* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;
