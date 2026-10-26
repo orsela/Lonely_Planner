@@ -34,6 +34,34 @@
 - QA: qa.f06 171/171 on the real project, independent browser suite 70/70, functions 19/19 + 23/23, flag-off regression
   identical to alpha.6; phone check partial (4א). See docs/qa/F06_QA.md.
 
+## 3.0.0-alpha.5.1 — S2 (F20, 2026-10-13 → 2026-10-17)
+
+### F20 · Super-admin start chooser, standalone admin, in-trip switcher
+<!-- CHANGE 2026-10-26 F20-DOCS-01: entry added at formal closure (it was missing). -->
+- App 3.0.0-alpha.5 → 5.1 (flag `SWITCH_FEATURE`): super-admin boots on "לאן נכנסים?" (ניהול מערכת with pending invites
+  count + "הטיולים שלי" = all trips); admin screen stands alone (no trip chrome, header "הטיולים שלי", `#admin`); device
+  option "לפתוח תמיד ישר לטיול האחרון" (off by default). D7 (Or, 17/10): no admin entry inside a trip; the avatar opens
+  the trip switcher only for 2+ trips; `#admin` while a trip runs reloads into the standalone admin.
+- No DB or Edge Function change.
+- QA: F20 suite 77/77 (alpha.5) → 82/82 (alpha.5.1); F02/F03/F04 regression and Deno green in both SWITCH states; no
+  defects. See docs/qa/F20_QA.md.
+
+## 3.0.0-alpha.4.2 — S2 (F04, 2026-10-12)
+
+### F04 · An invited manager sets up a trip in three steps
+<!-- CHANGE 2026-10-26 F04-DOCS-01: entry added at formal closure (it was missing). -->
+- App 3.0.0-alpha.4 (flag `WIZARD_FEATURE`): invite → 6-digit email code (Supabase OTP, email linked to the device's
+  anonymous identity) → wizard (name/dates/language · countries + currencies · review) → "הטיול נוצר" with the WhatsApp
+  join link; new trip = one empty day per date (never Vietnam `SEED_DATA`); "כניסה עם הזמנה" on the not-connected card.
+  alpha.4.1: tappable first-steps rows + "הוספת נקודה". alpha.4.2: display name "Lonely Planner", new address
+  `/Lonely_Planner/`, redirect pages from the old address.
+- `/invite/`: "פתיחה באפליקציה והקמת הטיול" + installed-app note.
+- Edge Functions: new `create-trip` (lookup / create, atomic, idempotent; writes `trip_kv.tripname`), `invite-manager`
+  alpha.4.x (APP_URL hardening, `check.email`). DB `0010_f04`, `0011_qa_f04_harness` (`qa.f04_run()` 90/90 on the real
+  project).
+- QA: F04 browser suite 85/85 (alpha.4) → 126/126 (alpha.4.2); F03/F02 regression green; functions 28/28 + 9/9 + 21/21;
+  local DB f01–f04 all pass. No product defects. See docs/qa/F04_QA.md.
+
 ## 3.0.0-alpha.6 — S2 (F05 done, 2026-10-22)
 
 ### F05 · A member joins from the group link, after manager approval — 2026-10-19 → 2026-10-22
