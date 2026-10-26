@@ -1,5 +1,17 @@
-"""Plan_Travel F04 QA · Playwright black-box suite · version 1.4.1
+"""Plan_Travel F04 QA · Playwright black-box suite · version 1.4.2
 CHANGE 2026-10-12 F04-QA: first version (no previous version).
+CHANGE 2026-10-26 QA-DEBT-04: 1.4.1 → 1.4.2: test_c21_static[protected:*] compares with the v2.15.2 declarations from git
+  (tests/qa_refs.py V2152_REF; alpha.3 had the same bytes) and test_c21_static[app_version|pt_version] pin
+  tests/qa_refs.py CURRENT_VERSION (was the literal 3.0.0-alpha.5.1). Nothing else changed.
+CHANGE 2026-10-26 QA-DEBT-12: 1.4.2 → 1.5.0, follows F04-HOME (alpha.7.1) only where it changes F04 behaviour on purpose; with
+  HOME_INSTALL_FEATURE='off' every path below is the 1.4.2 path unchanged (the flag is read from the served app/ and /invite/):
+  - gate_to_email() / test_c03_d6[gate]: the gate entry is "כניסה עם המייל" (F04-HOME C1, was "כניסה עם הזמנה"; same
+    openWizard('gate','entry') flow). test_c01_gate_button_email_entry (asserts the old card title/text) is deselected by
+    tests/run_all.sh as superseded by F04-HOME C1 (F4H-07a/07b) and runs on a HOME_INSTALL_FEATURE='off' copy.
+  - test_c16_invite_page_button_opens_app: the /invite/ installed-app note names "כניסה עם המייל" (F04-HOME §1.2).
+  - test_c01_token_entry_variants_reach_code_screen: the address bar may keep the token-FREE marker "?invite=1" (F04-HOME
+    §3.3 resume, dev notes §… "the wizard puts ?invite=1 back with history.replaceState"); the token / "#invite=" must still be
+    gone (was: no "invite" at all).
 CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.1.0, follows the two spec changes approved by Or after the first run:
   - F04-DB-02: the fake create-trip (F04Backend.create_trip_from_invite) now also writes trip_kv `tripname` = the trimmed
     trip name (spec §2 step 5). New test_c11_tripname_shown_home_and_settings[v1|v2] (criterion 11): the v1 home header
@@ -75,6 +87,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 import pytest
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # CHANGE 2026-10-26 QA-DEBT-04: tests/qa_refs.py
+import qa_refs  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 REPO_DIR = Path(os.environ.get("REPO_DIR", str(HERE.parent.parent)))
@@ -96,7 +110,7 @@ PT_URL, PT_KEY = f02.PT_URL, f02.PT_KEY
 IM_URL = PT_URL + "/functions/v1/invite-manager"
 CT_URL = PT_URL + "/functions/v1/create-trip"
 JOIN_BASE = "https://orsela.github.io/Lonely_Planner/join/"  # CHANGE 2026-10-12 F04-QA-05: was /Plan_Travel/join/
-VERSION = "3.0.0-alpha.5.1"  # CHANGE 2026-10-17 F20-QA-03: was 3.0.0-alpha.5. CHANGE 2026-10-13 F20-QA-02: was 3.0.0-alpha.4.2 (F04-QA-05: was 3.0.0-alpha.4.1; F04-QA-04: was 3.0.0-alpha.4)
+VERSION = qa_refs.CURRENT_VERSION  # CHANGE 2026-10-26 QA-DEBT-04: was "3.0.0-alpha.5.1". CHANGE 2026-10-17 F20-QA-03: was 3.0.0-alpha.5. CHANGE 2026-10-13 F20-QA-02: was 3.0.0-alpha.4.2 (F04-QA-05: was 3.0.0-alpha.4.1; F04-QA-04: was 3.0.0-alpha.4)
 APP_NAME = "Lonely Planner"  # CHANGE 2026-10-12 F04-QA-05: spec §8
 OLD_NAMES = ["Plan_Travel", "Vietnam Travel Planner"]  # CHANGE 2026-10-12 F04-QA-05: never rendered as the app name
 ALPHA3_REF = os.environ.get("ALPHA3_REF", "e591edc")
@@ -1063,10 +1077,21 @@ def gate_device(env, name="A"):
     return dev
 
 
+def home_install_on(rel="app/index.html"):
+    """CHANGE 2026-10-26 QA-DEBT-12: F04-HOME flag of the served app/ (or invite/) — 'on' renames the F04 gate entry."""
+    src = app_html() if rel == "app/index.html" else (REPO_DIR / rel).read_text(encoding="utf-8")
+    return re.search(r"""(const|let|var)\s+HOME_INSTALL_FEATURE\s*=\s*['"]on['"]""", src) is not None
+
+
+def gate_btn():
+    """CHANGE 2026-10-26 QA-DEBT-12: F04-HOME C1 renamed the gate entry to "כניסה עם המייל" (same flow)."""
+    return "כניסה עם המייל" if home_install_on() else TXT["gate_btn"]
+
+
 def gate_to_email(dev):
     page = dev.page
-    assert wait_text(page, TXT["gate_btn"]), "gate button %r not on the not-connected card" % TXT["gate_btn"]
-    click_text(page, TXT["gate_btn"])
+    assert wait_text(page, gate_btn()), "gate button %r not on the not-connected card" % gate_btn()  # CHANGE 2026-10-26 QA-DEBT-12
+    click_text(page, gate_btn())
     assert wait_screen(page, "email") == "email", "gate button did not open the email state (screen=%s)" % screen(page)
 
 
@@ -1298,7 +1323,9 @@ def test_c01_token_entry_variants_reach_code_screen(env, variant):
     assert st == "code", "%s: code screen not reached (screen=%s, text=%r)" % (variant, st, btext(page)[:200])
     assert has(page, INVITE_EMAIL) or page.locator(SEL["email_input"]).filter(visible=True).first.input_value().lower() == INVITE_EMAIL, \
         "%s: invite email not on the code screen" % variant
-    assert "invite" not in page.url, "%s: address bar not cleaned: %r" % (variant, page.url)
+    # CHANGE 2026-10-26 QA-DEBT-12: with F04-HOME on, the token-free resume marker ?invite=1 may stay (was: no "invite" at all)
+    rest = page.url.replace("?invite=1", "", 1) if home_install_on() else page.url
+    assert "invite" not in rest and token not in page.url, "%s: address bar not cleaned: %r" % (variant, page.url)
 
 
 def test_c01_token_and_code_never_stored_or_logged(env):
@@ -1620,8 +1647,8 @@ def test_c03_d6_other_confirmed_email_no_auth_call(env, via):
         dev, _, _ = token_link(env, iid_token=(iid, token))
     else:
         dev = gate_device(env)
-        assert wait_text(dev.page, TXT["gate_btn"]), "gate button missing"
-        click_text(dev.page, TXT["gate_btn"])
+        assert wait_text(dev.page, gate_btn()), "gate button missing"  # CHANGE 2026-10-26 QA-DEBT-12: was TXT["gate_btn"]
+        click_text(dev.page, gate_btn())
         # §1.3 'email state only when no email is known': a device with a confirmed email may skip the email state and look
         # up ITS OWN email → the 'no active invite' card is accepted here (open question in the QA report); typing the
         # invite email instead must lead to the D6 card. Either way: no auth call.
@@ -2715,9 +2742,12 @@ def test_c16_invite_page_button_opens_app(env):
     t = btext(page)
     if not re.search(r'הזמין אותך לנהל את הקבוצה\s*"?' + re.escape(DRAFT) + r'"?\.\s*' + re.escape(TXT["inv_copy"]), t):
         P.append("copy '…הזמין אותך לנהל את הקבוצה \"%s\". ההקמה לוקחת כ-3 דקות.' missing" % DRAFT)
-    for k in ("inv_step1", "inv_note"):
-        if not has(page, TXT[k]):
-            P.append("missing %r" % TXT[k])
+    inv_note = TXT["inv_note"]
+    if home_install_on("invite/index.html"):  # CHANGE 2026-10-26 QA-DEBT-12: F04-HOME §1.2 — the note names "כניסה עם המייל"
+        inv_note = inv_note.replace("כניסה עם הזמנה", "כניסה עם המייל")
+    for k, want in (("inv_step1", TXT["inv_step1"]), ("inv_note", inv_note)):
+        if not has(page, want):
+            P.append("missing %r" % want)
     # CHANGE 2026-10-12 F04-QA-03: F04-INV-02 — the old note wording must be gone
     if has(page, TXT["inv_note_old"]):
         P.append("old note wording %r still shown" % TXT["inv_note_old"])
@@ -2901,10 +2931,10 @@ def test_c21_static(check, tmp_path):
     html = app_html()
     if check.startswith("protected:"):
         name = check.split(":", 1)[1]
-        a = _extract(alpha3_html(), [name], tmp_path)["found"][name]
+        a = _extract(qa_refs.v2152_html(), [name], tmp_path)["found"][name]  # CHANGE 2026-10-26 QA-DEBT-04: was alpha3_html()
         b = _extract(html, [name], tmp_path)["found"][name]
-        assert len(a) == 1, "harness: %s found %d times in alpha.3" % (name, len(a))
-        assert b and a[0] in b, "%s is not byte-identical to alpha.3" % name
+        assert len(a) == 1, "harness: %s found %d times in v2.15.2" % (name, len(a))
+        assert b and a[0] in b, "%s is not byte-identical to v2.15.2" % name
     elif check == "app_version":
         assert re.search(r"""const\s+APP_VERSION\s*=\s*['"]%s['"]""" % re.escape(VERSION), html), "APP_VERSION != %s" % VERSION
     elif check == "pt_version":

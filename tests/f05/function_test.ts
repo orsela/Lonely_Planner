@@ -1,5 +1,10 @@
-// Plan_Travel F05 QA · join-trip + approve-member black-box tests (Deno-style) · version 1.0.0
+// Plan_Travel F05 QA · join-trip + approve-member black-box tests (Deno-style) · version 1.1.0
 // CHANGE 2026-10-19 F05-QA-05: first version (no previous version).
+// CHANGE 2026-10-26 QA-DEBT-10: 1.0.0 → 1.1.0: F5-FN-01 / F5-FN-02 pinned both functions to alpha.6.0; join-trip is
+//   alpha.7.0 since F06 (F06-FN-07, it also added the X-Function-Version header). The expected FN_VERSION of each function
+//   now comes from tests/qa_versions.json (one place). F5-FN-02 is split per function: F5-FN-02a join-trip (header must
+//   carry its version), F5-FN-02b approve-member — still no version header: open finding F05-QA-D1 (docs/qa/F05_QA.md);
+//   it fails with "KNOWN-BUG F05-QA-D1", which tests/run_all.sh lists as a known app bug (xfail) instead of a new failure.
 //
 // Written from docs/F05_spec.md §2–§3 and the two README files (export surface only: handler(req), setDeps({getUser, rpc}),
 // resetDeps(), FN_VERSION). The function sources were NOT read. Case ids F5-FN-xx are listed in docs/qa/F05_QA.md.
@@ -80,20 +85,29 @@ async function sha(s: string) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-T("F5-FN-01 version alpha.6.0 (FN_VERSION) in both functions", () => {
-  ok(/alpha\.6\.0$/.test(String(JT.FN_VERSION)), "join-trip FN_VERSION " + JT.FN_VERSION);
-  ok(/alpha\.6\.0$/.test(String(AM.FN_VERSION)), "approve-member FN_VERSION " + AM.FN_VERSION);
+// CHANGE 2026-10-26 QA-DEBT-10: expected versions from tests/qa_versions.json (was the literal alpha.6.0 for both)
+const QV: Any = JSON.parse(await (await import("node:fs/promises")).readFile(new URL("../qa_versions.json", import.meta.url), "utf8"));
+const WANT_JT = String(QV.functions["join-trip"]), WANT_AM = String(QV.functions["approve-member"]);
+
+T("F5-FN-01 FN_VERSION of both functions = tests/qa_versions.json", () => {
+  ok(String(JT.FN_VERSION) === WANT_JT, "join-trip FN_VERSION " + JT.FN_VERSION + " (expected " + WANT_JT + ")");
+  ok(String(AM.FN_VERSION) === WANT_AM, "approve-member FN_VERSION " + AM.FN_VERSION + " (expected " + WANT_AM + ")");
 });
 
-T("F5-FN-02 §3 'Version header alpha.6.0': responses carry a header whose value names alpha.6.0", async () => {
+function versionHeader(r: Any, want: string) {
+  return [...r.headers.entries()].some(([, v]: [string, string]) => String(v).includes(want));
+}
+
+T("F5-FN-02a §3 version header: join-trip responses carry a header whose value is its FN_VERSION", async () => {
   mock(JT, { trip_id: TRIP, name: "n", me: null });
   const a = await call(JT, { action: "preview", code: CODE }, { ip: IP });
+  ok(versionHeader(a, WANT_JT), `join-trip: no response header carries ${WANT_JT} (headers: ${[...a.headers.keys()].join(", ")})`);
+});
+
+T("F5-FN-02b §3 version header: approve-member responses carry a header whose value is its FN_VERSION", async () => {
   mock(AM, { status: "active", member_id: MEMBER, role: "editor" }, MGR);
   const b = await call(AM, { member_id: MEMBER, decision: "approve" });
-  for (const [n, r] of [["join-trip", a], ["approve-member", b]] as const) {
-    const vals = [...r.headers.entries()].filter(([k, v]) => /alpha\.6\.0/.test(v) || /version/i.test(k));
-    ok(vals.some(([, v]) => /alpha\.6\.0/.test(v)), `${n}: no response header carries the version (headers: ${[...r.headers.keys()].join(", ")})`);
-  }
+  ok(versionHeader(b, WANT_AM), `KNOWN-BUG F05-QA-D1: approve-member: no response header carries ${WANT_AM} (headers: ${[...b.headers.keys()].join(", ")})`);
 });
 
 T("F5-FN-03 auth: no / unknown JWT → 401 unauthorized, no rpc; anonymous identity accepted (join-trip)", async () => {

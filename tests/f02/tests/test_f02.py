@@ -1,7 +1,24 @@
-"""Plan_Travel F02 QA · Playwright + static suite · version 1.0.1
+"""Plan_Travel F02 QA · Playwright + static suite · version 1.1.0
 CHANGE 2026-10-04 F02-QA: first version (no previous version).
 CHANGE 2026-10-12 F04-QA-05: 1.0.0 → 1.0.1: the local server serves APP_DIR under /Lonely_Planner/ (was /Plan_Travel/),
   following the site address move (F04 spec §8.1). Nothing else changed.
+CHANGE 2026-10-26 QA-DEBT-02: 1.0.1 → 1.1.0 (offline baseline + one version pin):
+  - test_ac15_static[protected:*] and the parity dataset (SEED_DATA) read the v2.15.2 declarations from git
+    (tests/qa_refs.py V2152_REF = e711542, verified byte-identical to v2.15.2) instead of BASELINE_DIR — no checkout, no
+    network. The assertion is unchanged (the v2.15.2 declaration must appear byte-for-byte in the app).
+  - test_ac15_static[app_version] pins tests/qa_refs.py CURRENT_VERSION (was the literal 3.0.0-alpha.2).
+  - The three browser cases that RUN the whole v2.15.2 app (test_ac05_parity_with_v2152_rendering,
+    test_ac09_concurrent_edits_same_sync_merge_outcome, test_ac10_live_app_state_byte_identical_after_session) and
+    manifest_visible_fields_unchanged still need a v2.15.2 checkout in BASELINE_DIR; without one they now SKIP with that
+    reason instead of failing (the repo history has no full v2.15.2 app; tests/f05/run.sh no longer clones it).
+  - Follows F06 (MEMBERS_FEATURE='on'; with the flag 'off' both paths are the 1.0.1 paths):
+    test_ac11_two_trips_do_not_mix — after trip B's membership is removed, F06 §3.4 deletes every pt:<B>: device key (removed /
+    left clean-up), so "trip B local copy still under pt:<B>:" and the pt-vault-<B> check become "no pt:<B>: key left";
+    the isolation checks (nothing of B in trip A, server rows) are unchanged.
+    test_ac12_chat_soon_zero_network — the "chatty" scan looked at every request since boot; F06 D11 sends a legitimate
+    manage-members "touch" at boot. It now looks at requests after the chat tap only and ignores manage-members (not chat).
+  - test_ac03 (F06 D10 viewer guard) and test_ac05 (F05 D10 names / members list) are superseded on 'on' and run by
+    tests/run_all.sh on a JOIN_FEATURE + MEMBERS_FEATURE 'off' copy (job sup_f02_flags_off).
 
 Black-box acceptance tests for docs/F02_spec.md §8, written from the spec only (the implementation under app/,
 scripts/, F02_dev_notes.md and migration 0005 were NOT read). Reference for "same as v2.15.2": the baseline at
@@ -32,6 +49,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys  # CHANGE 2026-10-26 QA-DEBT-02
 import tempfile
 import threading
 import time
@@ -53,6 +71,21 @@ FAKE_JS = (HERE / "fake_supabase.js").read_text(encoding="utf-8")
 
 APP_DIR = Path(os.environ.get("APP_DIR", "/home/claude/plan_travel/app"))
 BASELINE_DIR = Path(os.environ.get("BASELINE_DIR", "/home/claude/orsela/vietnam_travel_planner"))
+sys.path.insert(0, str(HERE.parent.parent))  # CHANGE 2026-10-26 QA-DEBT-02: tests/qa_refs.py (shared versions / git refs)
+import qa_refs  # noqa: E402
+
+
+def have_baseline_app():
+    """CHANGE 2026-10-26 QA-DEBT-02: True when BASELINE_DIR is a real v2.15.2 checkout (needed only by the cases that run it)."""
+    try:
+        return "const APP_VERSION='2.15.2'" in (BASELINE_DIR / "index.html").read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
+def need_baseline_app():
+    if not have_baseline_app():
+        pytest.skip("needs a v2.15.2 checkout in BASELINE_DIR (runs the whole old app); not in the repo history, no network")
 SCRIPTS_DIR = Path(os.environ.get("SCRIPTS_DIR", "/home/claude/plan_travel/scripts"))
 APP_PATH = "/Lonely_Planner/"  # CHANGE 2026-10-12 F04-QA-05: was "/Plan_Travel/" (F04 spec §8.1 new address)
 BASE_PATH = "/Vietnam_Travel_Planner/"
@@ -65,7 +98,7 @@ AUTH_KEY = "sb-zwufpxnioqaweobnvffs-auth-token"
 LIVE_REF = "kkitwcnkoxuhbcsabcdl"
 LIVE_URL = "https://kkitwcnkoxuhbcsabcdl.supabase.co"
 
-VERSION = "3.0.0-alpha.2"
+VERSION = qa_refs.CURRENT_VERSION  # CHANGE 2026-10-26 QA-DEBT-02: was "3.0.0-alpha.2" (one place: tests/qa_refs.py)
 NC_TITLE = "המכשיר עדיין לא מחובר לטיול"
 NC_BODY = "שלחו למנהל הטיול את קוד המכשיר:"
 NC_RETRY = "נסו שוב"
@@ -945,6 +978,11 @@ def read_app(name):
     return (APP_DIR / name).read_text(encoding="utf-8")
 
 
+def members_feature_on():
+    """CHANGE 2026-10-26 QA-DEBT-02: F06 flag of the served app."""
+    return re.search(r"""const\s+MEMBERS_FEATURE\s*=\s*['"]on['"]""", read_app("index.html")) is not None
+
+
 # =====================================================================================================
 # 1 · Identity
 # =====================================================================================================
@@ -1191,7 +1229,11 @@ _SEED_CACHE = {}
 
 def baseline_seed_data():
     if "seed" not in _SEED_CACHE:
-        r = node([str(JS_TOOLS / "extract.js"), str(BASELINE_DIR / "index.html"), "SEED_DATA"])
+        # CHANGE 2026-10-26 QA-DEBT-02: SEED_DATA from git (V2152_REF, byte-identical to v2.15.2), was BASELINE_DIR/index.html
+        with tempfile.TemporaryDirectory() as td:
+            bp = Path(td) / "v2152.html"
+            bp.write_text(qa_refs.v2152_html(), encoding="utf-8")
+            r = node([str(JS_TOOLS / "extract.js"), str(bp), "SEED_DATA"])
         src = json.loads(r.stdout)["found"]["SEED_DATA"][0]
         r2 = node(["-e", src + "\nprocess.stdout.write(JSON.stringify(SEED_DATA))"])
         _SEED_CACHE["seed"] = json.loads(r2.stdout)
@@ -1304,6 +1346,7 @@ PARITY_TIME = datetime.datetime(2026, 9, 20, 5, 0, 0, tzinfo=datetime.timezone.u
 def test_ac05_parity_with_v2152_rendering(env):
     """C5: same visible text as v2.15.2 on the same data: home, route, budget, reservations, journal, check-in, vault,
     converter. Baseline runs local-only (its live Supabase block is cut off); the new app reads the same data from trip_kv."""
+    need_baseline_app()  # CHANGE 2026-10-26 QA-DEBT-02
     shared, device = parity_dataset()
     # baseline, local-only
     b = env.new_device("BASE", fixed_time=PARITY_TIME)
@@ -1488,6 +1531,7 @@ def run_concurrency(env, app):
 def test_ac09_concurrent_edits_same_sync_merge_outcome(env):
     """C9: two devices editing concurrently -> the same SYNC-MERGE outcome as v2.15.2 (baseline run on an emulated
     planner_kv, new app on trip_kv; identical scripted scenario)."""
+    need_baseline_app()  # CHANGE 2026-10-26 QA-DEBT-02
     base_result = run_concurrency(env, "base")
     new_result = run_concurrency(env, "new")
     expected = [i["description"] for i in smmerge3(
@@ -1562,6 +1606,7 @@ def test_ac10_live_app_state_byte_identical_after_session(env):
     """C10: seeded live-app state (planner:* / vietnam_planner_* localStorage, vtp-vault IndexedDB, vtp-* caches, the
     live SW registration) is byte-identical after a full session in the new app; the new app only adds pt:* keys,
     pt-vault-* databases and pt-* caches, and its SW scope is its own directory."""
+    need_baseline_app()  # CHANGE 2026-10-26 QA-DEBT-02
     tid = linked_setup(env)
     dev = env.new_device("A", service_workers="allow")
     page = dev.page
@@ -1639,11 +1684,16 @@ def test_ac11_two_trips_do_not_mix(env):
     pa, pb = "pt:%s:" % ta, "pt:%s:" % tb
     leaks = [k for k, v in ls.items() if k.startswith(pa) and "only-B" in (v or "")]
     assert not leaks, "trip B data stored under trip A keys: %r" % leaks
-    assert "QA only-B" in (ls.get(pb + "planner:expenses") or ""), "trip B local copy not under pt:<B>:"
+    f06 = members_feature_on()  # CHANGE 2026-10-26 QA-DEBT-02: F06 §3.4 purges a removed trip's pt:<B>: keys
+    if f06:
+        assert not [k for k in ls if k.startswith(pb)], "F06 §3.4: pt:<B>: keys left after B was removed: %r" % [k for k in ls if k.startswith(pb)]
+    else:
+        assert "QA only-B" in (ls.get(pb + "planner:expenses") or ""), "trip B local copy not under pt:<B>:"
     stray = [k for k in ls if not k.startswith("pt:") and k != AUTH_KEY]  # pt:_device:<auth key> is under pt: anyway
     assert not stray, "keys outside pt:*: %r" % stray
     dbs = dev.idb_names()
-    assert "pt-vault-" + tb in dbs, "trip B vault DB pt-vault-<B> missing: %r" % dbs
+    if not f06:  # CHANGE 2026-10-26 QA-DEBT-02: with F06 the removed trip's vault DB goes too (§3.4 clean-up)
+        assert "pt-vault-" + tb in dbs, "trip B vault DB pt-vault-<B> missing: %r" % dbs
     assert all(d.startswith("pt-vault-") for d in dbs), "unexpected IndexedDB names: %r" % dbs
     assert "QA only-B" not in (be.kv(ta, "expenses") or "") and "QA only-B" in (be.kv(tb, "expenses") or "")
 
@@ -1672,7 +1722,10 @@ def test_ac12_chat_soon_zero_network(env):
     page.wait_for_timeout(800)
     new_net = [r for r in env.net[n_net:] if r.get("action") != "same-origin" or "functions" in r["url"]]
     new_calls = [c for c in be.calls[n_calls:] if c["op"] in ("functions.invoke", "rpc")]
-    chatty = [r for r in env.net if re.search(r"functions/v1|chat-assistant|anthropic", r["url"])]
+    # CHANGE 2026-10-26 QA-DEBT-02: only requests after the tap; the F06 D11 manage-members "touch" is not chat (was env.net)
+    new_net = [r for r in new_net if "functions/v1/manage-members" not in r["url"]]
+    new_calls = [c for c in new_calls if "manage-members" not in json.dumps(c, ensure_ascii=False, default=str)]
+    chatty = [r for r in env.net[n_net:] if re.search(r"functions/v1|chat-assistant|anthropic", r["url"]) and "manage-members" not in r["url"]]
     consts = page.evaluate("()=>({f:typeof CHAT_FEATURE!=='undefined'?CHAT_FEATURE:null,e:typeof CHAT_ENDPOINT!=='undefined'?CHAT_ENDPOINT:null})")
     assert toast, "chat button did not show the toast %r" % CHAT_TOAST
     assert not new_net and not new_calls and not chatty, "chat made network calls: %r" % (new_net + new_calls + chatty)[:5]
@@ -1774,7 +1827,9 @@ def test_ac15_static(check, tmp_path):
     html = idx.read_text(encoding="utf-8")
     if check.startswith("protected:"):
         name = check.split(":", 1)[1]
-        a = _extract(BASELINE_DIR / "index.html", [name])["found"][name]
+        bp = tmp_path / "v2152.html"  # CHANGE 2026-10-26 QA-DEBT-02: v2.15.2 declarations from git (was BASELINE_DIR)
+        bp.write_text(qa_refs.v2152_html(), encoding="utf-8")
+        a = _extract(bp, [name])["found"][name]
         b = _extract(idx, [name])["found"][name]
         assert len(a) == 1, "harness: %s found %d times in baseline" % (name, len(a))
         assert b, "%s not found as a top-level declaration in the new index.html" % name
@@ -1832,6 +1887,7 @@ def test_ac15_static(check, tmp_path):
         assert m.get("id") == "plan-travel", "manifest id=%r" % m.get("id")
     elif check == "manifest_visible_fields_unchanged":
         m = json.loads(read_app("manifest.json"))
+        need_baseline_app()  # CHANGE 2026-10-26 QA-DEBT-02
         b = json.loads((BASELINE_DIR / "manifest.json").read_text(encoding="utf-8"))
         for k in ("name", "short_name", "icons"):
             assert m.get(k) == b.get(k), "manifest %s changed (visible change)" % k

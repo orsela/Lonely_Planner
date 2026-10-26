@@ -1,4 +1,7 @@
-"""Lonely Planner F04-HOME QA · Playwright black-box suite · version 1.0.1
+"""Lonely Planner F04-HOME QA · Playwright black-box suite · version 1.0.2
+CHANGE 2026-10-26 QA-DEBT-08: 1.0.1 → 1.0.2: VERSION comes from tests/qa_refs.py CURRENT_VERSION (same value,
+  3.0.0-alpha.7.1; one place for every suite) and F4H-13[protected:*] compares with the v2.15.2 declarations from git
+  (V2152_REF; ee5c723 had the same bytes). Nothing else changed.
 CHANGE 2026-10-26 F04H-QA-FIX-00: 1.0.0 → 1.0.1 — test-side fixes after the first run on 7fdd234 (F04H-QA-FIX-01 below);
   no behavioural assertion weakened. (The node --check script extraction fix is already in 1.0.0.)
 CHANGE 2026-10-26 F04H-QA-03: first version (no previous version).
@@ -31,7 +34,7 @@ from harness import f02, f03, f04, f05, f20, norm, btext, has, wait_has, layout_
 
 from playwright.sync_api import Error as PWError
 
-VERSION = "3.0.0-alpha.7.1"
+VERSION = f02.qa_refs.CURRENT_VERSION  # CHANGE 2026-10-26 QA-DEBT-08: was the literal "3.0.0-alpha.7.1"
 EMAIL = H.INVITE_EMAIL
 DRAFT = H.DRAFT
 
@@ -1305,9 +1308,9 @@ def test_f4h_13_static(check, tmp_path):
     html, inv = H.app_html(), H.invite_html()
     if check.startswith("protected:"):
         name = check.split(":", 1)[1]
-        a = f20._extract(H.base_file("app/index.html"), [name], tmp_path)["found"][name]
+        a = f20._extract(f02.qa_refs.v2152_html(), [name], tmp_path)["found"][name]  # CHANGE 2026-10-26 QA-DEBT-08: was BASE_REF
         b = f20._extract(html, [name], tmp_path)["found"][name]
-        assert len(a) == 1 and b and a[0] in b, "%s is not byte-identical to %s" % (name, H.BASE_REF)
+        assert len(a) == 1 and b and a[0] in b, "%s is not byte-identical to v2.15.2" % name
     elif check == "app_version":
         assert re.search(r"""const\s+APP_VERSION\s*=\s*['"]%s['"]""" % re.escape(VERSION), html), "APP_VERSION != " + VERSION
     elif check == "pt_version":

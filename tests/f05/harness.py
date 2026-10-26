@@ -1,5 +1,11 @@
-"""Plan_Travel F05 QA · browser harness (fake backend, server, devices, helpers) · version 1.0.0
-CHANGE 2026-10-19 F05-QA-03: first version (no previous version). Reuses the F20 harness (tests/f20/test_f20.py, which
+"""Plan_Travel F05 QA · browser harness (fake backend, server, devices, helpers) · version 1.0.1
+CHANGE 2026-10-19 F05-QA-03: first version (no previous version).
+CHANGE 2026-10-26 QA-DEBT-09: 1.0.0 → 1.0.1: STANDALONE_JS (standalone=True devices) returned a fake MediaQueryList built
+  with Object.assign onto Object.create(MediaQueryList.prototype); `matches` is a getter-only accessor there, so EVERY
+  matchMedia('(display-mode: standalone)') call threw "Cannot set property matches … which has only a getter" (found by the
+  F04-HOME QA team, tests/f04home/harness.py). It now returns a plain object (same fields), like the F04-HOME harness; the
+  app's isStandalone() / join/flow.js caught the throw and fell back to navigator.standalone, which hid the bug.
+  test_f05.py::test_h00_standalone_fake guards it. Nothing else changed. Reuses the F20 harness (tests/f20/test_f20.py, which
 imports F04 → F03 → F02) for the PostgREST-like query engine, RLS rules, anonymous sign-in, flag flips and UI helpers.
 
 What is new for F05:
@@ -466,8 +472,9 @@ class F05Backend(f20.F20Backend):
 # =====================================================================================================
 STANDALONE_JS = r"""(()=>{try{Object.defineProperty(Navigator.prototype,'standalone',{configurable:true,get(){return true}})}catch(e){}
  try{const mm=window.matchMedia.bind(window);window.matchMedia=function(q){const r=mm(q);
-   if(/display-mode:\s*standalone/.test(String(q))){return Object.assign(Object.create(Object.getPrototypeOf(r)),{matches:true,media:String(q),
-     onchange:null,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){},dispatchEvent(){return false}})}return r}}catch(e){}})();"""
+   if(/display-mode:\s*standalone/.test(String(q))){return {matches:true,media:String(q),
+     onchange:null,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){},dispatchEvent(){return false}}}return r}}catch(e){}})();"""
+# CHANGE 2026-10-26 QA-DEBT-09: was Object.assign(Object.create(Object.getPrototypeOf(r)),{matches:true,…}) — threw on every call
 NOT_STANDALONE_JS = r"""(()=>{try{Object.defineProperty(Navigator.prototype,'standalone',{configurable:true,get(){return false}})}catch(e){}})();"""
 IPAD_TOUCH_JS = r"""(()=>{try{Object.defineProperty(Navigator.prototype,'platform',{configurable:true,get(){return 'MacIntel'}});
  Object.defineProperty(Navigator.prototype,'maxTouchPoints',{configurable:true,get(){return 5}})}catch(e){}})();"""

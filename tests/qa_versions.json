@@ -1,0 +1,11 @@
+{
+  "_comment": "Lonely Planner QA · expected versions of the tree under test · version 1.0.0. CHANGE 2026-10-26 QA-DEBT-01: new file (no previous version). The ONE place to bump on a release: the app (APP_VERSION / PT_VERSION) and each Edge Function's FN_VERSION as deployed on main 1403761. Read by tests/qa_refs.py (Python suites) and tests/f05/function_test.ts.",
+  "app": "3.0.0-alpha.7.1",
+  "functions": {
+    "join-trip": "3.0.0-alpha.7.0",
+    "approve-member": "3.0.0-alpha.6.0",
+    "manage-members": "3.0.0-alpha.7.0",
+    "create-trip": "3.0.0-alpha.4.1",
+    "invite-manager": "3.0.0-alpha.4.1"
+  }
+}

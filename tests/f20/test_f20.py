@@ -1,5 +1,9 @@
-"""Plan_Travel F20 QA · Playwright black-box suite · version 1.1.0
+"""Plan_Travel F20 QA · Playwright black-box suite · version 1.1.1
 CHANGE 2026-10-13 F20-QA-01: first version (no previous version).
+CHANGE 2026-10-26 QA-DEBT-05: 1.1.0 → 1.1.1: MAIN_REF defaults to the alpha.4.2 commit from tests/qa_refs.py (a7c7a32; was
+  "main", which stopped being alpha.4.2 at F20's merge, so every static case failed on its harness assert when the suite was
+  run without the F05 runner); test_st_static[protected:*] compares with the v2.15.2 declarations from git (V2152_REF);
+  test_st_static[app_version|pt_version] pin tests/qa_refs.py CURRENT_VERSION (was 3.0.0-alpha.5.1). Nothing else changed.
 CHANGE 2026-10-17 F20-QA-03: 1.0.0 → 1.1.0, follows alpha.5.1 (spec D5 amended, D7, §1.3, criterion 8; dev notes §7):
   - VERSION pin → 3.0.0-alpha.5.1.
   - test_a03 (sheet → admin) replaced by test_a03_reopen_choose_to_admin_ignores_d3 (the only way from a trip to admin is
@@ -50,6 +54,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # CHANGE 2026-10-26 QA-DEBT-05: tests/qa_refs.py
+import qa_refs  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 REPO_DIR = Path(os.environ.get("REPO_DIR", str(HERE.parent.parent)))
@@ -67,8 +73,8 @@ from playwright.sync_api import Error as PWError  # noqa: E402
 
 APP_DIR = Path(os.environ["APP_DIR"])
 APP_PATH = f02.APP_PATH
-MAIN_REF = os.environ.get("MAIN_REF", "main")
-VERSION = "3.0.0-alpha.5.1"  # CHANGE 2026-10-17 F20-QA-03: was 3.0.0-alpha.5
+MAIN_REF = os.environ.get("MAIN_REF", qa_refs.REFS["3.0.0-alpha.4.2"])  # CHANGE 2026-10-26 QA-DEBT-05: default was "main"
+VERSION = qa_refs.CURRENT_VERSION  # CHANGE 2026-10-26 QA-DEBT-05: was "3.0.0-alpha.5.1". CHANGE 2026-10-17 F20-QA-03: was 3.0.0-alpha.5
 APP_NAME = "Lonely Planner"
 OLD_NAMES = ["Plan_Travel", "Vietnam Travel Planner"]
 PROTECTED = f02.PROTECTED
@@ -1928,10 +1934,10 @@ def test_st_static(check, tmp_path):
     html = app_html()
     if check.startswith("protected:"):
         name = check.split(":", 1)[1]
-        a = _extract(main_html(), [name], tmp_path)["found"][name]
+        a = _extract(qa_refs.v2152_html(), [name], tmp_path)["found"][name]  # CHANGE 2026-10-26 QA-DEBT-05: was main_html()
         b = _extract(html, [name], tmp_path)["found"][name]
-        assert len(a) == 1, "harness: %s found %d times in main" % (name, len(a))
-        assert b and a[0] in b, "%s is not byte-identical to main (alpha.4.2)" % name
+        assert len(a) == 1, "harness: %s found %d times in v2.15.2" % (name, len(a))
+        assert b and a[0] in b, "%s is not byte-identical to v2.15.2" % name
     elif check == "app_version":
         assert re.search(r"""const\s+APP_VERSION\s*=\s*['"]%s['"]""" % re.escape(VERSION), html), "APP_VERSION != %s" % VERSION
     elif check == "pt_version":

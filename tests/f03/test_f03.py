@@ -1,5 +1,13 @@
-"""Plan_Travel F03 QA · Playwright black-box suite · version 1.0.4
+"""Plan_Travel F03 QA · Playwright black-box suite · version 1.0.5
 CHANGE 2026-10-05 F03-QA: first version (no previous version).
+CHANGE 2026-10-26 QA-DEBT-03: 1.0.4 → 1.0.5: test_ac18_static[protected:*] compares with the v2.15.2 declarations from git
+  (tests/qa_refs.py V2152_REF; alpha.2 had the same bytes, so the assertion is unchanged in substance) and
+  test_ac18_static[app_version] pins tests/qa_refs.py CURRENT_VERSION (was the literal 3.0.0-alpha.3.4).
+  test_ac18_static[title_version] is left as written: it is superseded by F04 §8 (<title> is exactly "Lonely Planner") and
+  deselected by tests/run_all.sh with that reason.
+  test_ac16_off_more_panel_identical_to_alpha2: with MEMBERS_FEATURE='on' the F06 "עוד" additions (section "הטיול" + row
+  "חברים וקישור" #ptF06TripSec/#ptF06MembersRow, section "אני בטיול" #ptF06MeSec; F06 D1, spec §1.1) are hidden before the
+  alpha.2 comparison, exactly like the F04 row #ptJoinRow (F04-QA-03). Nothing else changed.
 CHANGE 2026-10-12 F04-QA-03: 1.0.0 → 1.0.1. test_ac16_off_more_panel_identical_to_alpha2 now ignores the F04 row
   #ptJoinRow ("קישור הצטרפות לקבוצה") when the served app has WIZARD_FEATURE='on' (architect's decision, F04 dev notes §7:
   the row is spec'd F04 behaviour, independent of ADMIN_FEATURE). Nothing else changed.
@@ -58,6 +66,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # CHANGE 2026-10-26 QA-DEBT-03: tests/qa_refs.py
+import qa_refs  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 REPO_DIR = Path(os.environ.get("REPO_DIR", str(HERE.parent.parent)))
@@ -80,7 +90,7 @@ ALPHA2_REF = os.environ.get("ALPHA2_REF", "9b8151b")
 PT_URL, PT_KEY = f02.PT_URL, f02.PT_KEY
 FN_URL = PT_URL + "/functions/v1/invite-manager"
 PROD_APP_URL = "https://orsela.github.io/Lonely_Planner/app/"  # CHANGE 2026-10-12 F04-QA-05: was /Plan_Travel/app/
-VERSION = "3.0.0-alpha.3.4"
+VERSION = qa_refs.CURRENT_VERSION  # CHANGE 2026-10-26 QA-DEBT-03: was "3.0.0-alpha.3.4"
 PROTECTED = f02.PROTECTED
 VIEWPORT = f02.VIEWPORT
 HEADFUL = os.environ.get("QA_HEADFUL") == "1"
@@ -1778,6 +1788,10 @@ def test_ac16_off_more_panel_identical_to_alpha2(env):
     if re.search(r"""const\s+WIZARD_FEATURE\s*=\s*(['"])on\1""", app_html()):
         open_more(n.page)
         n.page.evaluate("()=>{const r=document.getElementById('ptJoinRow');if(r)r.style.display='none'}")
+    # CHANGE 2026-10-26 QA-DEBT-03: F06 D1 rows in '#more' (MEMBERS_FEATURE='on') are not part of the alpha.2 comparison either
+    if re.search(r"""const\s+MEMBERS_FEATURE\s*=\s*(['"])on\1""", app_html()):
+        open_more(n.page)
+        n.page.evaluate("()=>['ptF06TripSec','ptF06MembersRow','ptF06MeSec'].forEach(i=>{const r=document.getElementById(i);if(r)r.style.display='none'})")
     got = more_text(n.page)
     assert got == ref, "#more differs from alpha.2 with ADMIN_FEATURE='off':\nalpha.2: %r\noff:     %r" % (ref, got)
 
@@ -1909,10 +1923,10 @@ def test_ac18_static(check, tmp_path):
     html = app_html()
     if check.startswith("protected:"):
         name = check.split(":", 1)[1]
-        a = _extract(alpha2_html(), [name], tmp_path)["found"][name]
+        a = _extract(qa_refs.v2152_html(), [name], tmp_path)["found"][name]  # CHANGE 2026-10-26 QA-DEBT-03: was alpha2_html()
         b = _extract(html, [name], tmp_path)["found"][name]
-        assert len(a) == 1, "harness: %s found %d times in alpha.2" % (name, len(a))
-        assert b and a[0] in b, "%s is not byte-identical to alpha.2" % name
+        assert len(a) == 1, "harness: %s found %d times in v2.15.2" % (name, len(a))
+        assert b and a[0] in b, "%s is not byte-identical to v2.15.2" % name
     elif check == "app_version":
         assert re.search(r"""const\s+APP_VERSION\s*=\s*['"]%s['"]""" % re.escape(VERSION), html), "APP_VERSION != %s" % VERSION
     elif check == "title_version":

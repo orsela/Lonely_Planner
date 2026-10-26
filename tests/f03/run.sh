@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Plan_Travel F03 QA runner · version 1.0.0
+# Plan_Travel F03 QA runner · version 1.0.1
+# CHANGE 2026-10-26 QA-DEBT-13: 1.0.0 → 1.0.1: the v2.15.2 baseline is never cloned from GitHub (offline runs); without a local
+#   checkout in BASELINE_DIR the F02 suite still runs (protected functions from git) and its 4 whole-old-app cases skip.
+#   The full regression is tests/run_all.sh (one summary table, current deselect list); this runner is kept for its feature.
 # CHANGE 2026-10-05 F03-QA: first version (no previous version).
 #
 # Runs everything available for F03 and prints a pass/fail summary:
@@ -43,11 +46,8 @@ if [ -z "${BASELINE_DIR:-}" ]; then
     [ -f "$c/index.html" ] && export BASELINE_DIR=$c && break
   done
 fi
-if [ -z "${BASELINE_DIR:-}" ]; then
-  mkdir -p "$HOME/.cache/plan_travel_qa"
-  timeout 90 git clone -q --depth 1 https://github.com/orsela/Vietnam_Travel_Planner "$HOME/.cache/plan_travel_qa/vtp_baseline" 2>/dev/null \
-    && export BASELINE_DIR="$HOME/.cache/plan_travel_qa/vtp_baseline"
-fi
+# CHANGE 2026-10-26 QA-DEBT-13: no network clone any more — the F02 protected functions / SEED_DATA come from git
+#   (tests/qa_refs.py V2152_REF); only the 4 F02 cases that RUN the whole v2.15.2 app need a local checkout and SKIP without one.
 if ! grep -q "const APP_VERSION='2.15.2'" "${BASELINE_DIR:-/nonexistent}/index.html" 2>/dev/null; then
   echo "WARN: BASELINE_DIR is not a v2.15.2 checkout (${BASELINE_DIR:-unset}); F02 baseline-dependent cases will fail"
 fi

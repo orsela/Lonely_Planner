@@ -1,5 +1,25 @@
-"""Plan_Travel F05 QA · Playwright black-box suite · version 1.0.0
+"""Plan_Travel F05 QA · Playwright black-box suite · version 1.1.0
 CHANGE 2026-10-19 F05-QA-03: first version (no previous version).
+CHANGE 2026-10-26 QA-DEBT-06: 1.0.0 → 1.1.0 (static part; behavioural changes are listed under QA-DEBT-07 below):
+  - MAIN_REF defaults to the alpha.5.1 commit from tests/qa_refs.py (4bd04e4 = parent of the F05 client commit 59ebf13; was
+    "main", which is no longer alpha.5.1, so every static case that reads it failed on the harness assert).
+  - test_s01_static[protected:*] compares with the v2.15.2 declarations from git (V2152_REF; alpha.5.1 had the same bytes).
+  - test_s01_static[app_version|pt_version] pin tests/qa_refs.py CURRENT_VERSION (was "3.0.0-alpha.6").
+  - test_s01_static[node_check] extracted scripts with a regex on "<script", which also matched the word inside HTML comments
+    and JS strings of the app (false failures app_7.js / app_9.js since alpha.6); it now uses the F02 extractor
+    (tests/f02/tests/js_tools/extract.js, browser-like tokenizer, the one F04/F20 use) for app/ and join/.
+  - New harness guard test_h00_standalone_fake (QA-DEBT-09: the standalone fake no longer throws).
+CHANGE 2026-10-26 QA-DEBT-07: behavioural triage of the first full run on main 1403761 (alpha.7.1); see
+  docs/qa/QA-DEBT_2026-10-26.md. No behavioural assertion weakened beyond what the spec / dev notes say:
+  - test_b10_name_taken[pending_spaces]: "input kept" accepts the cleaned name too ("נועה כהן" for "נועה   כהן") — the
+    spec (§1.6b) asks for a red input + message, not for the raw spacing; the error text already accepted both forms.
+  - test_b13_known_identity[removed]: the removed screen is checked for "הוסרת מהטיול" AND "פנו למנהל" (dev notes §4: title
+    "הוסרת מהטיול", text "פנו למנהל של הטיול אם זו טעות."); it required the spec's one-line summary
+    "הוסרת מהטיול - פנו למנהל" verbatim. (Since F06 D2 the live server never reaches this branch; it is kept for flag off.)
+  - test_c03_claim_moves_membership_and_starts_trip: "מי אני" is read from #homeUserName (as test_e01 does); it looked for
+    the name anywhere in the visible home text, where the v2-min home shows only the avatar initial.
+  - Known app bugs found by this run are reported as xfail with their id (KNOWN_BUGS below), only when the failure is
+    exactly that bug; any other problem in the same test still fails it.
 
 Black-box acceptance tests for docs/F05_spec.md §4 (criteria 1–17, browser side). Contract: the spec, the approved mockup
 artboards F05_* (canvas row 7) and docs/F05_dev_notes.md §3–§4 (flags, stable ids, texts) ONLY. NOT read: app/index.html's
@@ -28,8 +48,9 @@ from harness import f02, f03, f04, f20, norm, btext, has, wait_has, layout_probl
 
 from playwright.sync_api import Error as PWError
 
-MAIN_REF = os.environ.get("MAIN_REF", "main")
-VERSION = "3.0.0-alpha.6"
+qa_refs = f02.qa_refs  # CHANGE 2026-10-26 QA-DEBT-06: tests/qa_refs.py (imported by the F02 harness)
+MAIN_REF = os.environ.get("MAIN_REF", qa_refs.REFS["3.0.0-alpha.5.1"])  # CHANGE 2026-10-26 QA-DEBT-06: default was "main"
+VERSION = qa_refs.CURRENT_VERSION  # CHANGE 2026-10-26 QA-DEBT-06: was "3.0.0-alpha.6"
 APP_NAME = "Lonely Planner"
 OLD_NAMES = ["Plan_Travel", "Vietnam Travel Planner"]
 JOIN_URL = "https://orsela.github.io/Lonely_Planner/join/#code={c}"
@@ -236,6 +257,26 @@ def iphone_code(env, tid, code, name="נועה", role="editor"):
 
 def calls(env, name=None, action=None, device=None):
     return env.backend.calls_of(name, action, device)
+
+
+# CHANGE 2026-10-26 QA-DEBT-07: app bugs found by the QA-DEBT run (docs/qa/QA-DEBT_2026-10-26.md §4). A test whose only
+# problems match the bug's pattern is xfailed with the id; when the bug is fixed the test passes again (no edit needed).
+KNOWN_BUGS = {
+    "QA-DEBT-BUG-01": "F06 membership watch treats ANY Realtime DELETE on trip_members as 'my row deleted' (no ev.old.id check): "
+                      "a manager who rejects a request gets the 'removed' screen 1.8b and the trip's device data is purged",
+    "QA-DEBT-BUG-02": "approve-member not_manager does not hide the pending card (F05 §1.5 'not_manager → hide card')",
+    "QA-DEBT-BUG-03": "pending card role buttons (צופה / עורך / מנהל) are 40px tall, touch target < 44px (F05 §1, criterion 15)",
+    "QA-DEBT-BUG-04": "/join/ fatal() renders a second #joinTitle (and <main>) while the hidden F04 section #m stays in the DOM",
+}
+
+
+def assert_or_known_bug(P, bug, pattern):
+    """CHANGE 2026-10-26 QA-DEBT-07: fail on P, except when every problem matches `pattern` → xfail with the bug id."""
+    if not P:
+        return
+    if all(re.search(pattern, p) for p in P):
+        pytest.xfail("%s: %s" % (bug, KNOWN_BUGS[bug]))
+    assert not P, "\n".join(P)
 
 
 def seen(page, text):
@@ -571,8 +612,8 @@ def test_b10_name_taken(env, variant):
       const m=c.match(/\\d+/g).map(Number);return e.getAttribute('aria-invalid')==='true'&&m[0]>m[1]+60}""")
     if not red:
         P.append("input not marked red / aria-invalid")
-    if page.input_value("#lpjName") != typed:
-        P.append("input not kept")
+    if page.input_value("#lpjName") not in (typed, shown):  # CHANGE 2026-10-26 QA-DEBT-07: cleaned form accepted (was == typed)
+        P.append("input not kept (%r)" % page.input_value("#lpjName"))
     assert not P, "\n".join(P)
 
 
@@ -649,8 +690,8 @@ def test_b13_known_identity(env, state):
     else:
         if st != "removed" or not has(dev.page, TXT["removed"]):
             P.append("removed identity: screen %r, text %r" % (st, btext(dev.page)[:200]))
-        elif not has(dev.page, TXT["removed_full"]):
-            P.append("removed text is not %r (text=%r)" % (TXT["removed_full"], btext(dev.page)[:200]))
+        elif not has(dev.page, "פנו למנהל"):  # CHANGE 2026-10-26 QA-DEBT-07: was TXT["removed_full"] verbatim (dev notes §4)
+            P.append("removed screen lacks 'פנו למנהל' (text=%r)" % btext(dev.page)[:200])
         if is_vis(dev.page, "#lpjName"):
             P.append("form shown to a removed identity")
     if len(calls(env, "join-trip", "request")) != n_req:
@@ -846,8 +887,8 @@ def test_c03_claim_moves_membership_and_starts_trip(env):
         page.wait_for_timeout(1000)
         if page.locator("#userModal.open").count():
             P.append("user picker opened")
-        if not has(page, "נועה"):
-            P.append("member name not shown")
+        if norm(H.text_of(page, "#homeUserName") or "") != "נועה":  # CHANGE 2026-10-26 QA-DEBT-07: was has(page, "נועה")
+            P.append("member name not shown (#homeUserName %r)" % H.text_of(page, "#homeUserName"))
     r = be.member(mid)
     if not r or r["user_id"] != be.uid_of("A") or r["display_name"] != "נועה" or r["role"] != "viewer" or r["status"] != "active":
         P.append("membership after claim: %r" % r)
@@ -1120,7 +1161,9 @@ def test_d05_reject_inline_confirm(env):
         P.append("toast %r missing" % TXT["t_rejected"])
     if [r["id"] for r in card_rows(page)] != [keep]:
         P.append("rows after reject %r" % [r["id"] for r in card_rows(page)])
-    assert not P, "\n".join(P)
+    if has(page, "כבר אינך חבר/ה"):  # CHANGE 2026-10-26 QA-DEBT-07: the manager was shown the F06 'removed' screen 1.8b
+        P.append("manager sees the 'removed' screen after rejecting")
+    assert_or_known_bug(P, "QA-DEBT-BUG-01", r"^(rows after reject|manager sees the 'removed')")
 
 
 def test_d06_second_manager_not_pending(env):
@@ -1204,7 +1247,8 @@ def test_d09_not_manager_hides_card(env):
     assert wait_until(lambda: card_vis(page), 6, page)
     env.backend.force[("approve-member", "approve")] = "not_manager"
     row_btn(page, mid, "[data-act=approve]").click()
-    assert wait_until(lambda: not card_vis(page), 5, page), "card still shown after not_manager"
+    ok = wait_until(lambda: not card_vis(page), 5, page)
+    assert_or_known_bug([] if ok else ["card still shown after not_manager"], "QA-DEBT-BUG-02", "^card still shown")  # QA-DEBT-07
 
 
 LAYOUTS = {"v2_min": {}, "v2": {"HOME_MIN": "off"}, "v1": {"HOME_LAYOUT": "v1"}}
@@ -1235,7 +1279,7 @@ def test_d10_card_on_every_home_layout_with_global_elements(env, layout):
         P.append("global elements hidden/covered: visible=%r" % vis)
     if not page.evaluate("()=>['hminSync','moreSyncCard','syncBadge'].some(id=>!!document.getElementById(id))"):
         P.append("sync card element missing")
-    assert not P, "\n".join(P)
+    assert_or_known_bug(P, "QA-DEBT-BUG-03", r"touch target < 44px: (צופה|עורך|מנהל) \d+x4[0-3]$")  # CHANGE 2026-10-26 QA-DEBT-07
 
 
 # =====================================================================================================
@@ -1328,6 +1372,7 @@ def test_l01_layout_390(env, scr):
     P = layout_problems(dev.page, scope, scr)
     if scr == "home_manager":
         P += [p for p in layout_problems(dev.page, None, scr) if "horizontal" in p]
+        assert_or_known_bug(P, "QA-DEBT-BUG-03", r"touch target < 44px: (צופה|עורך|מנהל) \d+x4[0-3]$")  # CHANGE 2026-10-26 QA-DEBT-07
     assert not P, "\n".join(P)
 
 
@@ -1357,9 +1402,9 @@ def test_s01_static(check, tmp_path):
     flow = (H.JOIN_DIR / "flow.js").read_text(encoding="utf-8")
     if check.startswith("protected:"):
         name = check.split(":", 1)[1]
-        a = f20._extract(main_html(), [name], tmp_path)["found"][name]
+        a = f20._extract(qa_refs.v2152_html(), [name], tmp_path)["found"][name]  # CHANGE 2026-10-26 QA-DEBT-06: was main_html()
         b = f20._extract(html, [name], tmp_path)["found"][name]
-        assert len(a) == 1 and b and a[0] in b, "%s is not byte-identical to alpha.5.1" % name
+        assert len(a) == 1 and b and a[0] in b, "%s is not byte-identical to v2.15.2" % name
     elif check == "app_version":
         assert re.search(r"""const\s+APP_VERSION\s*=\s*['"]%s['"]""" % re.escape(VERSION), html), "APP_VERSION != " + VERSION
     elif check == "pt_version":
@@ -1374,15 +1419,15 @@ def test_s01_static(check, tmp_path):
         assert re.search(r"CHANGE 2026-10-19 F05-[^\n]*(alpha\.5\.1|was |no previous version)", html), "app CHANGE tags do not say what changed"
     elif check == "node_check":
         bad = []
-        for label, src in (("app", html), ("join", jhtml)):
-            for i, blk in enumerate(re.findall(r"<script(?![^>]*\bsrc=)([^>]*)>(.*?)</script>", src, re.S)):
-                attrs, code = blk
-                if re.search(r"type=['\"](?!module|text/javascript)", attrs):
-                    continue
-                p = tmp_path / ("%s_%d.%s" % (label, i, "mjs" if "module" in attrs else "js"))
-                p.write_text(code, encoding="utf-8")
-                if f02.node(["--check", str(p)]).returncode:
-                    bad.append(p.name)
+        # CHANGE 2026-10-26 QA-DEBT-06: F02 extractor (browser-like tokenizer) instead of a regex on "<script"
+        for label, f in (("app", H.APP_DIR / "index.html"), ("join", H.JOIN_DIR / "index.html")):
+            dd = tmp_path / label
+            dd.mkdir()
+            r = f02.node([str(f02.JS_TOOLS / "extract.js"), str(f)], env={**os.environ, "DUMP_DIR": str(dd)})
+            assert r.returncode == 0, r.stderr
+            files = sorted(list(dd.glob("*.js")) + list(dd.glob("*.mjs")))
+            assert files, "no inline scripts found in %s" % label
+            bad += ["%s/%s" % (label, x.name) for x in files if f02.node(["--check", str(x)]).returncode]
         p = tmp_path / "flow.js"
         p.write_text(flow, encoding="utf-8")
         if f02.node(["--check", str(p)]).returncode:
@@ -1393,6 +1438,8 @@ def test_s01_static(check, tmp_path):
             c = collections.Counter(re.findall(r"""\bid=["']([A-Za-z][\w:-]*)["']""", h))
             return {k for k, v in c.items() if v > 1}
         assert not (dups(html) - dups(main_html())), "new duplicate ids %r" % sorted(dups(html) - dups(main_html()))
+        if dups(jhtml) == {"joinTitle"}:  # CHANGE 2026-10-26 QA-DEBT-07: only the known fatal() duplicate → xfail
+            assert_or_known_bug(["duplicate ids in /join/: {'joinTitle'}"], "QA-DEBT-BUG-04", "joinTitle")
         assert not dups(jhtml), "duplicate ids in /join/: %r" % dups(jhtml)
     elif check == "no_live_project_ref":
         for s in (html, jhtml, flow):
@@ -1400,6 +1447,16 @@ def test_s01_static(check, tmp_path):
     elif check == "mockup_annotation_not_shipped":
         for s in (html, jhtml, flow):
             assert "במוקאפ" not in s, "mockup annotation '(במוקאפ: …)' shipped"
+
+
+def test_h00_standalone_fake(env):
+    """CHANGE 2026-10-26 QA-DEBT-09 (harness guard): a standalone=True device answers matchMedia('(display-mode: standalone)')
+    with matches=true without throwing, and navigator.standalone is true; other queries still reach the real matchMedia."""
+    dev = env.new_device("S", ua=H.IPHONE_UA, standalone=True)
+    dev.page.goto(env.server.origin + f02.BLANK_PATH)
+    r = dev.page.evaluate("""()=>{const o={};try{o.m=window.matchMedia('(display-mode: standalone)').matches}catch(e){o.err=String(e)}
+      o.nav=navigator.standalone===true;try{o.other=typeof window.matchMedia('(min-width: 1px)').matches}catch(e){o.err2=String(e)}return o}""")
+    assert r == {"m": True, "nav": True, "other": "boolean"}, r
 
 
 @pytest.mark.parametrize("state", ["on", "off"])
