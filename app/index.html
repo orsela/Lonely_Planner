@@ -1273,7 +1273,8 @@ function codeExtras(){
  if(wz.resumed&&wz.sentAt){
   const n=Math.max(1,Math.floor((Date.now()-wz.sentAt)/60000));
   const b=document.createElement('p');b.className='pt-f04h-resume';b.id='ptWzResume';b.setAttribute('role','status');b.hidden=!online();
-  b.textContent='חזרת לדף – הקוד ששלחנו לפני '+n+' דקות עדיין תקף. לא נשלח קוד חדש.';
+  /* CHANGE 2026-10-26 F04H-RESUME-07: what changed from the first alpha.7.1 build: Hebrew singular for one minute ("לפני דקה" instead of "לפני 1 דקות", QA note) */
+  b.textContent='חזרת לדף – הקוד ששלחנו '+(n===1?'לפני דקה':'לפני '+n+' דקות')+' עדיין תקף. לא נשלח קוד חדש.';
   if(form)sc.insertBefore(b,form);else sc.appendChild(b);
  }
  const c=document.createElement('section');c.className='pt-wz-card pt-f04h-where';c.id='ptWzWhere';
