@@ -1,5 +1,22 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.7 — S3 (F06 done, 2026-10-26)
+
+### F06 · A manager changes roles, removes members and resets the link — 2026-10-22 → 2026-10-26
+<!-- CHANGE 2026-10-26 F06-DOCS-04: new entry. -->
+- App (3.0.0-alpha.7, flag `MEMBERS_FEATURE`): "עוד" → "חברים וקישור" (managers): join link card with WhatsApp / copy /
+  reset, pending shortcut to home, members list with role badges and last seen; member sheet (role, rename, remove);
+  "יציאה מהטיול" for everyone; only-manager guard; viewer guard ("צפייה בלבד – השינוי לא נשמר"); membership watch
+  (Realtime + 60 s check) with "ההרשאה שלך השתנתה" and "כבר אינך חבר" screens and local clean-up. 2 existing lines
+  changed (versions). Protected functions byte-identical.
+- `/join/`: a removed member may ask again (D2); the join code is kept on the device for "בקשה להצטרף שוב".
+- Edge Functions: new `manage-members` (set_role / rename / remove / leave / rotate_link / touch) and `join-trip`
+  3.0.0-alpha.7.0 (version header), deployed 2026-10-26.
+- DB `0014_f06`: six service-role functions, D2 change in `join_preview`/`join_request`, trigger trip name → `trips.name`
+  (managers), `member_touch`; `0015_qa_f06_harness` (`qa.f06_run()`). Applied by Or 2026-10-26.
+- QA: qa.f06 171/171 on the real project, independent browser suite 70/70, functions 19/19 + 23/23, flag-off regression
+  identical to alpha.6; phone check partial (4א). See docs/qa/F06_QA.md.
+
 ## 3.0.0-alpha.6 — S2 (F05 done, 2026-10-22)
 
 ### F05 · A member joins from the group link, after manager approval — 2026-10-19 → 2026-10-22
