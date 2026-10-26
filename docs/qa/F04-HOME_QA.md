@@ -56,3 +56,14 @@ wording for the first two minutes (dev note §2.7), the `••••••` sam
 5. Android (if available): Gmail → automatic Chrome hop (`intent://`) → wizard → "התקנת האפליקציה" (real
    `beforeinstallprompt` / `appinstalled`).
 6. SFSafariViewController case ("לא רואים 'הוספה למסך הבית'?" line) — only visible on a device.
+
+## Phone check (Or, Android, 2026-10-26 20:10–20:13)
+<!-- CHANGE 2026-10-26 F04H-DOCS-04: phone check added. -->
+- Step 1 (templates): code requested from a private tab → subject shows the 6 digits, body code only, no link — OK (Or).
+- Step 3 (invite `86e0887e…` to orsela@gmail.com): Gmail → opened in a Chrome tab (no in-app browser, so no hop) → `/invite/`
+  → "פתיחה באפליקציה והקמת הטיול" → code → after switching to Gmail and back the page was still waiting (no reload, so the
+  resume banner did not need to show) → wizard → trip "F04-HOME" created 18:12:55Z → "הטיול נוצר" showed the
+  install card **with the install button** (`beforeinstallprompt`) — OK.
+- Not checked on a phone: iPhone (Or has no iPhone): in-app hop to Safari, Safari install card, "כניסה עם המייל" in a fresh
+  installed app (C3); new-manager template "Change email address" (no second email). Check with the first real iPhone /
+  new manager.
