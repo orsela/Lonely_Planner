@@ -8,7 +8,8 @@
 <meta name="theme-color" content="#0f5c43">
 <title>הצטרפות לטיול · Lonely Planner</title>
 <!-- CHANGE 2026-10-12 F04-NAME-01: display name Plan_Travel → Lonely Planner (title + brand). -->
-<!-- Lonely Planner join page · version 3.0.0-alpha.7 · F06
+<!-- Lonely Planner join page · version 3.0.0-alpha.7.2 · FIX-04 (QA-DEBT-BUG-04): fatal() removes the hidden #m first; no duplicate #joinTitle.
+     Lonely Planner join page · version 3.0.0-alpha.7 · F06
      CHANGE 2026-10-22 F06-JOIN-01: what changed from 3.0.0-alpha.6: new flag MEMBERS_FEATURE ('on' default). With it on,
      "פתיחת הטיול" also keeps the join code device-wide (pt:_device:join_code:<trip>, spec clarification C5) so that the app can
      offer "בקשה להצטרף שוב" if this member is removed later (docs/F06_spec.md §1.8b).
@@ -97,6 +98,9 @@ function enter(tripId,role){
  location.href='../app/';
 }
 function fatal(){
+ /* CHANGE 2026-10-26 FIX-04 (QA-DEBT-BUG-04): what changed from 3.0.0-alpha.7: the hidden F04 placeholder #m is removed first,
+    so #joinTitle exists once on the error screen (was: twice). */
+ const old=document.getElementById('m');if(old)old.remove();
  root.innerHTML='<main><div class="brand">Lonely Planner</div><section class="card center" role="alert"><h1 id="joinTitle">לא הצלחנו לטעון את הדף</h1>'+
   '<p>בדקו את החיבור ונסו שוב.</p><button type="button" id="lpReload" style="min-height:44px;padding:0 18px;border:0;border-radius:12px;background:#0f6b4f;color:#fff;font-weight:800;font-size:14px">נסו שוב</button></section></main>';
  document.getElementById('lpReload').onclick=()=>location.reload();

@@ -2616,7 +2616,8 @@ try{Object.defineProperty(window,'__ptF20',{value:Object.freeze({version:F20_VER
 .pt5-who .pt5-nm b{display:block;font-size:14px;overflow-wrap:anywhere}
 .pt5-who .pt5-nm small{font-size:11.5px;color:var(--muted)}
 .pt5-seg{display:flex;background:#f1f0ea;border-radius:12px;padding:3px;gap:3px}
-.pt5-seg button{flex:1;min-height:40px;border:0;border-radius:9px;background:none;color:#3a443d;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+/* CHANGE 2026-10-26 FIX-03 (QA-DEBT-BUG-03): role buttons min-height 40px → 44px (F05 §1 touch ≥44px) */
+.pt5-seg button{flex:1;min-height:44px;border:0;border-radius:9px;background:none;color:#3a443d;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 .pt5-seg button[aria-pressed="true"]{background:#fff;color:#0b5841;box-shadow:0 1px 3px #0000001f}
 .pt5-acts{display:flex;gap:8px}
 .pt5-acts .pt5-btn{min-height:44px;font-size:13.5px;border-radius:12px}
@@ -2784,6 +2785,9 @@ async function joinFromLink(){
    After the trip started (gate start()): "מי אני", the members list, the managers' pending card
    --------------------------------------------------------------------------------------------------------- */
 let started=false,tripIdNow=null,myName='',pend=[],chan=null,timer=null,busy=false,sel={},confirmFor=null;
+/* CHANGE 2026-10-26 FIX-02 (QA-DEBT-BUG-02): what changed from 3.0.0-alpha.7.1: new flag; set when approve-member answers
+   not_manager, so the pending card hides (F05 §1.5) until the next boot re-reads the role. */
+let notMgrHide=false;
 function tripId(){try{return api.tripId()||(window.__PT&&window.__PT.tripId)||null}catch{return null}}
 function isManager(){try{return(api.role()||(window.__PT&&window.__PT.role))==='manager'}catch{return false}}
 function nsGet(k){try{return localStorage.getItem(k)}catch{return null}}           /* namespaced by the gate (pt:<trip>:) */
@@ -2834,7 +2838,7 @@ function ago(iso){
 function homePanel(){return(typeof HOME_LAYOUT!=='undefined'&&HOME_LAYOUT==='v2')?$('homeV2'):$('home')}
 function paintPending(){
  let card=$('ptF05Pending');
- if(!isManager()||!pend.length){if(card)card.remove();return}
+ if(notMgrHide||!isManager()||!pend.length){if(card)card.remove();return}   /* CHANGE 2026-10-26 FIX-02: + notMgrHide (was: !isManager()||!pend.length) */
  const panel=homePanel();if(!panel)return;
  if(!card){
   card=document.createElement('section');card.id='ptF05Pending';card.setAttribute('aria-labelledby','ptF05PTitle');
@@ -2881,6 +2885,7 @@ async function decide(memberId,decision){
   toast(decision==='approve'?(p.display_name+' הצטרף/ה כ'+(ROLE[r.role]||ROLE[role])):'הבקשה נדחתה',document.body);
  }catch(e){
   const c=e&&e.code;
+  if(c==='not_manager')notMgrHide=true;   /* CHANGE 2026-10-26 FIX-02: hide the card on not_manager (was: toast only) */
   toast(c==='not_pending'?TX.handled:c==='not_manager'?TX.notManager:errText(e),document.body);
  }finally{
   busy=false;confirmFor=null;delete sel[memberId];
@@ -3531,7 +3536,11 @@ function subscribeMe(mid){
  try{chanMe=c.channel('pt6-me-'+mid).on('postgres_changes',{event:'*',schema:'public',table:'trip_members',filter:'id=eq.'+mid},ev=>{
   /* C2: an UPDATE to status≠active (or a DELETE) on my own row → 1.8b at once; anything else → re-read my row */
   const nw=ev&&ev.new,t=tripId();
-  if(t&&ev&&((ev.eventType==='DELETE')||(nw&&nw.status&&nw.status!=='active'))){removedLive(t);return}
+  /* CHANGE 2026-10-26 FIX-01 (QA-DEBT-BUG-01): what changed from 3.0.0-alpha.7.1: Supabase Realtime does not apply the
+     id filter to DELETE events, so a DELETE counts as "my row" only when ev.old.id is my member id; any other DELETE (e.g. a
+     rejected or cancelled request) just re-reads my row (was: every DELETE → 1.8b + local clean-up on every open phone). */
+  const od=ev&&ev.old,mineGone=ev&&ev.eventType==='DELETE'&&od&&String(od.id)===String(mid);
+  if(t&&ev&&(mineGone||(ev.eventType!=='DELETE'&&nw&&nw.status&&nw.status!=='active'))){removedLive(t);return}
   fetchMyMembership()}).subscribe()}catch{chanMe=null}
 }
 /* removed / left: every pt:<trip>: device key goes (data, queue, members cache), the vault database too */
@@ -3710,7 +3719,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.7.1'; /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.7.2'; /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -8365,7 +8374,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.7.1';/* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.7.2';/* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;
