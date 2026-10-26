@@ -81,12 +81,23 @@ the node --check script extraction, fixed). Every failure is "F04-HOME UI / beha
 3 fail; F05 75 pass / 13 fail / 1 skip — all 16 failures exist on ee5c723 itself (recorded in `off_baseline_ee5c723.txt`),
 so after the implementation the off run must show no failure outside that list and the version pins.
 
+## Run on the implementation (7fdd234 + this suite, branch qa-run), 2026-10-26
+
+| Run | Collected | Passed | Failed | Skipped / xfail |
+|---|---|---|---|---|
+| browser suite 1.0.0 | 93 | 91 | 1 (F4H-09e[exit], category c) | 1 skip (F4H-14) |
+| browser suite 1.0.1 (F04H-QA-FIX-01) | 93 | 91 | 0 | 1 skip + 1 xfail (F4H-09e[exit]) |
+| `--only static` | 15 | 15 | 0 | — |
+| `--only off` (flag flipped in both files) | F04 121 / F05 89 / F06 70 | 118 / 75 / 70 | 3 / 13 / 0 — exactly the ee5c723 list | F05 1 skip |
+
+Details and triage: `docs/qa/F04-HOME_QA.md` (branch qa-run).
+
 ## Harness finding (outside F04-HOME)
 `tests/f05/harness.py` `STANDALONE_JS` builds its fake `MediaQueryList` with `Object.assign` onto an object whose prototype
 is `MediaQueryList.prototype`; `matches` is getter-only there, so every `matchMedia('(display-mode: standalone)')` call
 throws in F05/F06 standalone devices. This suite uses its own plain-object fake (F4H-00b checks it).
 
-## Spec ambiguities (not resolved by reading code; the tests' reading is given)
+## Spec ambiguities (written before the implementation; dev decisions reported 2026-10-26 settle 1, 4, 5, 8, 12, 13)
 1. §3.3 "same origin family": undefined. Tests: a gate send resumes from the gate entry; an invite send resumes on `?invite=1`.
 2. §3.3 "explicit exit": no exit control is named for the code screen. F4H-09e[exit] looks for a visible "חזרה" / "ביטול" / "יציאה" / "סגירה" there and fails if none.
 3. §3.3 "Clear on … TTL": whether an expired key must be deleted or only ignored. F4H-09d requires it gone after the reopen.
