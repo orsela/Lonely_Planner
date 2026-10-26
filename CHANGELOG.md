@@ -1,5 +1,22 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.7.1 — F04-HOME (2026-10-26)
+
+### F04-HOME · An invited manager ends up with the app on the home screen, and the email code never gets lost
+<!-- CHANGE 2026-10-26 F04H-DOCS-03: new entry. -->
+- `/invite/` (flag `HOME_INSTALL_FEATURE`): detects a mail app's in-app browser → "פתיחה בספארי" (iPhone,
+  `x-safari-https`, button only) / automatic hop to Chrome (Android, token as one-hop `?t=`); iPhone Safari: "קודם
+  מוסיפים את האפליקציה למסך הבית" with 3 steps + "להמשיך בדפדפן בלי להתקין"; Android: line about installing at the end.
+- App 3.0.0-alpha.7.1: gate card "מנהל/ת טיול → כניסה עם המייל" on top; after the code, no open invite + an active trip →
+  the trip opens (C3, was "לא מצאנו הזמנה" until restart); code screen resumes within 10 min after a reload without a new
+  send (`pt:_device:wz_resume`, never the code or the token); "איפה הקוד?" card; "הטיול נוצר" install card when not
+  standalone (iPhone steps / Android `beforeinstallprompt`). Protected functions byte-identical.
+- Supabase Auth templates "Change email address" + "Magic link": subject `{{ .Token }} – קוד הכניסה ל-Lonely Planner`,
+  body code only, no link (Or, 2026-10-26; docs/F04-HOME_email_templates.md).
+- No DB or Edge Function change.
+- QA: independent suite 91 pass / 0 fail / 1 skip (advisors) / 1 xfail (no "explicit exit" control — spec ambiguity);
+  static 15/15; flag-off regression identical to alpha.7. Phone check pending. See docs/qa/F04-HOME_QA.md.
+
 ## 3.0.0-alpha.7 — S3 (F06 done, 2026-10-26)
 
 ### F06 · A manager changes roles, removes members and resets the link — 2026-10-22 → 2026-10-26
