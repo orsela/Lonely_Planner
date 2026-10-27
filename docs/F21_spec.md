@@ -11,7 +11,7 @@ User value: a family that heard about Lonely Planner opens one link Or shared, s
 is done. Or sees the request in "ניהול מערכת" and approves with one tap; the approval is the normal F03 manager invite,
 already filled with what they asked for. Nobody waits for Or to type an email address, and nothing reaches Or by mail.
 
-Base: `main` at 3.0.0-alpha.7.1 + QA-DEBT (d148d74). Branch `f21`. Push rule (INDEX): the app and `/request/` stay on `f21`
+Base: `hotfix-7.2` (3.0.0-alpha.7.2, 313eb14) on top of `main` alpha.7.1 + QA-DEBT (d148d74) — rebased 2026-10-27 (Or). Branch `f21`. Push rule (INDEX): the app and `/request/` stay on `f21`
 until the migration and the functions are deployed. Reuses F04-HOME §3.1 (in-app browser hop) and §3.3 (code-screen resume).
 The live project `vietnam-trip-2026` is never touched.
 
@@ -263,7 +263,7 @@ HE — subject "הבקשה שלך ל-Lonely Planner"; body "תודה על ההת
 plus " ועוד N" / " +N" when more; " · <month name year>" when a month exists. Cut to 80 chars.
 
 ## 6. Acceptance criteria
-1. Flags off → app = alpha.7.1 (F02–F06/F20/F04-HOME suites pass except version pins); `/request/` off → the closed card,
+1. Flags off → app = alpha.7.2 (F02–F06/F20/F04-HOME suites pass except version pins); `/request/` off → the closed card,
    no network.
 2. `/request/` language: `?lang=en` → English LTR; switch keeps typed values; choice remembered; Hebrew device → HE.
 3. In-app UA (as F04-HOME criterion 2) → 1.1; iPhone button → `x-safari-https://…/request/?lang=…`; Android one automatic
@@ -301,7 +301,7 @@ plus " ועוד N" / " +N" when more; " · <month name year>" when a month exist
 19. Offline: `/request/` keeps values and shows the offline toast; the admin requests tab follows F03 offline behaviour.
 20. Protected functions byte-identical (`drawMap`, `drawGoogleMap`, `drawSchematicMap`, `fallbackToSchematic`,
     `SEED_DATA`, `stayBlock`, `bookingUrl`); `APP_VERSION`/`PT_VERSION` = 3.0.0-alpha.8; `/request/` version comment
-    alpha.8; functions `alpha.8.0`; every change marked `CHANGE 2026-10-2x F21-…` with what changed from alpha.7.1;
+    alpha.8; functions `alpha.8.0`; every change marked `CHANGE 2026-10-2x F21-…` with what changed from alpha.7.2;
     `node --check` on all script blocks; no duplicate ids; Supabase advisors: no new warning.
 
 ## 7. Deployment (one step at a time, Or confirms each)
