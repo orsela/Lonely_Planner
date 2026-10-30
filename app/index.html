@@ -204,6 +204,45 @@ div.pt-li{cursor:default}
 #ptToast.show{transform:translateX(-50%) translateY(0)}
 @media (prefers-reduced-motion:reduce){#ptToast{transition:none}}
 </style>
+<style>
+/* CHANGE 2026-10-27 F21-UI-01: new style block (no alpha.7.2 equivalent). F21 app styles: admin requests tab (artboard F21_Admin),
+   approve / reject sheets (F21_Approve, F21_ApproveReplace, F21_Reject), chooser badges (F21_Choose), wizard pre-fill
+   (F21_WizardPrefill). Only new pt-f21-* classes; they match nothing while REQUEST_FEATURE='off' (no such element is created). */
+.pt-seg.pt-f21-seg button[aria-pressed="true"]{background:#3730a3;color:#fff}
+.pt-badge.pt-f21-req{background:#3730a3;color:#fff}
+.pt-badge.pt-f21-en{background:#eef4fb;color:#1d4f8a}
+.pt-f21-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pt-f21-meter{padding:10px 14px}
+.pt-f21-mrow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px}
+.pt-f21-mrow span{color:#3a443d}
+.pt-f21-bar{height:6px;border-radius:9px;background:#e7e8f3;overflow:hidden;margin-top:6px}
+.pt-f21-bar span{display:block;height:100%;background:#3730a3}
+.pt-f21-bar.pt-f21-full span{background:#b42318}
+.pt-icard.pt-f21-mark{border-color:#f1d3a5}
+.pt-f21-tr{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.pt-f21-marks{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pt-f21-marks .pt-badge{white-space:normal;text-align:right}
+.pt-f21-note{font-size:12.5px;color:#3a443d;background:#f7f6f1;border-radius:10px;padding:8px 10px;margin-top:8px;line-height:1.45;overflow-wrap:anywhere}
+.pt-btn.pt-f21-ok{background:#3730a3;color:#fff}
+.pt-btn.pt-f21-ok[disabled]{background:#b7b9dd}
+.pt-f21-ltr{direction:ltr;unicode-bidi:isolate}
+.pt-f21-foot{margin:2px 4px 0;font-size:11.5px;color:#5f6861;line-height:1.5}
+.pt-f21-warn{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:#fef3e2;border:1px solid #f1d3a5;border-radius:14px;font-size:12.5px;color:#6b3a02;line-height:1.5}
+.pt-f21-warn b{display:block;margin-bottom:2px}
+.pt-f21-pre{background:#f7f6f1;border-radius:14px;padding:6px 14px}
+.pt-f21-pret{font-size:12px;font-weight:800;color:#3a443d;padding:6px 0 2px}
+.pt-f21-pre .pt-kv:first-of-type{border-top:0}
+.pt-f21-pre .pt-kv span:last-child{text-align:left;overflow-wrap:anywhere}
+.pt-f21-opt{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--text);min-height:44px;padding:10px 12px;border:1px solid var(--border);border-radius:14px;cursor:pointer;box-sizing:border-box}
+.pt-f21-opt input{width:22px;height:22px;accent-color:#3730a3;flex-shrink:0;margin:0}
+.pt-f21-opt input[disabled]{cursor:default}
+.pt-f21-prev{background:#f7f6f1;border-radius:14px;padding:12px 14px;font-size:12.5px;color:#3a443d;line-height:1.55}
+.pt-f21-prev[hidden]{display:none}
+.pt-f21-prev b{display:block;margin-bottom:4px}
+.pt-f21-wzbox{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:#edf8f3;border:1px solid #cfe1d7;border-radius:14px;font-size:12.5px;color:#0b5841;line-height:1.5}
+.pt-in.pt-f21-filled{background:#edf8f3;border-color:#cfe1d7}
+.pt-f21-tag{font-size:11px;font-weight:800;color:#0b5841;margin-inline-start:6px}
+</style>
 <script>
 /* CHANGE 2026-10-05 F03-UI-01 (3.0.0-alpha.3): new script (no alpha.2 equivalent). One IIFE; exposes only the frozen,
    read-only object window.__ptF03 {attach, takeOverBoot, version} used by the gate bridge (F03-GATE-01). The invite
@@ -535,6 +574,7 @@ function openAdmin(push){
  if(!el){el=document.createElement('section');el.id='admin';el.setAttribute('dir','rtl');el.setAttribute('aria-labelledby','ptAdminTitle');document.body.appendChild(el)}
  if(push&&location.hash!=='#admin'){try{history.pushState({ptAdmin:1},'',location.pathname+location.search+'#admin');adm.pushed=true}catch{}}
  adm.open=true;adm.filter='all';adm.showRevoked=false;
+ if(REQ)req.tab=null;   /* CHANGE 2026-10-27 F21-ADMIN-01: new line (no alpha.7.2 equivalent): the default tab is chosen again on every open (§1.7). 'off': no-op. */
  document.documentElement.classList.add('pt-admin-open');
  el.scrollTop=0;
  loadAdmin();
@@ -552,6 +592,7 @@ function closeAdmin(viaHistory){
 }
 async function loadAdmin(){
  if(!adm.open)return;
+ if(REQ)loadReq();   /* CHANGE 2026-10-27 F21-ADMIN-02: new line (no alpha.7.2 equivalent): the requests list loads in parallel with admin_trip_summary. 'off': no-op. */
  if(!online()){adm.state='offline';renderAdmin();return}
  const c=api&&api.client();if(!c){adm.state='offline';renderAdmin();return}
  adm.state='loading';renderAdmin();
@@ -617,10 +658,12 @@ function renderAdmin(){
     after each render: the back control (#ptAdminBack) is replaced by the button "הטיולים שלי" (#ptAdminSwitch) and the
     subtitle "Lonely Planner · סופר-אדמין" gets the badge style (spec §1.2, artboard F20_Admin). 'off': no-op. */
  if(window.__ptF20)window.__ptF20.adminHead(el);
+ if(REQ)reqDecorate(el);   /* CHANGE 2026-10-27 F21-ADMIN-03: new line (no alpha.7.2 equivalent): tabs "בקשות" / "קבוצות והזמנות"; the groups tab is the screen above unchanged (§1.7). 'off': no-op. */
 }
 function findInvite(id){return adm.items.find(x=>x.kind==='invite'&&x.id===id)||null}
 function adminClick(e){
  const t=e.target.closest('button');if(!t||t.disabled)return;
+ if(REQ&&reqClick(t))return;   /* CHANGE 2026-10-27 F21-ADMIN-04: new line (no alpha.7.2 equivalent): F21 buttons (tabs, approve, reject, retry). 'off': no-op. */
  if(t.id==='ptAdminBack'){closeAdmin(false);return}
  if(t.id==='ptAdminRetry'){loadAdmin();return}
  if(t.id==='ptInviteOpen'){openInviteSheet();return}
@@ -715,6 +758,204 @@ async function doRevoke(id,btn,okMsg){
  if(btn)btn.disabled=true;
  try{await invoke('revoke',{invite_id:id});closeSheet();toast(okMsg);loadAdmin()}
  catch(e){if(btn)btn.disabled=false;const msg=errText(e.code);if(!sheetErr(msg))toast(msg);if(e.code==='invite_used')loadAdmin()}
+}
+
+/* CHANGE 2026-10-27 F21-ADMIN-05: new lines (no alpha.7.2 equivalent), additive — no existing statement changed. F21 admin side
+   (docs/F21_spec.md §1.7–§1.9, §5.2): REQ = REQUEST_FEATURE is 'on' (every F21 line checks it; 'off' = alpha.7.2: no tab, no
+   admin_trip_requests call). The requests list lives in this closure only (memory, while the screen is open; never cached).
+   rpc('admin_trip_requests') → {cap, mail_today, requests:[…]}; approve / reject = invite-manager admin actions (invoke()). */
+const REQ=typeof REQUEST_FEATURE!=='undefined'&&REQUEST_FEATURE==='on';
+const req={state:'idle',list:[],cap:50,today:0,tab:null,seq:0};
+const REQ_MONTHS={he:['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'],
+ en:['January','February','March','April','May','June','July','August','September','October','November','December']};
+const REQ_REJECT={he:{s:'הבקשה שלך ל-Lonely Planner',b:'תודה על ההתעניינות ב-Lonely Planner. כרגע לא נוכל לפתוח את הטיול שלך. אפשר לשלוח בקשה חדשה בעתיד.'},
+ en:{s:'Your Lonely Planner request',b:'Thanks for your interest in Lonely Planner. We can’t open your trip right now. You’re welcome to send a new request in the future.'}};
+let reqCtry=null,reqCtryP=null;   /* countries.json by code {he,en,flag} — names in both languages for the cards and §5.2 */
+function reqCountries(){
+ if(reqCtry)return Promise.resolve(reqCtry);
+ if(reqCtryP)return reqCtryP;
+ reqCtryP=fetchT('countries.json',{cache:'no-cache'},10000).then(r=>{if(!r.ok)throw new Error('http '+r.status);return r.json()})
+  .then(a=>{const m={};(Array.isArray(a)?a:[]).forEach(x=>{if(x&&/^[A-Z]{2}$/.test(x.code))m[x.code]={he:x.he,en:x.en,flag:x.flag}});reqCtry=m;return m})
+  .catch(()=>null).finally(()=>{reqCtryP=null});
+ return reqCtryP;
+}
+function reqCName(c,lang){c=String(c||'').toUpperCase();const x=reqCtry&&reqCtry[c];return lang==='en'?(x&&x.en||c):(x&&x.he||countryName(c))}
+function reqFlag(c){c=String(c||'').toUpperCase();const x=reqCtry&&reqCtry[c];return x&&x.flag||flag(c)}
+function reqMonth(iso,lang){const m=/^(\d{4})-(\d{2})/.exec(String(iso||''));if(!m)return'';const i=+m[2]-1;return i>=0&&i<12?REQ_MONTHS[lang==='en'?'en':'he'][i]+' '+m[1]:''}
+function reqWhere(r){return(Array.isArray(r.countries)?r.countries:[]).map(c=>reqFlag(c)+' '+reqCName(c,'he')).join(' · ')}
+function reqTrav(n){n=Number(n)||0;return n===1?'מטייל אחד':n+' מטיילים'}
+function reqAgo(ts){
+ const t=new Date(ts).getTime();if(!isFinite(t))return'';
+ const mins=Math.floor((Date.now()-t)/60000);
+ if(mins<1)return'עכשיו';
+ if(mins<60)return mins===1?'לפני דקה':'לפני '+mins+' דקות';
+ const h=Math.floor(mins/60);
+ if(h<24)return h===1?'לפני שעה':h===2?'לפני שעתיים':'לפני '+h+' שעות';
+ const d=Math.floor(h/24);
+ return d===1?'אתמול':d===2?'לפני יומיים':'לפני '+d+' ימים';
+}
+function reqActive(r){const a=r&&r.active_invite;return a&&typeof a==='object'&&a.id?a:null}
+function reqManages(r){return(Array.isArray(r&&r.manages)?r.manages:[]).filter(x=>x!=null&&String(x).trim()).map(String)}
+/* §1.7 primary button, first match */
+function reqLabel(r){return reqActive(r)?'אישור · מחליף את ההזמנה':reqManages(r).length?'אישור טיול נוסף':r.lang==='en'?'אישור · מייל באנגלית':'אישור'}
+/* §5.2 D16: draft name in the request's language */
+function reqDraft(r){
+ const lang=r.lang==='en'?'en':'he',cs=Array.isArray(r.countries)?r.countries:[];
+ let s=cs.slice(0,2).map(c=>reqCName(c,lang)).join(lang==='en'?' & ':' ו');
+ if(cs.length>2)s+=lang==='en'?' +'+(cs.length-2):' ועוד '+(cs.length-2);
+ const mo=reqMonth(r.month,lang);if(mo)s+=' · '+mo;
+ return s.slice(0,80);
+}
+function findReq(id){return req.list.find(x=>x.id===id)||null}
+async function loadReq(){
+ if(!adm.open)return;
+ const c=api&&api.client();
+ if(!online()||!c){if(req.state!=='ready')req.state='offline';return}
+ const seq=++req.seq;
+ if(req.state!=='ready')req.state='loading';
+ reqCountries().then(m=>{if(m&&adm.open)renderAdmin()});
+ try{
+  const{data,error}=await api.withTimeout(c.rpc('admin_trip_requests'),api.timeoutMs);
+  if(seq!==req.seq)return;
+  if(error){
+   if(String(error.code)==='42501'||/not_platform_admin/.test(String(error.message||'')))req.state='denied';
+   else throw error;
+  }else{
+   const d=typeof data==='string'?JSON.parse(data):(data||{});
+   req.cap=Number(d.cap)>0?Number(d.cap):50;req.today=Math.max(0,Number(d.mail_today)||0);
+   req.list=(Array.isArray(d.requests)?d.requests:[]).filter(x=>x&&typeof x==='object'&&x.id)
+    .sort((a,b)=>String(a.verified_at||'').localeCompare(String(b.verified_at||'')));   /* oldest first */
+   req.state='ready';
+  }
+ }catch(e){if(seq!==req.seq)return;req.state=online()?'error':'offline'}
+ if(adm.open)renderAdmin();
+}
+/* default tab (§1.7): requests when N>0, else groups; decided once per open, after the list arrived */
+function reqTab(){
+ if(req.tab)return req.tab;
+ if(req.state==='ready'){req.tab=req.list.length?'req':'grp';return req.tab}
+ return'grp';
+}
+function reqCard(r,off){
+ const ai=reqActive(r),mg=reqManages(r),dis=off?' disabled':'';
+ const marks=(mg.length?'<span class="pt-badge wait">כבר מנהל: '+esc(mg.join(', '))+'</span>':'')+
+  (ai?'<span class="pt-badge wait">יש הזמנה פעילה · נשלחה '+esc(dm(ai.last_sent_at))+'</span>':'');
+ const when=(r.month&&reqMonth(r.month,'he')?reqMonth(r.month,'he'):'עוד לא יודעים מתי')+' · '+reqTrav(r.travellers);
+ return'<article class="pt-icard'+(marks?' pt-f21-mark':'')+'" data-request="'+esc(r.id)+'">'+
+  '<div class="pt-top"><span class="pt-nm" dir="auto">'+esc(r.name)+'</span><span class="pt-f21-tr">'+(r.lang==='en'?'<span class="pt-badge pt-f21-en" lang="en">EN</span>':'')+'<span class="pt-l2">'+esc(reqAgo(r.verified_at))+'</span></span></div>'+
+  '<div class="pt-l1 pt-ltr">'+esc(r.email)+'</div>'+
+  (marks?'<div class="pt-f21-marks">'+marks+'</div>':'')+
+  '<div class="pt-l1">'+esc(reqWhere(r))+'</div><div class="pt-l2">'+esc(when)+'</div>'+
+  (r.note&&String(r.note).trim()?'<div class="pt-f21-note" dir="auto">"'+esc(String(r.note).trim())+'"</div>':'')+
+  '<div class="pt-actions"><button type="button" class="pt-btn pt-sm pt-f21-ok" data-f21-approve="'+esc(r.id)+'"'+dis+'>'+esc(reqLabel(r))+'</button>'+
+  '<button type="button" class="pt-btn pt-out pt-sm" data-f21-reject="'+esc(r.id)+'"'+dis+'>דחייה</button></div></article>';
+}
+function reqBody(){
+ const off=!online();let h='';
+ if(req.state==='offline'||off)h+='<div class="pt-offline" role="status" id="ptReqOffline">אין חיבור — הרשימה תתעדכן כשהרשת תחזור</div>';
+ if(req.state==='loading'||req.state==='idle')h+='<div class="pt-empty" aria-busy="true">טוען…</div>';
+ else if(req.state==='error')h+='<div class="pt-empty" role="alert">לא הצלחנו לטעון את הבקשות.<br><button type="button" class="pt-linkbtn" id="ptReqRetry">נסו שוב</button></div>';
+ else if(req.state==='ready'){
+  const k=req.today,cap=req.cap,pct=Math.min(100,Math.round(k/cap*100));
+  h+='<section class="pt-icard pt-f21-meter" id="ptReqMeter"><div class="pt-f21-mrow"><b>מיילים מהטופס היום</b><span><b>'+k+'</b> מתוך '+cap+'</span></div>'+
+   '<div class="pt-f21-bar'+(k>=cap?' pt-f21-full':'')+'" role="img" aria-label="'+k+' מתוך '+cap+' מיילים מהטופס היום"><span style="width:'+pct+'%"></span></div>'+
+   '<div class="pt-l2" style="margin-top:6px">קודי אימות והודעות דחייה. בתקרה הטופס מציג "נסו שוב מחר"; הזמנות מנהל וקודי כניסה לא נחסמים.</div></section>';
+  h+=req.list.length?req.list.map(r=>reqCard(r,off)).join(''):'<div class="pt-empty" id="ptReqEmpty">אין בקשות חדשות</div>';
+  h+='<p class="pt-f21-foot">כאן מופיעות רק בקשות שהמייל שלהן אומת. בקשה ממייל שיש לו הזמנה פעילה – אישור מבטל את ההזמנה הישנה ושולח חדשה.</p>';
+ }
+ return h;
+}
+function reqDecorate(el){
+ const body=el&&el.querySelector('.pt-adm-body');if(!body||req.state==='denied')return;
+ const tab=reqTab(),g=classify(adm.items),m=g.pend.length+g.act.length+g.end.length;
+ body.insertAdjacentHTML('afterbegin','<div class="pt-seg pt-f21-seg" role="group" aria-label="תצוגה" id="ptReqTabs">'+
+  '<button type="button" id="ptReqTabReq" data-f21-tab="req" aria-pressed="'+(tab==='req')+'">בקשות'+(req.state==='ready'?' · '+req.list.length:'')+'</button>'+
+  '<button type="button" id="ptReqTabGrp" data-f21-tab="grp" aria-pressed="'+(tab==='grp')+'">קבוצות והזמנות'+(adm.state==='ready'?' · '+m:'')+'</button></div>');
+ if(tab!=='req')return;
+ Array.from(body.children).forEach(c=>{if(c.id!=='ptReqTabs')c.remove()});
+ body.insertAdjacentHTML('beforeend',reqBody());
+}
+function reqClick(t){
+ if(t.dataset.f21Tab){req.tab=t.dataset.f21Tab==='req'?'req':'grp';renderAdmin();const b=$(req.tab==='req'?'ptReqTabReq':'ptReqTabGrp');try{b&&b.focus({preventScroll:true})}catch{}return true}
+ if(t.id==='ptReqRetry'){req.state='loading';renderAdmin();loadReq();return true}
+ if(t.dataset.f21Approve){const r=findReq(t.dataset.f21Approve);if(r)openApprove(r);return true}
+ if(t.dataset.f21Reject){const r=findReq(t.dataset.f21Reject);if(r)openReject(r);return true}
+ return false;
+}
+/* server answer → error code: {ok:false, code} (any HTTP status) or invoke()'s thrown code */
+function reqCode(res,e){if(e)return(e.data&&typeof e.data.code==='string'&&e.data.code)||e.code||'server_error';return res&&res.ok===false?(res.code||'server_error'):null}
+function reqDone(id){req.list=req.list.filter(x=>x.id!==id);if(adm.open)renderAdmin()}
+function reqKv(k,v){return'<div class="pt-kv"><span>'+k+'</span><span>'+v+'</span></div>'}
+/* §1.8 approve sheet (artboards F21_Approve / F21_ApproveReplace) */
+async function openApprove(r){
+ await reqCountries();
+ if(!adm.open)return;
+ const ai=reqActive(r),en=r.lang==='en',nm=esc(r.name);
+ const mo=reqMonth(r.month,'he');
+ const sendLbl=ai?'ביטול הישנה ושליחת הזמנה חדשה':'אישור ושליחה אל <bdi class="pt-f21-ltr" dir="ltr">'+esc(r.email)+'</bdi>';
+ openSheet('אישור בקשה',
+  '<div class="pt-shead"><div class="pt-main"><h2 id="ptApTitle">'+(ai?'אישור ושליחת הזמנה חדשה':'אישור ושליחת הזמנה')+'</h2><p><bdi>'+nm+'</bdi> יקבל/תקבל מייל הזמנה להקמת הטיול, כמו הזמנת מנהל רגילה (תוקף 7 ימים).</p></div></div>'+
+  (ai?'<section class="pt-f21-warn" role="note" id="ptApActive">'+ICON.warn+'<span><b>יש כבר הזמנה פעילה למייל הזה</b>"'+esc(ai.draft_name||'קבוצה ללא שם')+'" · נשלחה '+esc(dm(ai.last_sent_at))+' · בתוקף עד '+esc(dm(ai.expires_at))+'. באישור היא מבוטלת והקישור הישן מפסיק לעבוד.</span></section>':'')+
+  '<div><label class="pt-lbl" for="ptApName">שם זמני לטיול</label><input id="ptApName" class="pt-in" dir="auto" maxlength="80" autocomplete="off" value="'+esc(reqDraft(r))+'">'+
+  '<p class="pt-hint">נוצר מהבקשה. <bdi>'+nm+'</bdi> יכול/ה לשנות אותו באשף.</p><p class="pt-err" id="ptApNameErr" role="alert"></p></div>'+
+  '<section class="pt-f21-pre" id="ptApPre"><div class="pt-f21-pret">ממולא מראש באשף</div>'+
+  reqKv('שם בקבוצה','<bdi>'+nm+'</bdi>')+reqKv('יעדים ומטבעות',esc(reqWhere(r)))+
+  reqKv('חודש',mo?esc(mo)+' (תאריכים בוחרים באשף)':'עוד לא יודעים – בוחרים באשף')+
+  reqKv('שפת המייל',en?'אנגלית – כמו הבקשה':'עברית – כמו הבקשה')+'</section>'+
+  '<p class="pt-err" id="ptApErr" role="alert"></p>'+
+  '<button class="pt-btn pt-f21-ok" type="button" id="ptApSend">'+sendLbl+'</button>'+
+  '<button class="pt-btn pt-out" type="button" id="ptApCancel" data-pt-close>ביטול</button>');
+ const inp=$('ptApName'),btn=$('ptApSend'),e1=$('ptApNameErr'),e2=$('ptApErr');
+ inp.oninput=()=>{e1.textContent='';e2.textContent=''};
+ btn.disabled=!online();
+ btn.onclick=async()=>{
+  const name=inp.value.trim();e1.textContent='';e2.textContent='';
+  if(!name){e1.textContent='צריך לתת שם זמני לטיול.';inp.focus();return}
+  if(name.length>80){e1.textContent=ERR_HE.invalid_name;inp.focus();return}
+  if(!online()){e2.textContent=ERR_HE.offline;return}
+  btn.disabled=true;btn.textContent='שולחים…';
+  let res=null,err=null;
+  try{res=await invoke('approve_request',{request_id:r.id,draft_name:name})}catch(e){err=e}
+  const code=reqCode(res,err);
+  if(!code){closeSheet();toast('ההזמנה נשלחה ל-'+r.email);reqDone(r.id);loadAdmin();return}
+  if(code==='request_closed'){closeSheet();toast('הבקשה כבר טופלה');reqDone(r.id);loadAdmin();return}
+  btn.innerHTML=sendLbl;btn.disabled=!online();
+  if(code==='email_failed'){toast('המייל לא נשלח. שום דבר לא השתנה – נסו שוב.');return}
+  e2.textContent=errText(code);
+ };
+}
+/* §1.9 reject sheet (artboard F21_Reject) */
+function openReject(r){
+ const lang=r.lang==='en'?'en':'he',cap=req.today>=req.cap,t=REQ_REJECT[lang];
+ openSheet('דחיית בקשה',
+  '<div class="pt-shead"><div class="pt-main"><h2 id="ptRjTitle">לדחות את הבקשה של <bdi>'+esc(r.name)+'</bdi>?</h2><p>הבקשה יורדת מהרשימה ונמחקת אחרי 5 ימים.</p></div></div>'+
+  '<label class="pt-f21-opt" for="ptRjMail"><input type="checkbox" id="ptRjMail"'+(cap?' disabled':' checked')+'><span><b>לשלוח הודעה מנומסת במייל</b>'+
+  '<span class="pt-sub" id="ptRjMailSub">'+(cap?'התקרה היומית מלאה – הדחייה תהיה בלי מייל':'בשפת הבקשה (כאן: '+(lang==='en'?'אנגלית':'עברית')+')')+'</span></span></label>'+
+  '<section class="pt-f21-prev" id="ptRjPreview" dir="'+(lang==='en'?'ltr':'rtl')+'" lang="'+lang+'"'+(cap?' hidden':'')+'><b>'+esc(t.s)+'</b>'+esc(t.b)+'</section>'+
+  '<p class="pt-err" id="ptRjErr" role="alert"></p>'+
+  '<button class="pt-btn pt-red" type="button" id="ptRjSend">דחייה</button>'+
+  '<button class="pt-btn pt-out" type="button" id="ptRjCancel" data-pt-close>ביטול</button>');
+ const chk=$('ptRjMail'),pv=$('ptRjPreview'),btn=$('ptRjSend'),er=$('ptRjErr');
+ chk.onchange=()=>{pv.hidden=!chk.checked};
+ btn.disabled=!online();
+ btn.onclick=async()=>{
+  er.textContent='';
+  if(!online()){er.textContent=ERR_HE.offline;return}
+  const mail=!cap&&chk.checked;
+  btn.disabled=true;btn.textContent='דוחים…';
+  let res=null,err=null;
+  try{res=await invoke('reject_request',{request_id:r.id,send_mail:mail})}catch(e){err=e}
+  const code=reqCode(res,err);
+  if(!code){
+   closeSheet();
+   const sk=res&&res.mail_skipped;
+   toast(sk==='daily_limit'?'הבקשה נדחתה, בלי מייל (התקרה היומית מלאה)':sk?'הבקשה נדחתה, המייל לא נשלח':mail?'הבקשה נדחתה ונשלחה הודעה במייל':'הבקשה נדחתה');
+   reqDone(r.id);loadReq();return;
+  }
+  if(code==='request_closed'){closeSheet();toast('הבקשה כבר טופלה');reqDone(r.id);loadReq();return}
+  btn.textContent='דחייה';btn.disabled=!online();
+  er.textContent=errText(code);
+ };
 }
 
 /* ---------------------------------------------------------------------------------------------------------
@@ -1417,6 +1658,7 @@ async function afterVerified(){
     gate never flashes. No trips (or the lookup of trips fails) → today's "לא מצאנו הזמנה פעילה…" card. 'off': as before. */
  if(!res||res.found!==true){if(HOMEI&&await bootIntoTrip())return;noInviteCard();return}
  wz.invite={draft_name:res.draft_name||'',inviter_name:res.inviter_name||'',expires_at:res.expires_at||null};
+ if(REQ)f21Prefill(res);   /* CHANGE 2026-10-27 F21-WIZ-01: new line (no alpha.7.2 equivalent): lookup's `prefill` (invite from a request) → name in the group, countries, month (§1.11). 'off' / no prefill: no-op. */
  if(!wz.f.name)wz.f.name=String(res.draft_name||'').slice(0,80);
  loadData();
  step1();
@@ -1487,6 +1729,7 @@ function step1(){
  [nm,me,fr,to].forEach(x=>x.addEventListener('input',upd));[fr,to,cur].forEach(x=>x.addEventListener('change',upd));
  $('ptWzNext').onclick=()=>{upd();const bad=validate1();if(bad){setErr(bad.msg);bad.el.classList.add('pt-bad');try{bad.el.focus()}catch{}return}step2()};
  prefillMe();
+ if(REQ)f21Step1();   /* CHANGE 2026-10-27 F21-WIZ-02: new line (no alpha.7.2 equivalent): green box, "מהבקשה" tags, date picker on the requested month (§1.11). 'off' / no prefill: no-op. */
 }
 function daysHelp(n){return(n&&n>0?daysTxt(n)+' · ':'')+'ייווצר יום ריק לכל תאריך'}
 function validate1(){
@@ -1507,6 +1750,42 @@ async function prefillMe(){
  let rows=[];try{rows=await api.activeTrips()}catch{}
  const dn=(rows||[]).map(r=>r&&r.display_name).find(x=>x&&String(x).trim());
  if(dn&&!wz.f.me){wz.f.me=String(dn).slice(0,40);const el=$('ptWzMe');if(el&&!el.value)el.value=wz.f.me}
+}
+
+/* CHANGE 2026-10-27 F21-WIZ-04: new functions (no alpha.7.2 equivalent), artboard F21_WizardPrefill, spec §1.11. REQ =
+   REQUEST_FEATURE 'on'. wz.f21pre = {countries, month 'YYYY-MM' | null, name, applied} from create-trip lookup's `prefill`
+   (memory only); null without prefill → today's wizard. Everything stays editable. */
+const REQ=typeof REQUEST_FEATURE!=='undefined'&&REQUEST_FEATURE==='on';
+function f21Prefill(res){
+ const p=res&&res.prefill;
+ if(!p||typeof p!=='object'){wz.f21pre=null;return}
+ const cs=[];(Array.isArray(p.countries)?p.countries:[]).forEach(c=>{c=String(c||'').toUpperCase();if(/^[A-Z]{2}$/.test(c)&&!cs.includes(c)&&cs.length<COUNTRY_MAX)cs.push(c)});
+ const m=/^(\d{4})-(\d{2})/.exec(String(p.month||''));
+ const was=wz.f21pre;
+ wz.f21pre={countries:cs,month:m?m[1]+'-'+m[2]:null,name:String(p.name||'').trim().slice(0,40),applied:!!(was&&was.applied)};
+ if(wz.f21pre.name&&!wz.f.me)wz.f.me=wz.f21pre.name;
+}
+function f21Step1(){
+ const p=wz.f21pre;if(!p||wz.screen!=='step1')return;
+ const form=document.querySelector('#ptWizard .pt-wz-form');if(!form||$('ptWzF21Box'))return;
+ form.insertAdjacentHTML('afterbegin','<section class="pt-f21-wzbox" id="ptWzF21Box" role="note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0b5841" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>מילאנו מה שכתבת בבקשה, כולל היעדים בשלב 2. נשאר לבחור תאריכים.</span></section>');
+ const tag=el=>{
+  const l=el&&document.querySelector('label[for="'+el.id+'"]');if(!l)return;
+  if(!l.querySelector('.pt-f21-tag'))l.insertAdjacentHTML('beforeend','<span class="pt-f21-tag">מהבקשה</span>');
+  el.classList.add('pt-f21-filled');el.addEventListener('input',()=>el.classList.remove('pt-f21-filled'),{once:true});
+ };
+ const nm=$('ptWzName'),me=$('ptWzMe');
+ if(nm&&nm.value&&wz.invite&&nm.value===String(wz.invite.draft_name||'').slice(0,80)){tag(nm);const h=nm.parentNode.querySelector('.pt-wz-help');if(h)h.remove()}
+ if(me&&p.name&&me.value===p.name)tag(me);
+ /* the native date picker opens on the first allowed date: min = 1st of the requested month while no date is chosen yet,
+    removed at the first change (null month: the picker opens on today = the current month, as today) */
+ const fr=$('ptWzFrom');
+ if(fr&&!fr.value&&p.month){fr.min=p.month+'-01';fr.addEventListener('change',()=>fr.removeAttribute('min'),{once:true})}
+}
+function f21Countries(){
+ const p=wz.f21pre;if(!p||p.applied||!data.byCode)return;
+ p.applied=true;
+ p.countries.forEach(c=>{if(data.byCode[c])addCountry(c)});
 }
 
 /* ---------------------------------------------------------------------------------------------------------
@@ -1544,6 +1823,7 @@ async function step2(){
   const ok=await loadData();
   if(!ok){cardScreen('retry',online()?TX.generic:TX.offline,'','נסו שוב',step2,ICON.wifi);return}
  }
+ if(REQ)f21Countries();   /* CHANGE 2026-10-27 F21-WIZ-03: new line (no alpha.7.2 equivalent): step 2 starts with the requested countries (once; currencies via addCountry, as when the user picks them). 'off' / no prefill: no-op. */
  paint('step2',progress(2)+h1('לאן נוסעים?')+'<p class="pt-wz-sub">אפשר לבחור כמה מדינות, לפי סדר הטיול.</p>'+
   '<div class="pt-wz-form" style="gap:12px">'+
   '<div><div class="pt-wz-search"><label for="ptWzSearch" class="pt-sr">חיפוש מדינה</label><input id="ptWzSearch" class="pt-in" type="search" autocomplete="off" spellcheck="false" placeholder="חיפוש מדינה, בעברית או באנגלית…" value="'+esc(wz.q)+'">'+ICON.search+'</div>'+
@@ -2251,6 +2531,32 @@ function loadPending(){
 function rowFor(tid){return(st.rows||[]).find(r=>r&&r.trip_id===tid)||null}
 function tripName(tid){const d=st.det&&st.det[tid];return d&&d.name?d.name:'טיול'}
 
+/* CHANGE 2026-10-27 F21-CHOOSE-03: new lines (no alpha.7.2 equivalent), additive. F21 chooser badges (artboard F21_Choose, §1.6):
+   reqN = number of verified pending requests from rpc('admin_trip_requests') (super-admin only, memory only; null = unknown /
+   failed → no badge). reqBadges() rewrites the "ניהול מערכת" row after renderChooser built it: new sub line, the requests badge
+   (indigo) then the existing amber pending-invites badge with the text "<M> הזמנות ממתינות" (was "<M> ממתינות"); each badge is
+   omitted at 0 or on a failed call. REQ = REQUEST_FEATURE 'on'; 'off' = alpha.7.2 (no call, row unchanged). */
+const REQ=typeof REQUEST_FEATURE!=='undefined'&&REQUEST_FEATURE==='on';
+let reqN=null;
+function loadReqCount(){
+ if(!REQ||!st.isAdmin||!online()||!api)return Promise.resolve();
+ const c=api.client();if(!c)return Promise.resolve();
+ return api.withTimeout(c.rpc('admin_trip_requests'),api.timeoutMs).then(r=>{
+  let d=r&&!r.error?r.data:null;if(typeof d==='string'){try{d=JSON.parse(d)}catch{d=null}}
+  reqN=d&&Array.isArray(d.requests)?d.requests.length:null;
+ },()=>{reqN=null});
+}
+function reqBadges(){
+ const b=$('ptChooseAdmin');if(!b)return;
+ const sub=b.querySelector('.pt-f20-sub');if(sub)sub.textContent='בקשות, קבוצות והזמנת מנהלים';
+ const main=b.querySelector('.pt-f20-main'),p=$('ptChoosePending'),n=Number(reqN)||0;
+ if(!main||(!p&&n<1))return;
+ const row=document.createElement('span');row.className='pt-f21-badges';
+ if(n>0)row.insertAdjacentHTML('beforeend','<span class="pt-badge pt-f21-req" id="ptChooseRequests">'+n+' בקשות חדשות</span>');
+ if(p){p.textContent=(Number(st.pending)||0)+' הזמנות ממתינות';row.appendChild(p)}
+ main.appendChild(row);
+}
+
 /* ---------------------------------------------------------------------------------------------------------
    F20-BOOT-02: the gate's decision point (spec §1.4). Called by resolveAndStart once the memberships are known (online,
    client + session exist). Returns true when F20 took over (chooser / standalone admin / direct D3 entry); false = the
@@ -2306,6 +2612,7 @@ function showChooser(){
   renderChooser();
   loadDetails().then(renderChooser);
   if(st.isAdmin)loadPending().then(renderChooser);
+  if(REQ&&st.isAdmin)loadReqCount().then(renderChooser);   /* CHANGE 2026-10-27 F21-CHOOSE-01: new line (no alpha.7.2 equivalent): number of verified pending requests (§1.6). 'off': no-op. */
  });
 }
 function renderChooser(){
@@ -2317,6 +2624,7 @@ function renderChooser(){
   '<div class="pt-f20-sec" style="margin-bottom:10px">ניהול</div><button type="button" class="pt-f20-card pt-f20-adm" id="ptChooseAdmin"><span class="pt-f20-ic">'+ICON.shield+'</span>'+
   '<span class="pt-f20-main"><b>ניהול מערכת</b><span class="pt-f20-sub">כל הקבוצות והזמנת מנהלים</span></span>'+
   (n>0?'<span class="pt-badge wait" id="ptChoosePending">'+n+' ממתינות</span>':'')+'<span class="pt-f20-chev" aria-hidden="true">‹</span></button>':'';
+ if(REQ)reqBadges();   /* CHANGE 2026-10-27 F21-CHOOSE-02: new line (no alpha.7.2 equivalent): sub "בקשות, קבוצות והזמנת מנהלים" + badges "<N> בקשות חדשות" / "<M> הזמנות ממתינות" (§1.6). 'off': no-op. */
  const box=$('ptChooseTrips'),rows=st.rows||[];
  let h='';
  if(!rows.length)h='<p class="pt-f20-note" id="ptChooseNone">'+TX.none+'</p>';
@@ -3725,7 +4033,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.7.2'; /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.8'; /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -8380,7 +8688,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.7.2';/* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.8';/* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;
