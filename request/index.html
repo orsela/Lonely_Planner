@@ -119,7 +119,7 @@ textarea.rq-in{resize:none;line-height:1.45}
 .rq-inapp h1{margin:0;font-size:19px}
 .rq-inapp p{margin:0;font-size:13.5px;color:#3a443d;line-height:1.6}
 .rq-manual{padding:10px 16px}
-.rq-manual b{font-size:13px;display:block;padding-bottom:4px}
+.rq-manual>b{font-size:13px;display:block;padding-bottom:4px}
 .rq-mstep{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;padding:8px 0;border-top:1px solid #efeee8}
 .rq-mstep .rq-n{width:24px;height:24px;font-size:12px}
 .rq-hop{display:flex;gap:10px;align-items:center;background:#edf8f3;border-color:#cfe1d7}
@@ -145,7 +145,9 @@ const REQUEST_FEATURE='on';
 /* CHANGE 2026-10-27 F21-REQ-03: Cloudflare Turnstile site key. For now Cloudflare's documented always-pass TEST key; Or
    replaces it with the real site key of the orsela.github.io widget at deploy (docs/F21_spec.md §7 step 1). The site key is
    public by design; the secret lives only in the Supabase secret TURNSTILE_SECRET. */
-const TURNSTILE_SITE_KEY='1x00000000000000000000AA';
+/* CHANGE 2026-10-30 F21-REQ-04: real site key of the orsela.github.io widget (from Or, §7 step 1); was the always-pass test
+   key '1x00000000000000000000AA'. It only works on orsela.github.io; the smoke test swaps in Cloudflare's test keys. */
+const TURNSTILE_SITE_KEY='0x4AAAAAAFpMlOd4CB04apzJ';
 (function(){
 'use strict';
 /* CHANGE 2026-10-27 F21-REQ-04: endpoint + publishable key, the same project and key as /join/ (publishable by design). */
@@ -176,7 +178,7 @@ const T={
   tRate:'יותר מדי בקשות היום. נסו שוב מחר.',tTs:'בדיקת האבטחה נכשלה. נסו שוב.',tOffline:'אין חיבור. נסו שוב כשהרשת תחזור.',tGeneric:'משהו השתבש. נסו שוב.',
   tResent:'נשלח קוד חדש.',tLocked:'יותר מדי ניסיונות. מתחילים מחדש.',tUnknown:'הבקשה לא נמצאה. מתחילים מחדש.',
   inT:'פותחים בדפדפן הרגיל',inP:'הטופס נפתח בתוך אפליקציה אחרת. בהמשך נשלח לכם קוד למייל, ומעבר למייל מכאן סוגר את הדף ומוחק את מה שמילאתם.',
-  safari:'פתיחה בספארי',manualT:'הכפתור לא עבד?',manual1:'לוחצים על <b>⋯</b> בפינה העליונה של הדף',manual2:'בוחרים <b>"פתיחה בספארי"</b> (או "Open in Safari")',
+  safari:'פתיחה בספארי',manualT:'הכפתור לא עבד?',manual1:'לוחצים על <b>⋯</b> בפינה העליונה של הדף',manual2:'בוחרים <b>"פתיחה בספארי"</b> (או <bdi dir="ltr">"Open in Safari"</bdi>)',
   hop:'עוברים ל-Chrome אוטומטית…',chrome:'לא נפתח? פתיחה ב-Chrome',here:'להמשיך כאן בכל זאת',
   codeT:'בדקו את המייל',codeLead1:'שלחנו קוד בן 6 ספרות אל ',codeLead2:'. מקלידים אותו כאן.',codeLbl:'קוד אימות',digit:'ספרה ',
   codeHelp1:'הקוד בתוקף 10 דקות. הדבקה ממלאת את כל התיבות.',codeHelp2:'יצאתם לבדוק את המייל? חוזרים לאותו קישור – הדף זוכר אתכם ולא שולח קוד חדש.',
@@ -340,8 +342,9 @@ function genericToast(code){toast(code==='offline'?tx().tOffline:code==='rate_li
 
 /* ---------- resume (F04-HOME §3.3 pattern; never the code) ---------- */
 function readResume(){
- let o=null;try{o=JSON.parse(lsGet(RESUME_KEY)||'null')}catch(e){o=null}
- if(!o||o.v!==1||typeof o.request_id!=='string'||!o.request_id||typeof o.email!=='string'||typeof o.sentAt!=='number'){if(o)lsDel(RESUME_KEY);return null}
+ const raw=lsGet(RESUME_KEY);if(!raw)return null;
+ let o=null;try{o=JSON.parse(raw)}catch(e){o=null}
+ if(!o||o.v!==1||typeof o.request_id!=='string'||!o.request_id||typeof o.email!=='string'||typeof o.sentAt!=='number'){lsDel(RESUME_KEY);return null}
  const age=Date.now()-o.sentAt;
  if(age>=RESUME_TTL_MS||age<-60000){lsDel(RESUME_KEY);return null}
  return o;
