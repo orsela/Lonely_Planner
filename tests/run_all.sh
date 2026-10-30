@@ -44,6 +44,11 @@
 #   f20       F20 suite (MAIN_REF = alpha.4.2 from tests/qa_refs.py). Deselected: test_st_static[change_comments_cover_hunks]
 #             (F20's rule "every hunk vs alpha.4.2 carries an F20 tag" — F05/F06/F04-HOME hunks carry their own tags) and
 #             test_st_static[no_db_or_function_change] (F20 shipped no migration; F05/F06 add migrations + functions on purpose).
+#             CHANGE 2026-10-30 F21-QA-08: + 4 cases superseded by F21 §1.6 (chooser admin row sub "כל הקבוצות והזמנת מנהלים" →
+#             "בקשות, קבוצות והזמנת מנהלים"; badge "<M> ממתינות" → "<M> הזמנות ממתינות"; new RPC admin_trip_requests):
+#             test_b01_superadmin_online_sees_chooser_no_trip_started, test_c01_chooser_rows_order_content_flags_last_badge,
+#             test_c02_pending_badge[two], test_d01_network_reads_only_spec_tables. They RUN in job sup_f20_req_off and must
+#             pass there; the new texts / RPC are tested by tests/f21/test_f21.py test_c11_chooser_badges / _omitted.
 #   f04h      F04-HOME suite.
 #   f21       F21 suite (tests/f21/test_f21.py: /request/, chooser badges, requests tab, sheets, wizard pre-fill).
 #   sup_f20_req_off  the F20 cases deselected from f20 because of F21 §1.6, on a copy with REQUEST_FEATURE='off' in app/ (F21
@@ -166,8 +171,14 @@ run_job() {
            "F04-HOME-superseded F05 cases, HOME_INSTALL_FEATURE=off copy" "test_f05.py::test_c01_not_connected_screen" \
            "test_f05.py::test_c07_f04_invite_entry_unchanged";;
     f06) pyjob f06 "$REPO" tests/f06 test_f06.py "";;
-    f20) pyjob f20 "$REPO" tests/f20 test_f20.py "desel: 2 F20 diff rules superseded by F05/F06/F04-HOME" \
-           --deselect "test_f20.py::test_st_static[change_comments_cover_hunks]" --deselect "test_f20.py::test_st_static[no_db_or_function_change]";;
+    f20) pyjob f20 "$REPO" tests/f20 test_f20.py "desel: 2 F20 diff rules superseded by F05/F06/F04-HOME, 4 by F21 §1.6 (sup_f20_req_off)" \
+           --deselect "test_f20.py::test_st_static[change_comments_cover_hunks]" --deselect "test_f20.py::test_st_static[no_db_or_function_change]" \
+           --deselect "test_f20.py::test_b01_superadmin_online_sees_chooser_no_trip_started" \
+           --deselect "test_f20.py::test_c01_chooser_rows_order_content_flags_last_badge" \
+           --deselect "test_f20.py::test_c02_pending_badge[two]" --deselect "test_f20.py::test_d01_network_reads_only_spec_tables";;  # CHANGE 2026-10-30 F21-QA-08: + 4 F21 §1.6 deselects (sup_f20_req_off)
+    sup_f20_req_off) pyjob sup_f20_req_off "$WORK/req_off" tests/f20 "test_f20.py::test_b01_superadmin_online_sees_chooser_no_trip_started" \
+           "F21-superseded F20 cases, REQUEST_FEATURE=off copy" "test_f20.py::test_c01_chooser_rows_order_content_flags_last_badge" \
+           "test_f20.py::test_c02_pending_badge[two]" "test_f20.py::test_d01_network_reads_only_spec_tables";;  # CHANGE 2026-10-30 F21-QA-08: new job
     f04h) pyjob f04h "$REPO" tests/f04home test_f04home.py "";;
     f21) pyjob f21 "$REPO" tests/f21 test_f21.py "";;  # CHANGE 2026-10-30 F21-QA-08
     static)
