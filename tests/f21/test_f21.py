@@ -204,6 +204,8 @@ def type_rq_code(page, code, env=None):
     verify call followed (otherwise it would submit twice)."""
     be = env.backend if env else getattr(page, "_qa_backend", None)
     n0 = len(be.rt("verify")) if be else None
+    # clear the boxes silently first (after a wrong code the page keeps the digits; see F21-QA-BUG-01 / test_c06_retype_…)
+    page.evaluate("()=>{for(let i=0;i<6;i++){const e=document.getElementById('rqOtp'+i);if(e)e.value=''}}")
     for i, d in enumerate(code):
         page.locator(RQ["otp"] % i).fill(d)
     page.wait_for_timeout(700)
@@ -707,6 +709,33 @@ def test_c06_expired_and_resend(env):
         assert re.search(TXT["wrong_re"], btext(page)), "old code not refused"
     type_rq_code(page, third)
     assert wait_has(page, TXT["sent_he"], 6), "new code did not verify"
+
+
+def test_c06_retype_after_wrong_code(env):
+    """C6 / §1.3 + §4 (5 wrong → code_locked): after ONE wrong code the user taps the first box and types the right code
+    (keyboard, like a phone). Expected: one more verify with the right code → Sent. A typing pattern must not burn the
+    remaining attempts. (F21-QA-BUG-01)"""
+    dev = to_code(env)
+    page = dev.page
+    good = last_code(env)
+    bad = "000000" if good != "000000" else "111111"
+    page.locator(RQ["otp"] % 0).click()
+    for d in bad:
+        page.keyboard.press(d)
+        page.wait_for_timeout(60)
+    page.wait_for_timeout(900)
+    assert [c["resp"].get("code") for c in env.backend.rt("verify")] == ["code_wrong"]
+    page.locator(RQ["otp"] % 0).click()
+    for d in good:
+        page.keyboard.press(d)
+        page.wait_for_timeout(60)
+    page.wait_for_timeout(1500)
+    if not has(page, TXT["sent_he"]) and page.locator(RQ["verify"]).count() and page.locator(RQ["verify"]).is_visible():
+        page.click(RQ["verify"])
+        page.wait_for_timeout(1000)
+    seq = [c["resp"].get("code") or "ok" for c in env.backend.rt("verify")]
+    assert has(page, TXT["sent_he"]) and seq[-1] == "ok" and len(seq) == 2, \
+        "retyping the right code after one wrong code → verify results %r (request %s)" % (seq, "deleted" if not env.backend.requests else "kept")
 
 
 def test_c06_fourth_resend_refused(env):
