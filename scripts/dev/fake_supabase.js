@@ -46,11 +46,24 @@
       const i=s.kv.findIndex(r=>r.trip_id===p.trip_id&&r.key===p.key);const row={trip_id:p.trip_id,key:p.key,value:p.value,updated_by:uid,updated_at:new Date().toISOString()};if(i>-1)s.kv[i]=row;else s.kv.push(row);save(s);return{data:null,error:null}}
      if(q.op==='delete'){const w=myTrips(['manager','editor']);const del=s.kv.filter(r=>w.includes(r.trip_id)&&q.filters.every(f=>f(r)));s.kv=s.kv.filter(r=>!del.includes(r));save(s);return{data:del.map(r=>({key:r.key})),error:null}}
     }
+    /* CHANGE 2026-10-27 F21-DEVFAKE-01: new branch (no alpha.7.2 equivalent): own platform_admins row (s.admins = [uid…]). */
+    if(table==='platform_admins'){const rows=(s.admins||[]).includes(uid)?[{user_id:uid}]:[];const f=rows.filter(r=>q.filters.every(fn=>fn(r)));return{data:q.single?(f[0]||null):f,error:null}}
     return{data:null,error:{message:'unknown table'}};
    }
    return b;
   }
-  return{auth,from};
+  /* CHANGE 2026-10-27 F21-DEVFAKE-02: new (the client had no rpc before; existing calls are unchanged). rpc('admin_trip_requests')
+     answers the F21 contract from sessionStorage state {admins, requests, mail_today, cap}: pending requests only, raises
+     not_platform_admin (42501) for anyone else; any other function → PGRST202 (not found). */
+  async function rpc(fn,args){
+   log({op:'rpc',fn:String(fn)});
+   if(String(fn)!=='admin_trip_requests')return{data:null,error:{code:'PGRST202',message:'Could not find the function public.'+fn}};
+   const s=load();
+   if(!uid||!(s.admins||[]).includes(uid))return{data:null,error:{code:'42501',message:'not_platform_admin'}};
+   const reqs=(s.requests||[]).filter(r=>!r.status||r.status==='pending').map(r=>{const x=Object.assign({manages:[],active_invite:null},r);delete x.status;return x});
+   return{data:{cap:Number(s.cap)||50,mail_today:Number(s.mail_today)||0,requests:reqs},error:null};
+  }
+  return{auth,from,rpc};
  }
  window.supabase={createClient};
 })();

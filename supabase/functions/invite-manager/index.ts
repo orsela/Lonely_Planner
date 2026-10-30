@@ -1,4 +1,14 @@
-// Plan_Travel Edge Function `invite-manager` · version 3.0.0-alpha.4.1 · F04 (first version: F03)
+// Plan_Travel Edge Function `invite-manager` · version 3.0.0-alpha.8.0 · F21 (first version: F03)
+// CHANGE 2026-10-27 F21-FN-10: what changed from 3.0.0-alpha.4.1 (docs/F21_spec.md §3.2, all additive):
+//   (1) two new admin actions (same requireAdmin): `approve_request {request_id, draft_name}` → new token →
+//       rpc request_approve → invite email in the invite's lang → on send failure rpc request_approve_undo + email_failed;
+//       `reject_request {request_id, send_mail}` → rpc request_reject → when the database says mail:true the polite reject
+//       email in the request's lang (failure → {ok:true, mail_skipped:'email_failed'}, the reject stands);
+//   (2) renderInviteEmail gains an optional `lang` (+ `greetName`): 'he'/absent = the alpha.4.1 output byte for byte,
+//       'en' = the English template (artboard F21_InviteEmailEN); new renderRejectEmail (§5.1);
+//   (3) `resend` uses the invite's stored `lang` (column added by 0016_f21.sql); `create` is unchanged (Hebrew,
+//       invite_exists kept — D12 is approval-only); (4) Deps gains an optional `rpc` (service-role RPC; production wiring
+//       below); (5) error code `request_closed`. Nothing else changed.
 // CHANGE 2026-10-12 F04-FN-05: APP_URL hardening + `check` returns the invite's email (docs/F04_spec.md §3.2).
 //   What changed from 3.0.0-alpha.3.7: (1) the APP_URL secret is used only if it parses as a URL, starts with https://
 //   and has a host; otherwise DEFAULT_APP_URL is used and ONE log line `app_url_invalid_fallback` is written (never the
@@ -25,7 +35,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.4
 // =====================================================================================================
 // 1. Pure helpers
 // =====================================================================================================
-export const FN_VERSION = "3.0.0-alpha.4.1"; // CHANGE 2026-10-12 F04-NAME-01: app display name → Lonely Planner (was "3.0.0-alpha.4.0"); // CHANGE 2026-10-12 F04-FN-05: APP_URL hardening + check.email (was "3.0.0-alpha.3.7"); // CHANGE 2026-10-10 F03-LAND-05: link via /invite/ bridge; F03-LAND-03: ?invite=1 in the link; F03-MAIL-04: own MIME+SMTP (denomailer removed); F03-MAIL-03: subject pre-encoded; F03-MAIL-02: redesigned invite email; F03-FN-03: mailer error logging; // CHANGE 2026-10-09 F03-FN-02: bumped for the startServer()/main.ts entry split
+export const FN_VERSION = "3.0.0-alpha.8.0"; // CHANGE 2026-10-27 F21-FN-10: F21 approve/reject actions + English template (was "3.0.0-alpha.4.1"); // CHANGE 2026-10-12 F04-NAME-01: app display name → Lonely Planner (was "3.0.0-alpha.4.0"); // CHANGE 2026-10-12 F04-FN-05: APP_URL hardening + check.email (was "3.0.0-alpha.3.7"); // CHANGE 2026-10-10 F03-LAND-05: link via /invite/ bridge; F03-LAND-03: ?invite=1 in the link; F03-MAIL-04: own MIME+SMTP (denomailer removed); F03-MAIL-03: subject pre-encoded; F03-MAIL-02: redesigned invite email; F03-FN-03: mailer error logging; // CHANGE 2026-10-09 F03-FN-02: bumped for the startServer()/main.ts entry split
 export const INVITE_TTL_DAYS = 7;
 export const DEFAULT_APP_URL = "https://orsela.github.io/Lonely_Planner/app/"; // CHANGE 2026-10-12 F04-NAME-02: was /Plan_Travel/app/ (repo renamed)
 export const FALLBACK_INVITER = "מנהל המערכת";
@@ -36,7 +46,8 @@ const DAY_MS = 86_400_000;
 /** Fixed error codes (translated by the client dictionary). */
 export type ErrorCode =
   | "not_platform_admin" | "invalid_request" | "invalid_email" | "invalid_name" | "invite_exists"
-  | "invite_not_found" | "invite_closed" | "invite_used" | "email_failed" | "server_error" | "method_not_allowed";
+  | "invite_not_found" | "invite_closed" | "invite_used" | "email_failed" | "server_error" | "method_not_allowed"
+  | "request_closed"; // CHANGE 2026-10-27 F21-FN-10: + request_closed (approve_request / reject_request on a handled request)
 
 export function normalizeEmail(v: unknown): string {
   return typeof v === "string" ? v.trim().toLowerCase() : "";
@@ -144,7 +155,10 @@ export function resolveAppUrl(v: string | undefined | null): { url: string; fall
  *  copy-paste fallback link. What changed from 3.0.0-alpha.3.2: copy and layout only (RTL HTML + plain text, no tracking
  *  pixels, no remote images); the link, expiry and data are unchanged. */
 export const BUTTON_TEXT = "קבלת ההזמנה והקמת הטיול";
-export function renderInviteEmail(p: { to: string; inviter: string; draftName: string | null; link: string; expiresAt: string }): MailMessage {
+// CHANGE 2026-10-27 F21-FN-11: + optional `lang` / `greetName` (D11b). What changed from 3.0.0-alpha.4.1: lang 'en' returns
+//   renderInviteEmailEn(); with lang absent or 'he' the code below is untouched, so the output is byte-identical (test.ts).
+export function renderInviteEmail(p: { to: string; inviter: string; draftName: string | null; link: string; expiresAt: string; lang?: string; greetName?: string | null }): MailMessage {
+  if (p.lang === "en") return renderInviteEmailEn(p);
   const exp = fmtDate(p.expiresAt);
   const name = p.draftName ? `"${p.draftName}"` : "";
   const headline = p.draftName ? `${p.inviter} מזמין אותך לנהל את הטיול ${name}` : `${p.inviter} מזמין אותך לנהל טיול חדש`;
@@ -194,6 +208,73 @@ export function renderInviteEmail(p: { to: string; inviter: string; draftName: s
   return { to: p.to, subject: EMAIL_SUBJECT, text, html };
 }
 
+// CHANGE 2026-10-27 F21-FN-11: new (no previous version). English invite email for an approved English request (artboard
+//   F21_InviteEmailEN, D11b): greeting by requester name, approved line, trip name, button "Accept and set up the trip" → the
+//   same /invite/ link as F03 (same link builder), the Hebrew-for-now note, validity dd/mm/yyyy, footer. LTR.
+export const EMAIL_SUBJECT_EN = "Your trip request was approved";
+export const BUTTON_TEXT_EN = "Accept and set up the trip";
+export function renderInviteEmailEn(p: { to: string; draftName: string | null; link: string; expiresAt: string; greetName?: string | null }): MailMessage {
+  const exp = fmtDate(p.expiresAt);
+  const who = (p.greetName || "").trim();
+  const hi = who ? `Hi ${who},` : "Hi,";
+  const trip = p.draftName ? `the trip "${p.draftName}"` : "a new trip";
+  const tripHtml = p.draftName ? `the trip <b style="white-space:nowrap">"${htmlEscape(p.draftName)}"</b>` : "a new trip";
+  const approved = `Your request was approved. You're invited to set up ${trip} and manage its group: invite your fellow travelers and decide who can edit and who can only view.`;
+  const approvedHtml = `Your request was approved. You're invited to set up ${tripHtml} and manage its group: invite your fellow travelers and decide who can edit and who can only view.`;
+  const note = "Heads-up: the setup screens and the app are in Hebrew for now.";
+  const valid = `This link is personal, valid until ${exp}, and meant for this address only. Not expecting it? You can ignore this email.`;
+  const footer = "Sent by Lonely Planner. Please don't reply to this email.";
+  const text = [hi, "", approved, "", `${BUTTON_TEXT_EN}:`, p.link, "", note, "", valid, "", footer].join("\n");
+  const L = htmlEscape(p.link);
+  const html = `<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${htmlEscape(EMAIL_SUBJECT_EN)}</title></head>` +
+    `<body dir="ltr" style="margin:0;padding:16px 12px;background:#eceae3;color:#17211b;font-family:Arial,'Segoe UI',sans-serif">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden" dir="ltr">` +
+    `<tr><td style="background:#0f6b4f;color:#ffffff;padding:20px;text-align:left"><div style="font-size:20px;font-weight:900">Lonely Planner</div><div style="font-size:13px;opacity:.9">Plan together, travel together</div></td></tr>` +
+    `<tr><td style="padding:24px 20px 8px;text-align:left">` +
+    `<h1 style="margin:0 0 10px;font-size:20px;line-height:1.35">${htmlEscape(hi)}</h1>` +
+    `<p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#3a443d">${approvedHtml}</p>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="border-radius:14px;background:#0f6b4f">` +
+    `<a href="${L}" target="_blank" rel="noopener" style="display:block;padding:16px 12px;font-size:17px;font-weight:800;color:#ffffff;text-decoration:none;text-align:center">${BUTTON_TEXT_EN}</a>` +
+    `</td></tr></table>` +
+    `<p style="margin:16px 0 0;padding:10px 12px;background:#eef4fb;border:1px solid #cddcf0;border-radius:12px;font-size:13px;line-height:1.5;color:#1d3f6b">${htmlEscape(note)}</p>` +
+    `</td></tr>` +
+    `<tr><td style="padding:16px 20px 20px;text-align:left;font-size:12px;line-height:1.6;color:#5f6861">Button not working? Copy this link into your browser:<br>` +
+    `<a href="${L}" target="_blank" rel="noopener" style="word-break:break-all;color:#0f6b4f">${L}</a><br><br>` +
+    `${htmlEscape(valid)}</td></tr>` +
+    `<tr><td style="border-top:1px solid #efeee8;padding:12px 20px;font-size:11.5px;color:#5f6861;text-align:left">${htmlEscape(footer)}</td></tr>` +
+    `</table></body></html>`;
+  return { to: p.to, subject: EMAIL_SUBJECT_EN, text, html };
+}
+
+// CHANGE 2026-10-27 F21-FN-12: new (no previous version). Polite reject email (spec §5.1, artboard F21_Reject): no links,
+//   no reason, in the request's language.
+export const REJECT_TEXT: Record<"he" | "en", { subject: string; body: string; footer: string }> = {
+  he: {
+    subject: "הבקשה שלך ל-Lonely Planner",
+    body: "תודה על ההתעניינות ב-Lonely Planner. כרגע לא נוכל לפתוח את הטיול שלך. אפשר לשלוח בקשה חדשה בעתיד.",
+    footer: "נשלח ממערכת Lonely Planner. אין להשיב למייל זה.",
+  },
+  en: {
+    subject: "Your Lonely Planner request",
+    body: "Thanks for your interest in Lonely Planner. We can't open your trip right now. You're welcome to send a new request in the future.",
+    footer: "Sent by Lonely Planner. Please don't reply to this email.",
+  },
+};
+export function renderRejectEmail(p: { to: string; lang?: string }): MailMessage {
+  const l: "he" | "en" = p.lang === "en" ? "en" : "he";
+  const t = REJECT_TEXT[l];
+  const dir = l === "he" ? "rtl" : "ltr", align = l === "he" ? "right" : "left";
+  const text = [t.body, "", t.footer].join("\n");
+  const html = `<!doctype html><html lang="${l}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${htmlEscape(t.subject)}</title></head>` +
+    `<body dir="${dir}" style="margin:0;padding:16px 12px;background:#eceae3;color:#17211b;font-family:Arial,'Segoe UI',sans-serif">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden" dir="${dir}">` +
+    `<tr><td style="background:#0f6b4f;color:#ffffff;padding:20px;text-align:${align}"><div style="font-size:20px;font-weight:900">Lonely Planner</div></td></tr>` +
+    `<tr><td style="padding:22px 20px;text-align:${align};font-size:15px;line-height:1.6;color:#3a443d">${htmlEscape(t.body)}</td></tr>` +
+    `<tr><td style="border-top:1px solid #efeee8;padding:12px 20px;font-size:11.5px;color:#5f6861;text-align:${align}">${htmlEscape(t.footer)}</td></tr>` +
+    `</table></body></html>`;
+  return { to: p.to, subject: t.subject, text, html };
+}
+
 // =====================================================================================================
 // 2. Request logic (dependencies injected)
 // =====================================================================================================
@@ -210,6 +291,7 @@ export interface InviteRow {
   send_count: number;
   last_sent_at: string | null;
   created_at: string;
+  lang?: string | null; // CHANGE 2026-10-27 F21-FN-10: column added by 0016_f21.sql ('he' | 'en'); absent = 'he'
 }
 
 export interface NewInvite {
@@ -250,6 +332,9 @@ export interface Deps {
   random(n: number): Uint8Array;
   appUrl: string; // CHANGE 2026-10-12 F04-FN-05: checked with resolveAppUrl() in makeHandler
   log(event: string, fields?: Record<string, unknown>): void;
+  /** CHANGE 2026-10-27 F21-FN-10: service-role RPC (returns `data`, throws on a database error). Needed by approve_request /
+   *  reject_request and the English resend greeting; optional so alpha.4 callers/tests keep working. */
+  rpc?(name: string, args: Record<string, unknown>): Promise<unknown>;
 }
 
 class HttpError extends Error {
@@ -360,8 +445,15 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     const expires = plusDays(now, INVITE_TTL_DAYS);
     // Send first with the NEW token; the row is changed only after the email went out, so a failed send leaves the
     // previous token (and link) valid — the "transaction" of spec §3 without a multi-statement DB transaction.
+    // CHANGE 2026-10-27 F21-FN-13: the email uses the invite's stored lang (F21 §3.2); for 'en' the greeting name is the
+    //   request's name from find_invite_for_email().prefill (absent → "Hi,"). 'he' invites: exactly the alpha.4.1 call.
+    const lang = inv.lang === "en" ? "en" : "he";
+    const greetName = lang === "en" ? await requesterName(inv.email) : null;
     try {
-      await deps.sendMail(renderInviteEmail({
+      await deps.sendMail(renderInviteEmail(lang === "en" ? {
+        to: inv.email, inviter: inv.inviter_name || FALLBACK_INVITER, draftName: inv.draft_name,
+        link: inviteLink(appUrl, token), expiresAt: expires, lang, greetName,
+      } : {
         to: inv.email, inviter: inv.inviter_name || FALLBACK_INVITER, draftName: inv.draft_name,
         link: inviteLink(appUrl, token), expiresAt: expires,
       }));
@@ -392,6 +484,93 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     return { ok: true, invite_id: inv.id };
   }
 
+  // ---------------------------------------------------------------------------------------------------
+  // CHANGE 2026-10-27 F21-FN-10: new (no previous version) — F21 approve / reject (spec §1.8, §1.9, §3.2)
+  // ---------------------------------------------------------------------------------------------------
+  async function callRpc(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (!deps.rpc) throw new Error("rpc not configured");
+    let d = await deps.rpc(name, args);
+    if (typeof d === "string") { try { d = JSON.parse(d); } catch { /* not JSON */ } }
+    if (!d || typeof d !== "object" || Array.isArray(d)) throw new Error("rpc_bad_result");
+    return d as Record<string, unknown>;
+  }
+  function rpcRefusal(d: Record<string, unknown>): never {
+    const code = String(d.error);
+    if (code === "request_closed") throw new HttpError(409, "request_closed");
+    if (code === "not_platform_admin") throw new HttpError(403, "not_platform_admin");
+    if (code === "invalid_request" && d.field === "draft_name") throw new HttpError(400, "invalid_name");
+    if (code === "invalid_request") throw new HttpError(400, "invalid_request");
+    throw new Error("rpc_refusal");
+  }
+  async function requesterName(email: string): Promise<string | null> {
+    if (!deps.rpc) return null;
+    try {
+      const d = await callRpc("find_invite_for_email", { p_email: email });
+      const pf = d.prefill as Record<string, unknown> | undefined;
+      return pf && typeof pf.name === "string" ? pf.name : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function actApproveRequest(uid: string, body: Record<string, unknown>) {
+    const rid = typeof body.request_id === "string" ? body.request_id : "";
+    if (!UUID_RE.test(rid)) throw new HttpError(400, "invalid_request");
+    const draft = cleanDraftName(body.draft_name);
+    if (draft === undefined) throw new HttpError(400, "invalid_name");
+    let inviter = (await deps.store.inviterName(uid)) || FALLBACK_INVITER;
+    inviter = inviter.trim().slice(0, 40) || FALLBACK_INVITER;
+    const token = makeToken(deps.random);
+    const d = await callRpc("request_approve", {
+      p_admin: uid, p_request: rid, p_token_hash: await sha256Hex(token), p_draft: draft, p_inviter: inviter,
+    });
+    if ("error" in d) rpcRefusal(d);
+    const inviteId = String(d.invite_id || ""), revoked = typeof d.revoked_invite_id === "string" ? d.revoked_invite_id : null;
+    const email = String(d.email || ""), lang = d.lang === "en" ? "en" : "he", expiresAt = String(d.expires_at || "");
+    if (!UUID_RE.test(inviteId) || !email || !expiresAt) throw new Error("rpc_bad_result");
+    const link = inviteLink(appUrl, token);
+    try {
+      await deps.sendMail(lang === "en"
+        ? renderInviteEmail({ to: email, inviter, draftName: draft, link, expiresAt, lang, greetName: typeof d.name === "string" ? d.name : null })
+        : renderInviteEmail({ to: email, inviter, draftName: draft, link, expiresAt }));
+    } catch (e) {
+      deps.log("email_error", mailErr(e));
+      try {
+        await callRpc("request_approve_undo", { p_invite: inviteId, p_revoked: revoked, p_request: rid });
+      } catch (u) {
+        deps.log("undo_error", { message: u instanceof Error ? u.name : "unknown" });
+      }
+      throw new HttpError(502, "email_failed");
+    }
+    deps.log("approve_request", { request: rid, invite: inviteId, replaced: !!revoked, lang });
+    return { ok: true, request_id: rid, invite_id: inviteId, email, draft_name: draft, expires_at: expiresAt, lang, revoked_invite_id: revoked };
+  }
+
+  async function actRejectRequest(uid: string, body: Record<string, unknown>) {
+    const rid = typeof body.request_id === "string" ? body.request_id : "";
+    if (!UUID_RE.test(rid)) throw new HttpError(400, "invalid_request");
+    if (body.send_mail !== undefined && typeof body.send_mail !== "boolean") throw new HttpError(400, "invalid_request");
+    const d = await callRpc("request_reject", { p_admin: uid, p_request: rid, p_mail: body.send_mail === true });
+    if ("error" in d) rpcRefusal(d);
+    if (d.mail === true) {
+      try {
+        await deps.sendMail(renderRejectEmail({ to: String(d.email || ""), lang: String(d.lang || "he") }));
+      } catch (e) {
+        deps.log("email_error", mailErr(e));
+        deps.log("reject_request", { request: rid, mail: "email_failed" });
+        return { ok: true, request_id: rid, mail_sent: false, mail_skipped: "email_failed" };
+      }
+      deps.log("reject_request", { request: rid, mail: "sent" });
+      return { ok: true, request_id: rid, mail_sent: true };
+    }
+    if (d.reason === "daily_limit") {
+      deps.log("reject_request", { request: rid, mail: "daily_limit" });
+      return { ok: true, request_id: rid, mail_sent: false, mail_skipped: "daily_limit" };
+    }
+    deps.log("reject_request", { request: rid, mail: "none" });
+    return { ok: true, request_id: rid, mail_sent: false };
+  }
+
   async function actCheck(body: Record<string, unknown>) {
     const INVALID = { valid: false };
     const token = typeof body.token === "string" ? body.token : "";
@@ -419,9 +598,12 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
       }
       action = typeof body.action === "string" ? body.action : "";
       if (action === "check") return json(origin, 200, await actCheck(body));
-      if (!["create", "resend", "revoke"].includes(action)) throw new HttpError(400, "invalid_request");
+      // CHANGE 2026-10-27 F21-FN-10: + approve_request / reject_request (was create / resend / revoke only)
+      if (!["create", "resend", "revoke", "approve_request", "reject_request"].includes(action)) throw new HttpError(400, "invalid_request");
       const uid = await requireAdmin(req);
-      const out = action === "create" ? await actCreate(uid, body) : action === "resend" ? await actResend(body) : await actRevoke(body);
+      const out = action === "create" ? await actCreate(uid, body) : action === "resend" ? await actResend(body)
+        : action === "approve_request" ? await actApproveRequest(uid, body)
+        : action === "reject_request" ? await actRejectRequest(uid, body) : await actRevoke(body);
       return json(origin, 200, out);
     } catch (e) {
       if (e instanceof HttpError) {
@@ -438,7 +620,7 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
 // =====================================================================================================
 // 3. Production wiring
 // =====================================================================================================
-const COLS = "id,email,token_hash,draft_name,inviter_name,expires_at,used_at,revoked_at,opened_at,send_count,last_sent_at,created_at";
+const COLS = "id,email,token_hash,draft_name,inviter_name,expires_at,used_at,revoked_at,opened_at,send_count,last_sent_at,created_at,lang"; // CHANGE 2026-10-27 F21-FN-10: + lang
 
 export function supabaseStore(db: SupabaseClient): InviteStore {
   const t = () => db.from("manager_invites");
@@ -607,6 +789,12 @@ export function startServer(): void {
     now: () => new Date(),
     random: (n) => crypto.getRandomValues(new Uint8Array(n)),
     appUrl: Deno.env.get("APP_URL") as string, // CHANGE 2026-10-12 F04-FN-05: raw secret, checked in makeHandler (was env("APP_URL") || DEFAULT_APP_URL)
+    // CHANGE 2026-10-27 F21-FN-10: service-role RPC for the F21 actions (request_approve / _undo / request_reject, find_invite_for_email)
+    async rpc(name, args) {
+      const { data, error } = await db.rpc(name, args);
+      if (error) throw error;
+      return data;
+    },
     // only event names, invite ids and error codes — never tokens, hashes, emails or bodies
     log: (event, fields) => console.log(JSON.stringify({ fn: "invite-manager", v: FN_VERSION, event, ...(fields || {}) })),
   });

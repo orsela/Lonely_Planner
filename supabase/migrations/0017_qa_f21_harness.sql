@@ -216,7 +216,7 @@ begin
     r := qa.f21_rec(r, 7, '§2.2/2.3 attempts kind / mail_log kind outside the list → check violation', 'error 23514/error 23514',
       qa.f21_try('insert into private.request_attempts (kind) values (''login'')') || '/' ||
       qa.f21_try('insert into private.mail_log (kind) values (''invite'')'));
-    r := qa.f21_rec(r, 8, '§2.4 manager_invites.lang defaults to he, rejects fr; request_id FK on delete set null', '''he''::text/error 23514/a',
+    r := qa.f21_rec(r, 8, '§2.4 manager_invites.lang defaults to he, rejects fr; request_id FK on delete set null', '''he''::text/error 23514/n',
       (select c.column_default from information_schema.columns c where c.table_schema = 'public' and c.table_name = 'manager_invites' and c.column_name = 'lang') || '/' ||
       qa.f21_try('insert into public.manager_invites (email, token_hash, expires_at, lang) values (''f21-x@qa.invalid'', ''f21-h-x'', now(), ''fr'')') || '/' ||
       coalesce((select c.confdeltype::text from pg_catalog.pg_constraint c where c.conname = 'manager_invites_request_id_fkey'), '∅'));
@@ -342,8 +342,8 @@ begin
     res2 := qa.f21_verify(q7, qa.f21_h(q7::text || '555555'), qa.f21_h('ip-B'));
     r := qa.f21_rec(r, 207, '§4 20th wrong verify per ip in an hour still answered; 21st → rate_limited (right code too)', 'code_wrong/rate_limited/unverified',
       qa.f21_e(res) || '/' || qa.f21_e(res2) || '/' || qa.f21_st(q7));
-    r := qa.f21_rec(r, 208, '§4 a different ip is not limited', 'ok/pending',
-      qa.f21_e(qa.f21_verify(q7, qa.f21_h(q7::text || '555555'), qa.f21_h('ip-C'))) || '/' || qa.f21_st(q7));
+    res := qa.f21_verify(q7, qa.f21_h(q7::text || '555555'), qa.f21_h('ip-C'));
+    r := qa.f21_rec(r, 208, '§4 a different ip is not limited', 'ok/pending', qa.f21_e(res) || '/' || qa.f21_st(q7));
 
     -- ================= 3xx · request_resend / request_mail_failed =================
     q8 := gen_random_uuid();
@@ -368,8 +368,8 @@ begin
       act := act || qa.f21_e(qa.f21_resend(q8, qa.f21_h(q8::text || '88888' || k))) || ',';
     end loop;
     r := qa.f21_rec(r, 304, '§4 resends 2 and 3 ok, the 4th → rate_limited', 'ok,ok,rate_limited,', act);
-    r := qa.f21_rec(r, 305, 'the newest code verifies', 'ok/pending',
-      qa.f21_e(qa.f21_verify(q8, qa.f21_h(q8::text || '888883'), null)) || '/' || qa.f21_st(q8));
+    res := qa.f21_verify(q8, qa.f21_h(q8::text || '888883'), null);
+    r := qa.f21_rec(r, 305, 'the newest code verifies', 'ok/pending', qa.f21_e(res) || '/' || qa.f21_st(q8));
     r := qa.f21_rec(r, 306, '§2.6 resend on a pending / unknown request → request_unknown', 'request_unknown/request_unknown',
       qa.f21_e(qa.f21_resend(q8, qa.f21_h('z'))) || '/' || qa.f21_e(qa.f21_resend(gen_random_uuid(), qa.f21_h('z'))));
     -- mail failed on start: the row and its code mail row go
@@ -385,10 +385,10 @@ begin
     n := qa.f21_mails();
     perform qa.f21_resend(q9, qa.f21_h(q9::text || '654321'));
     res := qa.f21_failed(q9, 'resend');
+    act := (qa.f21_mails() = n)::text || '/' || (select q.resend_count::text from private.trip_requests q where q.id = q9);
+    res2 := qa.f21_resend(q9, qa.f21_h(q9::text || '111222'));
     r := qa.f21_rec(r, 311, '§3.1 email failed on resend → mail row removed, resend_count back to 0, a new resend allowed at once',
-      'ok/true/0/ok', qa.f21_e(res) || '/' || (qa.f21_mails() = n)::text || '/' ||
-      (select q.resend_count::text from private.trip_requests q where q.id = q9) || '/' ||
-      qa.f21_e(qa.f21_resend(q9, qa.f21_h(q9::text || '111222'))));
+      'ok/true/0/ok', qa.f21_e(res) || '/' || act || '/' || qa.f21_e(res2));
     act := qa.f21_e(qa.f21_failed(q9, 'drop'));
     res := qa.f21_failed(q8, 'start');
     r := qa.f21_rec(r, 312, 'request_mail_failed: bad action → invalid_request; ''start'' never deletes a pending row', 'invalid_request/ok/pending',
@@ -524,8 +524,8 @@ begin
       values (gen_random_uuid(), 'he', 'בלי', 'f21-plainreq@qa.invalid', '{GR}', 2, 'pending', now() - interval '1 day') returning id into q10;
     r := qa.f21_rec(r, 701, 'criterion 17: admin_trip_requests as a non-admin → not_platform_admin (42501); anon → 42501',
       'error 42501/error 42501',
-      qa.f21_val(u_out, 'authenticated', 'select public.admin_trip_requests()::text') || '/' ||
-      qa.f21_val(null, 'anon', 'select public.admin_trip_requests()::text'));
+      left(qa.f21_val(u_out, 'authenticated', 'select public.admin_trip_requests()::text'), 11) || '/' ||
+      left(qa.f21_val(null, 'anon', 'select public.admin_trip_requests()::text'), 11));
     r := qa.f21_rec(r, 702, 'non-admin refusal message is not_platform_admin', 'error 42501 not_platform_admin',
       qa.f21_val(u_out, 'authenticated', 'select public.admin_trip_requests()::text'));
     v := qa.f21_val(u_adm, 'authenticated', 'select public.admin_trip_requests()::text');
@@ -539,7 +539,7 @@ begin
       (select bool_and(a.ok)::text from (select (e->>'verified_at')::timestamptz >= lag((e->>'verified_at')::timestamptz, 1, '-infinity') over (order by o) as ok
                                      from pg_catalog.jsonb_array_elements(res->'requests') with ordinality x(e, o)) a) || '/' ||
       (select string_agg(k2, ',' order by k2) from pg_catalog.jsonb_object_keys(res->'requests'->0) k2) || '/' ||
-      (v ~ '(code_hash|ip_hash|decided|' || qa.f21_h('tok-mgr') || ')')::text);
+      (v ~ ('(code_hash|ip_hash|decided|' || qa.f21_h('tok-mgr') || ')'))::text);
     r := qa.f21_rec(r, 705, 'D6 markers: manager''s email (any case in auth) → manages [trip]; active invite {id, draft_name, last_sent_at, expires_at}',
       'en/["F21 קיים"]/איטליה/draft_name,expires_at,id,last_sent_at/["IT", "FR"]/' || m2 || '-01/5/hi',
       (select (e->>'lang') || '/' || (e->'manages')::text || '/' || (e#>>'{active_invite,draft_name}') || '/' ||
@@ -605,8 +605,8 @@ begin
        from pg_catalog.pg_class c join pg_catalog.pg_namespace s on s.oid = c.relnamespace, unnest(array['anon', 'authenticated']) g
       where s.nspname = 'private' and c.relname in ('trip_requests', 'request_attempts', 'mail_log')));
   r := qa.f21_rec(r, 902, 'criterion 17: a direct select as authenticated / anon → permission denied', 'error 42501/error 42501',
-    qa.f21_val('f2100000-0000-4000-8000-0000000000a1', 'authenticated', 'select count(*)::text from private.trip_requests') || '/' ||
-    qa.f21_val(null, 'anon', 'select count(*)::text from private.mail_log'));
+    left(qa.f21_val('f2100000-0000-4000-8000-0000000000a1', 'authenticated', 'select count(*)::text from private.trip_requests'), 11) || '/' ||
+    left(qa.f21_val(null, 'anon', 'select count(*)::text from private.mail_log'), 11));
   r := qa.f21_rec(r, 903, '§2.1–2.3 RLS on for the 3 tables, no policies in private', 'true/0',
     (select bool_and(c.relrowsecurity)::text from pg_catalog.pg_class c join pg_catalog.pg_namespace s on s.oid = c.relnamespace
       where s.nspname = 'private' and c.relname in ('trip_requests', 'request_attempts', 'mail_log')) || '/' ||

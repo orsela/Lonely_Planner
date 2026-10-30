@@ -249,14 +249,15 @@ def main():
         to_admin(dev)
         check("tabs shown", page.locator("#ptReqTabs").count() == 1)
         check("default tab = requests (N>0)", page.locator("#ptReqTabReq").get_attribute("aria-pressed") == "true")
-        check("tab labels 'בקשות · 4' / 'קבוצות והזמנות · 3'", text(page, "#ptReqTabReq") == "בקשות · 4" and text(page, "#ptReqTabGrp") == "קבוצות והזמנות · 3",
+        check("tab labels 'בקשות · 4' / 'קבוצות והזמנות · 4' (2 trips + 2 pending invites)", text(page, "#ptReqTabReq") == "בקשות · 4" and text(page, "#ptReqTabGrp") == "קבוצות והזמנות · 4",
               (text(page, "#ptReqTabReq"), text(page, "#ptReqTabGrp")))
         m = text(page, "#ptReqMeter")
         check("meter '12 מתוך 50' + role=img", "12 מתוך 50" in m and page.locator("#ptReqMeter [role=img]").get_attribute("aria-label").startswith("12 מתוך 50"), m)
         cs = cards(page)
         check("4 cards, oldest first", [c["name"] for c in cs] == ["בדיקה4", "רון לוי", "Tom Baker", "דנה כהן"], [c["name"] for c in cs])
         by = {c["name"]: c for c in cs}
-        check("EN badge only on Tom", "EN" in by["Tom Baker"]["text"].split("\n")[0] and "EN" not in by["דנה כהן"]["text"].split("\n")[0])
+        enb = page.evaluate("()=>[...document.querySelectorAll('#admin [data-request] .pt-f21-en')].map(e=>e.closest('[data-request]').querySelector('.pt-nm').innerText)")
+        check("EN badge only on Tom", enb == ["Tom Baker"], enb)
         check("Tom: 'עוד לא יודעים מתי · 2 מטיילים'", "עוד לא יודעים מתי · 2 מטיילים" in by["Tom Baker"]["text"])
         check("Dana: flags + names, month, travellers, note", "🇯🇵 יפן · 🇰🇷 דרום קוריאה" in by["דנה כהן"]["text"] and "אפריל 2027 · 5 מטיילים" in by["דנה כהן"]["text"]
               and '"משפחה עם 3 ילדים' in by["דנה כהן"]["text"], by["דנה כהן"]["text"])
@@ -290,7 +291,7 @@ def main():
         pre = text(page, "#ptApPre")
         check("pre-fill box rows", all(s in pre for s in ("שם בקבוצה", "דנה כהן", "🇯🇵 יפן · 🇰🇷 דרום קוריאה", "אפריל 2027 (תאריכים בוחרים באשף)", "עברית – כמו הבקשה")), pre)
         check("no active-invite box", page.locator("#ptApActive").count() == 0)
-        check("send label with email", text(page, "#ptApSend") == "אישור ושליחה אל dana@example.com", text(page, "#ptApSend"))
+        check("send label with email", " ".join(text(page, "#ptApSend").split()) == "אישור ושליחה אל dana@example.com", text(page, "#ptApSend"))
         check("sheet touch ≥44", not small_targets(page, "#ptSheet"), small_targets(page, "#ptSheet"))
         check("390: no h-scroll", not hscroll(page))
         shot(page, "03_approve")
@@ -302,7 +303,7 @@ def main():
         check("one approve_request with the edited name", len(a) == 1 and a[0]["body"] == {"action": "approve_request", "request_id": ids["dana"], "draft_name": "יפן וקוריאה 2027"}, a and a[0]["body"])
         check("card left the list", page.locator('[data-request="%s"]' % ids["dana"]).count() == 0)
         check("tab count 3", text(page, "#ptReqTabReq") == "בקשות · 3", text(page, "#ptReqTabReq"))
-        check("groups tab gained the invite (count 4)", text(page, "#ptReqTabGrp") == "קבוצות והזמנות · 4", text(page, "#ptReqTabGrp"))
+        check("groups tab gained the invite (count 5)", text(page, "#ptReqTabGrp") == "קבוצות והזמנות · 5", text(page, "#ptReqTabGrp"))
 
         print("approve with an active invite (D12) + email failure:")
         page.locator('[data-f21-approve="%s"]' % ids["ron"]).click()
