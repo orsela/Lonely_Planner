@@ -43,3 +43,7 @@ deno test --allow-env supabase/functions/create-trip/test.ts                    
 deno test --allow-env --import-map=supabase/functions/create-trip/test_import_map.json \
           supabase/functions/create-trip/test.ts                                              # offline (stub for supabase-js)
 ```
+
+<!-- CHANGE 2026-10-27 F21-FN-23: F21 note added. -->
+**F21 (3.0.0-alpha.8.0):** `lookup` adds `prefill: {name, countries, month ("YYYY-MM-01"|null), lang}` when the invite came
+from an approved request (from `find_invite_for_email`, migration `0016_f21.sql`); the key is absent otherwise. Tests: `test_f21.ts`.

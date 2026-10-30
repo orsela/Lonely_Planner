@@ -1,11 +1,12 @@
 {
-  "_comment": "Lonely Planner QA · expected versions of the tree under test · version 1.0.1. CHANGE 2026-10-26 FIX-VER-03: app 3.0.0-alpha.7.1 → 3.0.0-alpha.7.2 (bug fixes). CHANGE 2026-10-26 QA-DEBT-01: new file (no previous version). The ONE place to bump on a release: the app (APP_VERSION / PT_VERSION) and each Edge Function's FN_VERSION as deployed on main 1403761. Read by tests/qa_refs.py (Python suites) and tests/f05/function_test.ts.",
-  "app": "3.0.0-alpha.7.2",
+  "_comment": "Lonely Planner QA · expected versions of the tree under test · version 1.0.2. CHANGE 2026-10-30 F21-VER-03: app 3.0.0-alpha.7.2 → 3.0.0-alpha.8; create-trip and invite-manager alpha.4.1 → alpha.8.0; request-trip added (alpha.8.0). CHANGE 2026-10-26 FIX-VER-03: app 3.0.0-alpha.7.1 → 3.0.0-alpha.7.2 (bug fixes). CHANGE 2026-10-26 QA-DEBT-01: new file (no previous version). The ONE place to bump on a release: the app (APP_VERSION / PT_VERSION) and each Edge Function's FN_VERSION as deployed on main 1403761. Read by tests/qa_refs.py (Python suites) and tests/f05/function_test.ts.",
+  "app": "3.0.0-alpha.8",
   "functions": {
     "join-trip": "3.0.0-alpha.7.0",
     "approve-member": "3.0.0-alpha.6.0",
     "manage-members": "3.0.0-alpha.7.0",
-    "create-trip": "3.0.0-alpha.4.1",
-    "invite-manager": "3.0.0-alpha.4.1"
+    "create-trip": "3.0.0-alpha.8.0",
+    "invite-manager": "3.0.0-alpha.8.0",
+    "request-trip": "3.0.0-alpha.8.0"
   }
 }

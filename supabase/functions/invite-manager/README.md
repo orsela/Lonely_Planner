@@ -62,3 +62,17 @@ The one remote import (`npm:@supabase/supabase-js@2.45.4`) is only used by the p
 at the bottom of `index.ts` (`import.meta.main`), so the stubs in `test_stubs/` never change what the tests exercise.
 Not covered offline: the real supabase-js query shapes in `supabaseStore()` and the real SMTP send — verified on the
 deployed function (spec §6.7).
+
+## F21 additions (3.0.0-alpha.8.0)
+
+<!-- CHANGE 2026-10-27 F21-FN-15: section added (what changed from alpha.4.1: two admin actions, English invite, reject mail). -->
+
+| action | auth | input | success (200) | errors |
+|---|---|---|---|---|
+| `approve_request` | admin JWT | `request_id`, `draft_name?` (≤80) | `{ok, request_id, invite_id, email, draft_name, expires_at, lang, revoked_invite_id}` | 400 `invalid_request` / `invalid_name`, 409 `request_closed`, 502 `email_failed` (nothing changed: new invite deleted, old one re-opened, request pending) |
+| `reject_request` | admin JWT | `request_id`, `send_mail` (boolean) | `{ok, request_id, mail_sent}` + `mail_skipped:'daily_limit'\|'email_failed'` when a chosen mail was not sent | 400 `invalid_request`, 409 `request_closed` |
+
+- The invite email follows the invite's `lang` (`he` = the alpha.4.1 template byte for byte; `en` = "Your trip request was
+  approved"). `resend` uses the stored `lang`; `create` is unchanged (Hebrew, `invite_exists` kept).
+- Needs migration `0016_f21.sql` (RPCs `request_approve`, `request_approve_undo`, `request_reject`, column `manager_invites.lang`).
+- Extra tests: `test_f21.ts` (same runners as `test.ts`).
