@@ -1,4 +1,7 @@
-// Plan_Travel F04 QA · create-trip + invite-manager black-box tests (Deno) · version 1.1.0
+// Plan_Travel F04 QA · create-trip + invite-manager black-box tests (Deno) · version 1.1.1
+// CHANGE 2026-10-30 F21-QA-06: 1.1.0 → 1.1.1: the hard-coded alpha.4.x FN_VERSION pins of CT-00, IM-00, NAME-02 and NAME-03
+//   now read tests/qa_versions.json (create-trip / invite-manager are 3.0.0-alpha.8.0 since F21, spec §3.2/§3.3), like the
+//   F05/F06 function tests. Nothing else changed.
 // CHANGE 2026-10-12 F04-QA: first version (no previous version).
 // CHANGE 2026-10-12 F04-QA-05: 1.0.0 → 1.1.0, alpha.4.2 (spec §8/§8.1): defaults moved to /Lonely_Planner/ (DEFAULT_JOIN,
 //   DEFAULT_APP, the IM-02 email-link check now expects /Lonely_Planner/invite/#invite=…); new NAME-01..03 cases (email
@@ -40,6 +43,10 @@ async function loadCT(joinUrl?: string | null): Promise<Any> {
 }
 const CT: Any = await loadCT(null);
 const IM: Any = await import(IM_PATH);
+// CHANGE 2026-10-30 F21-QA-06: expected versions from tests/qa_versions.json (was the literal 3.0.0-alpha.4.x / alpha.4.1)
+const QV: Any = JSON.parse(await (await import("node:fs/promises")).readFile(new URL("../qa_versions.json", import.meta.url), "utf8"));
+const WANT_CT = String(QV.functions["create-trip"]);
+const WANT_IM = String(QV.functions["invite-manager"]);
 
 // ---------------------------------------------------------------------------------------------------------------
 // assert helpers
@@ -131,9 +138,9 @@ const lookup = (mod: Any, jwt: string | null = JWT) => ct(mod, { action: "lookup
 // ---------------------------------------------------------------------------------------------------------------
 // CT · create-trip
 // ---------------------------------------------------------------------------------------------------------------
-T("CT-00 export surface: handler / setDeps / resetDeps / FN_VERSION 3.0.0-alpha.4.x", () => {
+T("CT-00 export surface: handler / setDeps / resetDeps / FN_VERSION = tests/qa_versions.json", () => {
   for (const k of ["handler", "setDeps", "resetDeps"]) ok(typeof CT[k] === "function", `export ${k} missing`);
-  ok(/^3\.0\.0-alpha\.4(\.\d+)?$/.test(String(CT.FN_VERSION)), "FN_VERSION is not 3.0.0-alpha.4.x: " + CT.FN_VERSION);
+  ok(String(CT.FN_VERSION) === WANT_CT, "FN_VERSION is not " + WANT_CT + ": " + CT.FN_VERSION); // CHANGE 2026-10-30 F21-QA-06: was /^3\.0\.0-alpha\.4(\.\d+)?$/
 });
 
 T("CT-01 no Authorization / unknown JWT → 401|403, no data, rpc never called", async () => {
@@ -415,8 +422,8 @@ function linkOf(m: Any): string {
   return x![0].replace(/^.*?(h?t?tps?:\/\/)/, "$1").replace(/^href=["']?/, "");
 }
 
-T("IM-00 version 3.0.0-alpha.4.x; DEFAULT_APP_URL unchanged", () => {
-  ok(/^3\.0\.0-alpha\.4(\.\d+)?$/.test(String(IM.FN_VERSION)), "invite-manager FN_VERSION: " + IM.FN_VERSION);
+T("IM-00 version = tests/qa_versions.json; DEFAULT_APP_URL unchanged", () => {
+  ok(String(IM.FN_VERSION) === WANT_IM, "invite-manager FN_VERSION: " + IM.FN_VERSION + " (expected " + WANT_IM + ")"); // CHANGE 2026-10-30 F21-QA-06: was /^3\.0\.0-alpha\.4(\.\d+)?$/
   eq(IM.DEFAULT_APP_URL, DEFAULT_APP, "DEFAULT_APP_URL");
 });
 
@@ -530,7 +537,7 @@ T("NAME-01 invite email: subject 'הוזמנת לנהל טיול ב-Lonely Plann
 
 T("NAME-02 invite-manager default address: DEFAULT_APP_URL /Lonely_Planner/app/, email link /Lonely_Planner/invite/#invite=<43>", async () => {
   eq(IM.DEFAULT_APP_URL, DEFAULT_APP, "DEFAULT_APP_URL");
-  ok(/^3\.0\.0-alpha\.4\.1$/.test(String(IM.FN_VERSION)), "invite-manager FN_VERSION is not 3.0.0-alpha.4.1: " + IM.FN_VERSION);
+  ok(String(IM.FN_VERSION) === WANT_IM, "invite-manager FN_VERSION is not " + WANT_IM + ": " + IM.FN_VERSION); // CHANGE 2026-10-30 F21-QA-06: was /^3\.0\.0-alpha\.4\.1$/
   eq(IM.resolveAppUrl(undefined).url, DEFAULT_APP, "unset APP_URL");
   const { deps, mails } = imDeps(IM.resolveAppUrl(undefined).url);
   const h = IM.makeHandler(deps);
@@ -538,10 +545,10 @@ T("NAME-02 invite-manager default address: DEFAULT_APP_URL /Lonely_Planner/app/,
   ok(/^https:\/\/orsela\.github\.io\/Lonely_Planner\/invite\/#invite=[A-Za-z0-9_-]{43}$/.test(linkOf(mails[0])), "link: " + linkOf(mails[0]));
 });
 
-T("NAME-03 create-trip default join_url https://orsela.github.io/Lonely_Planner/join/#code=<CODE>; FN_VERSION alpha.4.1", async () => {
+T("NAME-03 create-trip default join_url https://orsela.github.io/Lonely_Planner/join/#code=<CODE>; FN_VERSION = tests/qa_versions.json", async () => {
   const mod = await loadCT(null);
   mock(mod);
-  ok(/^3\.0\.0-alpha\.4\.1$/.test(String(mod.FN_VERSION)), "create-trip FN_VERSION is not 3.0.0-alpha.4.1: " + mod.FN_VERSION);
+  ok(String(mod.FN_VERSION) === WANT_CT, "create-trip FN_VERSION is not " + WANT_CT + ": " + mod.FN_VERSION); // CHANGE 2026-10-30 F21-QA-06: was /^3\.0\.0-alpha\.4\.1$/
   const r = await create(mod);
   eq(r.status, 200, "create " + r.raw);
   eq(r.body.join_url, DEFAULT_JOIN + "#code=" + CREATED.join_code, "join_url");

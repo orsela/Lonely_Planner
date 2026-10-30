@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Lonely Planner · full regression runner (every QA suite, one summary table) · version 1.0.1
+# Lonely Planner · full regression runner (every QA suite, one summary table) · version 1.1.0
+# CHANGE 2026-10-30 F21-QA-08: 1.0.1 → 1.1.0 (F21, app 3.0.0-alpha.8): new jobs f21 (F21 browser suite), sup_f20_req_off (the F20
+#   cases F21 §1.6 changes on purpose, on a REQUEST_FEATURE='off' copy of app/), db21 (local PG 0001…0017: qa.f01–f06 + f21_run()
+#   + tests/f21/db_test.py scenarios + tests/f21/integration_test.ts); fn adds tests/f21/function_test.ts and the F21 function
+#   unit tests; f20 deselects the F21-superseded cases (listed below). The db job is unchanged (0001…0015).
 # CHANGE 2026-10-26 FIX-RUN-01: 1.0.0 → 1.0.1: the 'static' job runs the dev check of the latest release (hotfix 3.0.0-alpha.7.2).
 # CHANGE 2026-10-26 QA-DEBT-11: new file (no previous version). Replaces running tests/f0x/run.sh one by one for the full
 #   regression. Offline: no Supabase, no network (the v2.15.2 protected-function baseline is read from git, tests/qa_refs.py).
@@ -41,6 +45,14 @@
 #             (F20's rule "every hunk vs alpha.4.2 carries an F20 tag" — F05/F06/F04-HOME hunks carry their own tags) and
 #             test_st_static[no_db_or_function_change] (F20 shipped no migration; F05/F06 add migrations + functions on purpose).
 #   f04h      F04-HOME suite.
+#   f21       F21 suite (tests/f21/test_f21.py: /request/, chooser badges, requests tab, sheets, wizard pre-fill).
+#   sup_f20_req_off  the F20 cases deselected from f20 because of F21 §1.6, on a copy with REQUEST_FEATURE='off' in app/ (F21
+#             criterion 1: flag off = alpha.7.2) — they must pass there.
+#   db21      local PostgreSQL 0001…0017 (tests/f21/db_test.py --regression): qa.f01–f06_run() + qa.f21_run() + DB-xx scenarios,
+#             then the functions wired to that database (tests/f21/integration_test.ts). Superseded (run, counted apart):
+#             qa.f05 #100/#101 (F06 D2, as in db) and qa.f06 #910/#911 — they pin the exact contents of schema private
+#             (f06_* helpers only; tables join_attempts + transfer_codes); F21 §2 adds trip_requests, request_attempts,
+#             mail_log and private.f21_* on purpose. Now tested by tests/f21/db_test.py DB-03.private / DB-03.private_fn.
 #   static    dev self-check of the latest feature: scripts/dev/f04home_static_check.py ee5c723 (each suite above also runs
 #             its own static cases: protected functions == v2.15.2, versions from tests/qa_versions.json, node --check …).
 #   fn        Deno-style function tests on Node (scripts/dev/deno_test_node.mjs + tests/f05/deno_shim.mjs): QA F04/F05/F06 and
@@ -55,7 +67,7 @@ REPO="$(cd "$HERE/.." && pwd)"
 PY=${PYTHON:-python3}
 NODE=${NODE:-node}
 JOBS=2; ONLY=""
-ALL_JOBS="f04 f05 f20 f03on f03off f02 f04h f06 sup_f02_flags_off sup_f04_members sup_f04_home sup_f05_home fn static db"
+ALL_JOBS="f04 f05 f20 f03on f03off f02 f04h f06 f21 sup_f02_flags_off sup_f04_members sup_f04_home sup_f05_home sup_f20_req_off fn static db db21"  # CHANGE 2026-10-30 F21-QA-08: + f21, sup_f20_req_off, db21
 while [ $# -gt 0 ]; do
   case "$1" in
     -j) JOBS=$2; shift 2;;
@@ -100,6 +112,7 @@ want() { [ -z "$ONLY" ] || [[ " $ONLY " == *" $1 "* ]]; }
 if want f03off; then copy_repo "$WORK/wiz_off"; flip "$WORK/wiz_off/app/index.html" WIZARD_FEATURE off; fi
 if want sup_f02_flags_off; then copy_repo "$WORK/join_members_off"; for f in app/index.html join/index.html; do flip "$WORK/join_members_off/$f" JOIN_FEATURE off; flip "$WORK/join_members_off/$f" MEMBERS_FEATURE off; done; fi
 if want sup_f04_members; then copy_repo "$WORK/members_off"; flip "$WORK/members_off/app/index.html" MEMBERS_FEATURE off; flip "$WORK/members_off/join/index.html" MEMBERS_FEATURE off; fi
+if want sup_f20_req_off; then copy_repo "$WORK/req_off"; flip "$WORK/req_off/app/index.html" REQUEST_FEATURE off; fi  # CHANGE 2026-10-30 F21-QA-08
 if want sup_f04_home || want sup_f05_home; then copy_repo "$WORK/home_off"; flip "$WORK/home_off/app/index.html" HOME_INSTALL_FEATURE off; flip "$WORK/home_off/invite/index.html" HOME_INSTALL_FEATURE off; fi
 
 # ---------- job bodies (each writes $OUT/<job>.txt and $OUT/<job>.res = "status|collected|passed|failed|skipped|xfail|desel|note") ----------
@@ -156,6 +169,7 @@ run_job() {
     f20) pyjob f20 "$REPO" tests/f20 test_f20.py "desel: 2 F20 diff rules superseded by F05/F06/F04-HOME" \
            --deselect "test_f20.py::test_st_static[change_comments_cover_hunks]" --deselect "test_f20.py::test_st_static[no_db_or_function_change]";;
     f04h) pyjob f04h "$REPO" tests/f04home test_f04home.py "";;
+    f21) pyjob f21 "$REPO" tests/f21 test_f21.py "";;  # CHANGE 2026-10-30 F21-QA-08
     static)
       local log="$OUT/static.txt"
       (cd "$REPO" && $PY scripts/dev/fix772_static_check.py d148d74) >"$log" 2>&1  # CHANGE 2026-10-26 FIX-RUN-01: dev check of the latest release (was f04home_static_check.py ee5c723, which pins alpha.7.1 and F04H-only markers)
@@ -167,7 +181,9 @@ run_job() {
       for spec in "transform tests/f04/function_test.ts" "transform tests/f05/function_test.ts" "transform tests/f06/function_test.ts" \
                   "strip supabase/functions/join-trip/test.ts" "strip supabase/functions/approve-member/test.ts" \
                   "transform supabase/functions/create-trip/test.ts" "transform supabase/functions/invite-manager/test.ts" \
-                  "transform supabase/functions/manage-members/test.ts"; do
+                  "transform supabase/functions/manage-members/test.ts" \
+                  "transform tests/f21/function_test.ts" "transform supabase/functions/request-trip/test.ts" \
+                  "transform supabase/functions/invite-manager/test_f21.ts" "transform supabase/functions/create-trip/test_f21.ts"; do  # CHANGE 2026-10-30 F21-QA-08: + 4 F21 files
         set -- $spec
         local one="$WORK/fn_$(echo "$2" | tr '/.' '__').txt"
         (cd "$REPO" && "$NODE" --experimental-$1-types --no-warnings --import "$REPO/tests/f05/deno_shim.mjs" \
@@ -178,7 +194,7 @@ run_job() {
         P=$((P + ok)); F=$((F + fail - known)); X=$((X + known))
         grep -q "pass$" "$one" || { F=$((F + 1)); echo "  CRASH $2" >>"$log"; }
       done
-      echo "$([ $F = 0 ] && echo PASS || echo FAIL)|$((P + F + X))|$P|$F|0|$X|0|8 files (QA F04/F05/F06 + 5 function unit tests)" >"$OUT/fn.res";;
+      echo "$([ $F = 0 ] && echo PASS || echo FAIL)|$((P + F + X))|$P|$F|0|$X|0|12 files (QA F04/F05/F06/F21 + 8 function unit tests)" >"$OUT/fn.res";;
     db)
       local log="$OUT/db.txt"
       if (service postgresql status >/dev/null 2>&1 || service postgresql start >/dev/null 2>&1) && sudo -u postgres psql -Atc "select 1" >/dev/null 2>&1; then
@@ -207,6 +223,38 @@ PYEOF
       else
         echo "PostgreSQL could not be started — DB checks skipped" >"$log"
         echo "SKIP|0|0|0|0|0|0|PostgreSQL not available (service postgresql start failed)" >"$OUT/db.res"
+      fi;;
+    db21)  # CHANGE 2026-10-30 F21-QA-08: new job
+      local log="$OUT/db21.txt"
+      if (service postgresql status >/dev/null 2>&1 || service postgresql start >/dev/null 2>&1) && sudo -u postgres psql -Atc "select 1" >/dev/null 2>&1; then
+        (cd "$REPO" && $PY tests/f21/db_test.py --regression) >"$log" 2>&1
+        local rc1=$?
+        (cd "$REPO" && F21_QA_DB=pt_f21_int $PY tests/f21/db_test.py --setup-only && F21_QA_DB=pt_f21_int "$NODE" --experimental-transform-types \
+            --no-warnings --import "$REPO/tests/f05/deno_shim.mjs" scripts/dev/deno_test_node.mjs tests/f21/integration_test.ts) >>"$log" 2>&1
+        local rc2=$?
+        sudo -u postgres psql -qc "drop database if exists pt_f21_int" >/dev/null 2>&1
+        $PY - "$log" "$rc1" "$rc2" >"$OUT/db21.res" <<'PYEOF'
+import re, sys
+t = open(sys.argv[1], encoding="utf-8").read()
+SUP = {("qa.f05_run", "100"), ("qa.f05_run", "101"), ("qa.f06_run", "910"), ("qa.f06_run", "911")}
+tot = ok = sup = 0; bad = []; cur = None
+for line in t.splitlines():
+    m = re.match(r"^(qa\.f\d\d_run)\(\): (\d+)/(\d+) pass", line) or re.match(r"^(f21_db_test): (\d+)/(\d+) pass", line)
+    if m:
+        cur = m.group(1); ok += int(m.group(2)); tot += int(m.group(3)); continue
+    m = re.match(r"^\s+FAIL (\S+)", line)
+    if m and cur:
+        if (cur, m.group(1)) in SUP: sup += 1
+        else: bad.append("%s %s" % (cur, m.group(1)))
+m = re.search(r"^(\d+)/(\d+) pass$", t, re.M)
+ip, it = (int(m.group(1)), int(m.group(2))) if m else (0, 1)
+fails = len(bad) + (it - ip) + (1 if sys.argv[2] != "0" and not bad else 0) + (1 if sys.argv[3] != "0" and it == ip else 0)
+note = "PG 0001…0017: %d qa+scenario rows, %d superseded (f05 #100/#101 F06 D2; f06 #910/#911 F21 §2); integration %d/%d%s" % (tot, sup, ip, it, ("; FAILED: " + ", ".join(bad)) if bad else "")
+print("%s|%d|%d|%d|0|0|%d|%s" % ("PASS" if fails == 0 and tot else "FAIL", tot + it, ok - sup + ip, fails, sup, note))
+PYEOF
+      else
+        echo "PostgreSQL could not be started — DB checks skipped" >"$log"
+        echo "SKIP|0|0|0|0|0|0|PostgreSQL not available" >"$OUT/db21.res"
       fi;;
     *) echo "unknown job $j"; return 2;;
   esac
@@ -241,7 +289,7 @@ echo
 echo "Failures (not deselected, not a known bug):"
 FL=$( { grep -hE "^FAILED |^ERROR " "$OUT"/*.txt 2>/dev/null
         awk '/^  FAIL /{f=$0; getline n; if (n !~ /KNOWN-BUG/) print f} /^  CRASH /{print}' "$OUT/fn.txt" 2>/dev/null
-        grep -ho "FAILED: .*" "$OUT/db.res" 2>/dev/null | sed 's/^/db /'; } )
+        grep -ho "FAILED: .*" "$OUT/db.res" "$OUT/db21.res" 2>/dev/null | sed 's/^/db /'; } )
 if [ -n "$FL" ]; then echo "$FL" | sed 's/^ */  /'; else echo "  none"; fi
 echo "Known app bugs / accepted xfails:"
 grep -hE "^XFAIL " "$OUT"/*.txt 2>/dev/null | awk '{t=$2; r=$0; sub(/^XFAIL [^ ]+ - /,"",r); if (r ~ /^QA-DEBT-BUG-[0-9]+:/) {split(r,a,":"); print "  " a[1] "  " t} else print "  (other) " t " — " r}' | sort | uniq
