@@ -212,9 +212,9 @@ def type_rq_code(page, code, env=None):
     page.wait_for_timeout(900)
 
 
-def to_code(env, lang="he", email="dana@example.com", **kw):
+def to_code(env, lang="he", email="dana@example.com", name="R", **kw):
     q = "?lang=%s" % lang
-    dev = open_req(env, q, **kw)
+    dev = open_req(env, q, name=name, **kw)
     fill(dev.page, email=email, name="Ann" if lang == "en" else "דנה", lang=lang)
     send(dev.page)
     assert on_code(dev.page), "code screen not reached (text=%r)" % btext(dev.page)[:300]
@@ -1082,7 +1082,7 @@ def test_c12_approve_sheet_and_send(env, lang):
         name, email, draft = "Ann", "ann@example.com", "Portugal & Spain +1 · April 2027"
     else:
         rid = be.add_request(name="רון", email="ron@example.com", lang="he", countries=("TH", "VN"), month="2027-01-01")
-        name, email, draft = "רון", "ron@example.com", "תאילנד וויאטנם · ינואר 2027"
+        name, email, draft = "רון", "ron@example.com", "%s ו%s · ינואר 2027" % (cname("TH"), cname("VN"))   # D16 from countries.json he
     dev = admin_dev(env)
     open_requests_admin(env, dev)
     page = dev.page
@@ -1370,7 +1370,36 @@ def test_c16_prefill_month_null(env):
 # C20 · static
 # =====================================================================================================
 def _scripts(src):
-    return [(m.group(1) or "", m.group(2)) for m in re.finditer(r"<script\b([^>]*)>(.*?)</script>", src, re.S) if "src=" not in (m.group(1) or "")]
+    """Inline classic/module scripts, parsed with html.parser (a regex on "<script" also matches the word inside comments
+    and JS strings of the app — that gave false node --check failures on alpha.7)."""
+    from html.parser import HTMLParser
+
+    class P(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=False)
+            self.out, self.cur = [], None
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "script":
+                a = dict(attrs)
+                t = (a.get("type") or "").strip().lower()
+                ok = "src" not in a and t in ("", "module", "text/javascript", "application/javascript")
+                self.cur = [("module" if t == "module" else ""), []] if ok else None
+
+        def handle_data(self, data):
+            if self.cur is not None:
+                self.cur[1].append(data)
+
+        def handle_endtag(self, tag):
+            if tag == "script" and self.cur is not None:
+                self.out.append((self.cur[0], "".join(self.cur[1])))
+                self.cur = None
+
+    p = P()
+    p.feed(src)
+    p.close()
+    return p.out
+    # (copied from tests/f04home/test_f04home.py — a regex on '<script' matches the word inside app comments)
 
 
 @pytest.mark.parametrize("check", ["protected:" + n for n in qa_refs.PROTECTED] + ["app_version", "pt_version", "request_version_comment",
@@ -1419,16 +1448,35 @@ def test_c20_static(check, tmp_path):
         base = qa_refs.git_show(BASE_REF, "app/index.html")
         new = dups(html) - dups(base)
         assert not new, "new duplicate ids in app/: %r" % sorted(new)
-        assert not dups(req), "duplicate ids in /request/: %r" % sorted(dups(req))
+        # /request/ paints one screen at a time from JS templates (each screen has its own #rqTitle): static markup outside
+        # <script> must be duplicate-free; the rendered screens are checked by test_c20_runtime_duplicate_ids
+        markup = re.sub(r"<script\b.*?</script>", "", req, flags=re.S)
+        assert not dups(markup), "duplicate ids in /request/ markup: %r" % sorted(dups(markup))
     elif check == "no_live_project_ref":
         assert f02.LIVE_REF not in html and f02.LIVE_REF not in req
 
 
+DUP_JS = "()=>{const c={};for(const e of document.querySelectorAll('[id]'))c[e.id]=(c[e.id]||0)+1;return Object.keys(c).filter(k=>c[k]>1)}"
+
+
 def test_c20_runtime_duplicate_ids(env):
-    """C20: no duplicate ids in the rendered /request/ form and code screen."""
-    dev = to_code(env)
-    d = dev.page.evaluate("()=>{const c={};for(const e of document.querySelectorAll('[id]'))c[e.id]=(c[e.id]||0)+1;return Object.keys(c).filter(k=>c[k]>1)}")
-    assert not d, d
+    """C20: no duplicate ids in each rendered /request/ screen (form, code, sent, limit, closed)."""
+    out = {}
+    dev = open_req(env, "", name="F")
+    out["form"] = dev.page.evaluate(DUP_JS)
+    dev = to_code(env, name="C")
+    out["code"] = dev.page.evaluate(DUP_JS)
+    type_rq_code(dev.page, last_code(env), env)
+    out["sent"] = dev.page.evaluate(DUP_JS)
+    env.backend.fill_cap(50)
+    dev = open_req(env, "", name="L")
+    fill(dev.page)
+    send(dev.page)
+    out["limit"] = dev.page.evaluate(DUP_JS)
+    dev = open_req(env, "", flag="off", name="X")
+    out["closed"] = dev.page.evaluate(DUP_JS)
+    bad = {k: v for k, v in out.items() if v}
+    assert not bad, bad
 
 
 def test_c17_advisors_manual():
