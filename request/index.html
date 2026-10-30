@@ -642,6 +642,10 @@ function fillFrom(i,v,quiet){
 }
 function clearCodeErr(){if(!S.codeErr&&!S.codeBad)return;S.codeErr='';S.codeBad=false;const e=$('rqCodeErr');if(e){e.hidden=true;e.textContent=''}const r=$('rqOtpRow');if(r)r.classList.remove('bad')}
 function setCodeErr(msg,bad){S.codeErr=msg;S.codeBad=!!bad;const e=$('rqCodeErr');if(e){e.textContent=msg;e.hidden=!msg}const r=$('rqOtpRow');if(r)r.classList.toggle('bad',!!bad)}
+/* CHANGE 2026-10-30 F21-REQ-05 (F21-QA-BUG-01): after a wrong or expired code the six boxes are emptied and the first is
+   focused. Was: the wrong digits stayed, so typing the right code one digit at a time auto-submitted mixed codes and used up
+   the attempts until code_locked. The error line stays until the first new digit. */
+function resetOtp(){otpInputs().forEach(x=>{x.value=''});S.lastAuto='';paintVerify();const f=otpInputs()[0];if(f)try{f.focus({preventScroll:true})}catch(e){}}
 function paintVerify(){const b=$('rqVerify');if(b)b.disabled=S.busy||!/^\d{6}$/.test(codeValue())}
 function autoSubmit(){const v=codeValue();if(/^\d{6}$/.test(v)&&v!==S.lastAuto){S.lastAuto=v;verify()}}
 function paintCooldown(){
@@ -669,8 +673,8 @@ async function verify(){
  setBusy('rqVerify',false,tx().verify);paintVerify();
  if(r.ok===true){clearResume();S.sent={rq:S.rq,f:S.hasForm?JSON.parse(JSON.stringify(S.f)):null,server:r.request||null};S.rq=null;S.resumed=false;showSent();return}
  const c=r.code;
- if(c==='code_wrong'){const n=Number(r.attempts_left);setCodeErr(Number.isFinite(n)?tx().cWrong(n):tx().cWrong0,true);return}
- if(c==='code_expired'){S.rq.expired=true;setCodeErr(tx().cExpired,false);paintCooldown();return}
+ if(c==='code_wrong'){const n=Number(r.attempts_left);resetOtp();setCodeErr(Number.isFinite(n)?tx().cWrong(n):tx().cWrong0,true);return}
+ if(c==='code_expired'){S.rq.expired=true;resetOtp();setCodeErr(tx().cExpired,false);paintCooldown();return}
  if(c==='code_locked'){restart('tLocked');return}
  if(c==='request_unknown'){restart('tUnknown');return}
  S.lastAuto='';

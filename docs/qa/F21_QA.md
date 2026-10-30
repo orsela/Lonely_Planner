@@ -118,3 +118,10 @@ Regression edits (all marked `CHANGE 2026-10-30 F21-QA-NN`):
 9. Supabase advisors after running 0016 / 0017 (criterion 20).
 
 Overall: every job green except `f21`, whose only failure is F21-QA-BUG-01.
+
+## Architect addendum (2026-10-30)
+- **F21-QA-BUG-01 fixed** in `request/index.html` (CHANGE F21-REQ-05): after `code_wrong` / `code_expired` the six boxes are
+  emptied and the first box is focused. Re-run on the fix: `tests/f21/test_f21.py` **101 passed, 1 skipped** (advisors,
+  manual); dev checks `/request/` static 30/30, smoke 130/130.
+- Deployed so far: migration 0016 + 0017 on `plan-travel` (`qa.f21_run()` 101/101 live; f01–f04 all pass, f05 #100/101 and
+  f06 #910/911 superseded as expected; no F21 rows left behind), Edge Function `request-trip` v1 (alpha.8.0).
