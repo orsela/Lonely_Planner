@@ -329,7 +329,8 @@ end;
 $$;
 
 -- ===========================================================================
--- 6. request_resend — cooldown 60 s, ≤3 per request, cap; replaces the hash (the previous code stops working)
+-- 6. request_resend — cooldown 60 s, ≤3 per request, cap; replaces the hash (the previous code stops working).
+--    Returns {request_id, sent_at, email, lang}.
 -- ===========================================================================
 create or replace function public.request_resend(p_request uuid, p_code_hash text)
 returns jsonb
@@ -346,7 +347,7 @@ begin
   if p_request is null or p_code_hash is null or p_code_hash !~ '^[0-9a-f]{64}$' then
     return private.f21_err('invalid_request');
   end if;
-  select q.id, q.status, q.code_sent_at, q.resend_count, q.ip_hash into r
+  select q.id, q.status, q.code_sent_at, q.resend_count, q.ip_hash, q.email, q.lang into r
     from private.trip_requests q where q.id = p_request for update;
   if not found or r.status <> 'unverified' then
     return private.f21_err('request_unknown');
@@ -367,7 +368,8 @@ begin
    where q.id = p_request;
   insert into private.mail_log (kind, request_id) values ('code', p_request);
   perform private.f21_log('resend', null, r.ip_hash, p_request, true);
-  return pg_catalog.jsonb_build_object('request_id', p_request, 'sent_at', pg_catalog.now());
+  -- email + lang: the Edge Function needs them to send the new code (it never reads the private table itself)
+  return pg_catalog.jsonb_build_object('request_id', p_request, 'sent_at', pg_catalog.now(), 'email', r.email, 'lang', r.lang);
 end;
 $$;
 

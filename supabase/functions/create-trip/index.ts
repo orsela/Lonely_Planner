@@ -1,10 +1,13 @@
-// Plan_Travel Edge Function `create-trip` · version 3.0.0-alpha.4.1 · F04
+// Plan_Travel Edge Function `create-trip` · version 3.0.0-alpha.8.0 · F21 (first version: F04)
+// CHANGE 2026-10-27 F21-FN-20: what changed from 3.0.0-alpha.4.1 (docs/F21_spec.md §3.3): `lookup` passes `prefill`
+//   {name, countries, month, lang} through from find_invite_for_email when the invite came from an F21 request (shape-checked
+//   by cleanPrefill; the key is absent otherwise, so an F03 invite's lookup answer is unchanged). `create` unchanged.
 // CHANGE 2026-10-12 F04-FN-01: new file (no previous version). An invited manager whose email is verified looks up
 //   their invite and creates the trip (docs/F04_spec.md §3.1). Runs with the service role; verify_jwt is OFF for this
 //   function — it verifies the caller's JWT itself with auth.getUser(jwt) and requires a confirmed email.
 //
 // Actions (POST body {action, …}, every action needs `Authorization: Bearer <user JWT>`):
-//   lookup → rpc find_invite_for_email(user.email) → {found, draft_name, inviter_name, expires_at}  (no ids, no email)
+//   lookup → rpc find_invite_for_email(user.email) → {found, draft_name, inviter_name, expires_at, prefill?}  (no ids, no email)
 //   create → rpc create_trip_from_invite(user.id, user.email, payload) → {trip_id, join_code, join_url, created}
 // Errors: {error:<code>, field?}: 401 unauthorized · 403 email_not_verified · 400 invalid_request / invalid_payload
 //   {field} / too_many_currencies · 409 invite_invalid · 429 rate_limited · 405 method_not_allowed · 500 server_error.
@@ -18,7 +21,7 @@
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 
-export const FN_VERSION = "3.0.0-alpha.4.1"; // CHANGE 2026-10-12 F04-NAME-02: default join URL → /Lonely_Planner/join/ (was "3.0.0-alpha.4.0")
+export const FN_VERSION = "3.0.0-alpha.8.0"; // CHANGE 2026-10-27 F21-FN-20: lookup passes prefill (was "3.0.0-alpha.4.1"); // CHANGE 2026-10-12 F04-NAME-02: default join URL → /Lonely_Planner/join/ (was "3.0.0-alpha.4.0")
 export const DEFAULT_JOIN_URL = "https://orsela.github.io/Lonely_Planner/join/"; // CHANGE 2026-10-12 F04-NAME-02: was /Plan_Travel/join/ (repo renamed)
 export const RATE_WINDOW_MS = 10 * 60 * 1000;
 export const RATE_MAX: Record<string, number> = { create: 10, lookup: 30 };
@@ -114,6 +117,30 @@ export function pickPayload(body: Record<string, unknown>): Record<string, unkno
   const p: Record<string, unknown> = {};
   for (const k of PAYLOAD_FIELDS) if (k in body) p[k] = body[k];
   return p;
+}
+
+/** CHANGE 2026-10-27 F21-FN-20: new (no previous version). The F21 pre-fill as the wizard may use it, or null when absent
+ *  or malformed: name 1–40 chars, countries 1–10 distinct ISO-2 codes, month "YYYY-MM-01" or null, lang 'he' | 'en'. */
+export interface Prefill {
+  name: string;
+  countries: string[];
+  month: string | null;
+  lang: "he" | "en";
+}
+export function cleanPrefill(v: unknown): Prefill | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const name = typeof o.name === "string" ? o.name.trim() : "";
+  if (!name || name.length > 40) return null;
+  const c = Array.isArray(o.countries) ? o.countries : [];
+  if (c.length < 1 || c.length > 10 || !c.every((x) => typeof x === "string" && /^[A-Z]{2}$/.test(x)) || new Set(c).size !== c.length) return null;
+  let month: string | null = null;
+  if (o.month !== null && o.month !== undefined) {
+    if (typeof o.month !== "string" || !/^\d{4}-(0[1-9]|1[0-2])-01$/.test(o.month)) return null;
+    month = o.month;
+  }
+  if (o.lang !== "he" && o.lang !== "en") return null;
+  return { name, countries: [...c] as string[], month, lang: o.lang };
 }
 
 // -----------------------------------------------------------------------------------------------------
@@ -220,12 +247,15 @@ async function actLookup(user: AuthUser & { email: string }) {
   if (r.error) throw mapRpcError(r.error);
   const d = asObject(r.data);
   if (!d || d.found !== true) return { found: false };
-  return {
+  const out: Record<string, unknown> = {
     found: true,
     draft_name: typeof d.draft_name === "string" ? d.draft_name : null,
     inviter_name: typeof d.inviter_name === "string" ? d.inviter_name : null,
     expires_at: d.expires_at ?? null,
   };
+  const prefill = cleanPrefill(d.prefill); // CHANGE 2026-10-27 F21-FN-20: + prefill (only when the invite came from a request)
+  if (prefill) out.prefill = prefill;
+  return out;
 }
 
 async function actCreate(user: AuthUser & { email: string }, body: Record<string, unknown>) {

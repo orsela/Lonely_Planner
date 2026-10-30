@@ -60,7 +60,8 @@ function mock(user: unknown = U, rpcImpl?: (name: string, args: Record<string, u
 }
 
 Deno.test("version + JOIN_URL validation", () => {
-  assert(/^3\.0\.0-alpha\.4/.test(FN_VERSION));
+  // CHANGE 2026-10-27 F21-FN-21: version pin alpha.4 → alpha.8 (F21 §3.3 bumps this function to 3.0.0-alpha.8.0). Only edit.
+  assert(/^3\.0\.0-alpha\.8/.test(FN_VERSION));
   eq(resolveJoinBase(undefined).url, DEFAULT_JOIN_URL);
   eq(resolveJoinBase("https://example.org/join/").url, "https://example.org/join/");
   for (const bad of ["ttps://example.org/join/", "http://example.org/join/", "https://example.org/join", "not a url", "https:///"]) {

@@ -355,8 +355,9 @@ begin
     update private.trip_requests q set code_sent_at = now() - interval '61 seconds', code_attempts = 2 where q.id = q8;
     n := qa.f21_mails();
     res := qa.f21_resend(q8, qa.f21_h(q8::text || '777777'));
-    r := qa.f21_rec(r, 302, '§2.6 resend after 60 s → {request_id, sent_at}; new hash, attempts reset, resend_count 1, +1 code mail',
-      'ok/true/1', qa.f21_e(res) || '/' ||
+    r := qa.f21_rec(r, 302, '§2.6 resend after 60 s → {email, lang, request_id, sent_at}; new hash, attempts reset, resend_count 1, +1 code mail',
+      'ok/email,lang,request_id,sent_at/f21-r@qa.invalid/he/true/1', qa.f21_e(res) || '/' ||
+      (select string_agg(k2, ',' order by k2) from pg_catalog.jsonb_object_keys(res) k2) || '/' || (res->>'email') || '/' || (res->>'lang') || '/' ||
       (select (q.code_hash = qa.f21_h(q8::text || '777777') and q.code_attempts = 0 and q.code_sent_at = now()
                and q.code_expires_at = now() + interval '10 minutes')::text || '/' || q.resend_count from private.trip_requests q where q.id = q8)
       || case when qa.f21_mails() = n + 1 then '' else ' mails ' || n || '→' || qa.f21_mails() end);
