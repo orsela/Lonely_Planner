@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0f5c43">
+<title>בקשה להקמת טיול · Lonely Planner</title>
+<!-- Lonely Planner request page · version 3.0.0-alpha.8 · F21
+     CHANGE 2026-10-27 F21-REQ-01: new file (no previous version). The public, bilingual (Hebrew RTL / English LTR) page where
+     anyone asks to open a trip (docs/F21_spec.md §1.0–§1.5; artboards F21_InApp, F21_Request, F21_RequestEN, F21_Limit,
+     F21_Code, F21_Sent). Outside the app's PWA scope, like /invite/ and /join/. No supabase-js and no session: plain fetch to
+     the public Edge Function request-trip with the publishable apikey. Nothing secret in the URL. Device keys (raw):
+     pt:_device:rq_lang (the chosen language) and pt:_device:rq_resume ({request_id, email, sentAt, lang, v:1} — never the
+     code). REQUEST_FEATURE='off' = one neutral "closed" card, no network at all.
+     Stable ids for QA: #rqApp[data-screen = closed|inapp|form|code|limit|sent], #rqLangHe, #rqLangEn, #rqName, #rqEmail,
+     #rqWhere, #rqChips, #rqWhereList, #rqWhen, #rqUnsure, #rqCount, #rqMinus, #rqPlus, #rqNote, #rqNoteCount, #rqEnInfo,
+     #rqTurnstile, #rqSend, #rq<Field>Err, #rqOtp0–5, #rqVerify, #rqResend, #rqFix, #rqResumed, #rqCodeErr, #rqBack,
+     #rqSafari, #rqChrome, #rqHere, #rqToast. -->
+<style>
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{margin:0;background:#f7f6f1;color:#17211b;font-family:Arial,'Segoe UI',system-ui,sans-serif;-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+button,input,select,textarea{font-family:inherit}
+.rq{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+.rq-brand{font-size:14px;font-weight:900}
+.rq-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rq-bar{padding:14px 18px 0}
+.rq-hero{background:#0f5c43;color:#fff;padding:14px 20px 52px}
+.rq-hero h1{margin:24px 0 6px;font-size:25px;line-height:1.25}
+.rq-hero .rq-sub{font-size:13.5px;color:#e6f3ee;line-height:1.5}
+.rq-body{padding:0 16px 24px;margin-top:-32px;display:flex;flex-direction:column;gap:14px}
+.rq-pad{padding:22px 16px 24px;display:flex;flex-direction:column;gap:14px}
+.rq-card{background:#fff;border:1px solid #e4e6df;border-radius:18px;padding:16px}
+.rq-card.lift{box-shadow:0 6px 18px #0000001a;display:flex;flex-direction:column;gap:16px}
+.rq-lbl{display:block;font-size:12.5px;font-weight:700;color:#3a443d;margin:0 0 6px}
+.rq-lbl .opt{font-weight:400;color:#5f6861}
+.rq-in{width:100%;min-height:46px;padding:11px 14px;border:1.5px solid #d6d9cf;border-radius:12px;background:#fff;color:#17211b;font-size:16px}
+.rq-in:focus{outline:none;border-color:#0f6b4f;box-shadow:0 0 0 3px #0f6b4f22}
+.rq-in[aria-invalid="true"]{border-color:#b42318;box-shadow:none}
+.rq-in[disabled]{background:#f1f0ea;color:#8a918b}
+.rq-ltr{direction:ltr}
+[dir="rtl"] .rq-ltr{text-align:right}
+textarea.rq-in{resize:none;line-height:1.45}
+.rq-help{margin:6px 2px 0;font-size:11.5px;color:#5f6861;line-height:1.5}
+.rq-err{display:flex;gap:6px;align-items:flex-start;margin-top:6px;font-size:12.5px;color:#b42318;font-weight:700;line-height:1.5}
+.rq-err svg{flex-shrink:0;margin-top:3px}
+.rq-count{font-size:11px;color:#5f6861;margin-top:4px;text-align:end}
+.rq-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:48px;border:0;border-radius:14px;background:#0f6b4f;color:#fff;font-size:15px;font-weight:800;box-shadow:0 4px 12px #0f6b4f40;text-decoration:none;cursor:pointer;padding:0 14px;text-align:center}
+.rq-btn[disabled]{opacity:.6;cursor:default}
+.rq-btn.out{background:#fff;color:#17211b;border:1px solid #e4e6df;box-shadow:none}
+.rq-lang{display:flex;gap:2px;border:1px solid #d6d9d1;border-radius:999px;padding:3px;background:#fff;flex-shrink:0}
+.rq-lang button{min-height:44px;min-width:44px;border:0;border-radius:999px;background:none;color:#3a443d;font-size:12.5px;font-weight:800;padding:0 10px;cursor:pointer}
+.rq-lang button[aria-pressed="true"]{background:#0f5c43;color:#fff}
+.rq-hero .rq-lang{border-color:#ffffff66;background:transparent}
+.rq-hero .rq-lang button{color:#fff}
+.rq-hero .rq-lang button[aria-pressed="true"]{background:#fff;color:#0f5c43}
+.rq-chips{display:flex;flex-wrap:wrap;gap:6px}
+.rq-chips:not(:empty){margin-bottom:8px}
+.rq-chip{display:inline-flex;align-items:center;gap:4px;border:1.5px solid #0f6b4f;background:#edf8f3;border-radius:999px;padding-inline:12px 2px;font-size:13px;font-weight:700;color:#0b5841;min-height:44px;max-width:100%}
+.rq-chip span{overflow-wrap:anywhere}
+.rq-chip button{width:40px;height:40px;flex-shrink:0;border:0;background:none;color:#0b5841;font-size:18px;border-radius:999px;cursor:pointer}
+.rq-list{margin-top:6px;border:1px solid #e4e6df;border-radius:12px;background:#fff;overflow:hidden;max-height:290px;overflow-y:auto}
+.rq-list button{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;border:0;border-top:1px solid #efeee8;background:#fff;color:#17211b;font-size:14px;padding:0 14px;text-align:start;cursor:pointer}
+.rq-list button:first-child{border-top:0}
+.rq-list button:hover,.rq-list button:focus{background:#edf8f3;outline:none}
+.rq-list .none{padding:12px 14px;font-size:13px;color:#5f6861}
+.rq-chk{display:flex;align-items:center;gap:8px;font-size:13px;color:#3a443d;min-height:44px;cursor:pointer}
+.rq-chk input{width:20px;height:20px;accent-color:#0f6b4f;margin:0}
+.rq-step{display:flex;align-items:center;gap:12px}
+.rq-step button{width:44px;height:44px;border:1px solid #e4e6df;border-radius:12px;background:#fff;font-size:20px;color:#17211b;cursor:pointer}
+.rq-step input{width:64px;min-height:44px;text-align:center;font-size:20px;font-weight:800;border:1.5px solid transparent;border-radius:10px;background:transparent;color:#17211b;-moz-appearance:textfield}
+.rq-step input::-webkit-outer-spin-button,.rq-step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.rq-step input:focus{outline:none;border-color:#0f6b4f}
+.rq-step input[aria-invalid="true"]{border-color:#b42318}
+.rq-info{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:#eef4fb;border:1px solid #cddcf0;border-radius:14px;font-size:12.5px;color:#1d3f6b;line-height:1.5}
+.rq-info svg{flex-shrink:0;margin-top:1px}
+.rq-ts{min-height:65px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.rq-privacy{margin:0 6px;font-size:11.5px;color:#5f6861;line-height:1.55}
+.rq-center{text-align:center;padding:30px 18px 0}
+.rq-ring{width:64px;height:64px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center}
+.rq-center h1{margin:16px 0 6px;font-size:24px}
+.rq-center p{margin:0;font-size:14px;color:#5f6861;line-height:1.6}
+.rq-h1{margin:22px 0 4px;font-size:24px}
+.rq-lead{margin:0;font-size:14px;color:#5f6861;line-height:1.55}
+.rq-lead b{color:#17211b;unicode-bidi:isolate}
+.rq-otp-row{display:flex;gap:8px;direction:ltr;justify-content:center}
+.rq-otp{width:46px;height:56px;border:1.5px solid #e4e6df;border-radius:12px;background:#fff;text-align:center;font-size:24px;font-weight:800;color:#17211b;padding:0;min-width:0}
+.rq-otp:focus{outline:none;border-color:#0f6b4f;box-shadow:0 0 0 3px #0f6b4f22}
+.rq-otp-row.bad .rq-otp{border-color:#b42318;box-shadow:none}
+.rq-tiny{margin:8px 2px 0;font-size:11.5px;color:#5f6861;text-align:center;line-height:1.5}
+.rq-banner{margin:0;background:#edf8f3;color:#0b5841;border:1px solid #cfe1d7;border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5}
+.rq-where{background:#fff;border:1px solid #e4e6df;border-radius:18px;padding:12px 14px}
+.rq-where>b{font-size:12.5px;display:block;margin-bottom:8px}
+.rq-notif{display:flex;gap:10px;align-items:center;background:#f1f0ea;border-radius:14px;padding:10px 12px}
+.rq-notif .ic{width:32px;height:32px;border-radius:8px;background:#fff;border:1px solid #e4e6df;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rq-notif .tx{min-width:0;font-size:12px;line-height:1.45}
+.rq-notif .from{color:#5f6861}
+.rq-notif .subj{font-weight:800;color:#17211b;overflow-wrap:anywhere}
+.rq-links{display:flex;justify-content:center;gap:4px;align-items:center;flex-wrap:wrap}
+.rq-link{border:0;background:none;color:#0f6b4f;font-size:13px;font-weight:700;min-height:44px;padding:0 8px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.rq-link[disabled]{color:#5f6861;text-decoration:none;cursor:default}
+.rq-dot{color:#c9ccc4}
+.rq-foot{position:sticky;bottom:0;margin-top:auto;padding:14px 18px 22px;background:#f7f6f1;border-top:1px solid #e4e6df}
+.rq-codeerr{margin:8px 2px 0;font-size:12.5px;color:#b42318;font-weight:700;text-align:center;line-height:1.5}
+.rq-ticks{display:flex;flex-direction:column;gap:12px}
+.rq-tick{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:#3a443d;line-height:1.5}
+.rq-tick svg{flex-shrink:0;margin-top:1px}
+.rq-row{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:8px 0;border-bottom:1px solid #efeee8}
+.rq-row:last-child{border-bottom:0}
+.rq-row span{color:#5f6861;flex-shrink:0}
+.rq-row b{text-align:end;overflow-wrap:anywhere;min-width:0}
+.rq-steps{display:flex;flex-direction:column;gap:12px}
+.rq-steps>b{font-size:14px}
+.rq-n{width:26px;height:26px;border-radius:50%;background:#edf8f3;color:#0b5841;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rq-inapp{display:flex;flex-direction:column;gap:10px;text-align:center;align-items:center}
+.rq-inapp h1{margin:0;font-size:19px}
+.rq-inapp p{margin:0;font-size:13.5px;color:#3a443d;line-height:1.6}
+.rq-manual{padding:10px 16px}
+.rq-manual b{font-size:13px;display:block;padding-bottom:4px}
+.rq-mstep{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;padding:8px 0;border-top:1px solid #efeee8}
+.rq-mstep .rq-n{width:24px;height:24px;font-size:12px}
+.rq-hop{display:flex;gap:10px;align-items:center;background:#edf8f3;border-color:#cfe1d7}
+.rq-spin{width:22px;height:22px;border-radius:50%;border:3px solid #0f6b4f;border-top-color:transparent;flex-shrink:0;animation:rqs 1s linear infinite}
+@keyframes rqs{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.rq-spin{animation:none}}
+.rq-toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#17211b;color:#fff;border-radius:12px;padding:10px 16px;font-size:13.5px;line-height:1.45;width:max-content;max-width:calc(100vw - 32px);z-index:50;text-align:center}
+.rq-closed{max-width:420px;margin:0 auto;padding:28px 18px;display:flex;flex-direction:column;gap:16px}
+.rq-closed .rq-brand{text-align:center;font-size:18px}
+.rq-closed .rq-card{text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.rq-closed h1{margin:0;font-size:20px}
+.rq-closed p{margin:0;font-size:14px;line-height:1.6;color:#3a443d}
+</style>
+</head>
+<body>
+<div id="rqApp" class="rq" data-screen="loading"></div>
+<div id="rqToast" class="rq-toast" role="status" aria-live="polite" hidden></div>
+<script>
+/* CHANGE 2026-10-27 F21-REQ-02: new flag (no previous version), same name as the app's. 'on' = the request flow; 'off' = one
+   neutral card "הבקשות סגורות כרגע / Requests are closed right now" and no network at all (no countries.json, no Turnstile,
+   no request-trip). */
+const REQUEST_FEATURE='on';
+/* CHANGE 2026-10-27 F21-REQ-03: Cloudflare Turnstile site key. For now Cloudflare's documented always-pass TEST key; Or
+   replaces it with the real site key of the orsela.github.io widget at deploy (docs/F21_spec.md §7 step 1). The site key is
+   public by design; the secret lives only in the Supabase secret TURNSTILE_SECRET. */
+const TURNSTILE_SITE_KEY='1x00000000000000000000AA';
+(function(){
+'use strict';
+/* CHANGE 2026-10-27 F21-REQ-04: endpoint + publishable key, the same project and key as /join/ (publishable by design). */
+const SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
+const SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
+const FN_URL=SUPABASE_URL+'/functions/v1/request-trip';
+const TS_SRC='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=rqTurnstileReady';
+const COUNTRIES_URL='../app/countries.json';
+const LANG_KEY='pt:_device:rq_lang',RESUME_KEY='pt:_device:rq_resume';
+const RESUME_TTL_MS=600000,RESEND_S=60,CALL_TIMEOUT_MS=15000,MONTHS_AHEAD=18;
+
+const T={
+ he:{
+  closedT:'הבקשות סגורות כרגע',
+  langGroup:'שפה / Language',
+  heroT:'רוצים להקים טיול?',heroS:'ספרו לנו לאן ומתי. אחרי אישור יגיע אליכם מייל עם קישור להקמת הטיול.',
+  name:'השם שלך',email:'מייל',emailHelp:'נשלח אליו קוד אימות בן 6 ספרות.',
+  where:'לאן?',wherePh:'הוספת מדינה…',remove:'הסרת ',suggest:'מדינות מתאימות',noMatch:'לא נמצאה מדינה',
+  countriesFail:'לא הצלחנו לטעון את רשימת המדינות. נסו שוב.',
+  when:'מתי, בערך?',whenPh:'בחירת חודש',unsure:'עוד לא יודעים',
+  count:'כמה מטיילים, בערך?',fewer:'פחות',more:'יותר',
+  note:'משהו שכדאי שנדע?',optional:'(לא חובה)',
+  send:'שליחת קוד אימות',sending:'שולחים…',
+  privacy:'המייל משמש רק לטיפול בבקשה ולא מוצג לאף אחד. בקשה שנדחתה, או שהמייל שלה לא אומת, נמחקת אחרי 5 ימים.',
+  eName:'כתבו שם של עד 40 תווים.',eEmail:'כתובת המייל לא תקינה.',eCountries0:'בחרו לפחות מדינה אחת.',eCountries11:'אפשר לבחור עד 10 מדינות.',
+  eMonth:'בחרו חודש, או סמנו "עוד לא יודעים".',eCount:'מספר המטיילים: בין 1 ל-30.',eNote:'עד 200 תווים.',
+  eTs:'בדיקת האבטחה עוד לא הושלמה. נסו שוב בעוד רגע.',
+  tRate:'יותר מדי בקשות היום. נסו שוב מחר.',tTs:'בדיקת האבטחה נכשלה. נסו שוב.',tOffline:'אין חיבור. נסו שוב כשהרשת תחזור.',tGeneric:'משהו השתבש. נסו שוב.',
+  tResent:'נשלח קוד חדש.',tLocked:'יותר מדי ניסיונות. מתחילים מחדש.',tUnknown:'הבקשה לא נמצאה. מתחילים מחדש.',
+  inT:'פותחים בדפדפן הרגיל',inP:'הטופס נפתח בתוך אפליקציה אחרת. בהמשך נשלח לכם קוד למייל, ומעבר למייל מכאן סוגר את הדף ומוחק את מה שמילאתם.',
+  safari:'פתיחה בספארי',manualT:'הכפתור לא עבד?',manual1:'לוחצים על <b>⋯</b> בפינה העליונה של הדף',manual2:'בוחרים <b>"פתיחה בספארי"</b> (או "Open in Safari")',
+  hop:'עוברים ל-Chrome אוטומטית…',chrome:'לא נפתח? פתיחה ב-Chrome',here:'להמשיך כאן בכל זאת',
+  codeT:'בדקו את המייל',codeLead1:'שלחנו קוד בן 6 ספרות אל ',codeLead2:'. מקלידים אותו כאן.',codeLbl:'קוד אימות',digit:'ספרה ',
+  codeHelp1:'הקוד בתוקף 10 דקות. הדבקה ממלאת את כל התיבות.',codeHelp2:'יצאתם לבדוק את המייל? חוזרים לאותו קישור – הדף זוכר אתכם ולא שולח קוד חדש.',
+  whereT:'איפה הקוד? בהתראה של המייל',now:'עכשיו',subj:' – קוד האימות לבקשה ב-Lonely Planner',
+  resendIn:'שליחה חוזרת בעוד ',resend:'שליחה חוזרת',fix:'תיקון המייל',
+  codeFoot:'רק אחרי האימות הבקשה נשלחת לאישור. לא הגיע? בדקו בתיקיית הספאם.',
+  verify:'אימות ושליחת הבקשה',verifying:'מאמתים…',
+  resumed:n=>'חזרת לדף – הקוד ששלחנו '+(n<=1?'לפני דקה':'לפני '+n+' דקות')+' עדיין תקף.',
+  cWrong:n=>'הקוד שגוי. '+(n===1?'נשאר ניסיון אחד.':'נשארו '+n+' ניסיונות.'),cWrong0:'הקוד שגוי.',cExpired:'הקוד פג. שלחו קוד חדש.',
+  limT:'נסו שוב מחר',limP:'היום כבר נשלחו הרבה קודי אימות, ולכן אי אפשר לשלוח עוד קוד עד מחר.',
+  lim1:'מחר פותחים את אותו קישור ושולחים את הבקשה.',lim2:'בקשה שכבר שלחתם ואימתתם לא נפגעת וממשיכה כרגיל.',back:'חזרה לטופס',
+  sentT:'הבקשה נשלחה',sentP:'אין צורך לחכות במסך הזה. התשובה תגיע למייל.',
+  rWhere:'לאן',rWhen:'מתי',rCount:'מטיילים',rEmail:'מייל',notSure:'עוד לא יודעים',
+  nowT:'מה עכשיו?',s1:'אנחנו עוברים על הבקשה.',s2:'אם היא מאושרת, מגיע מייל עם קישור להקמת הטיול.',
+  s3:'בקישור מוסיפים את האפליקציה למסך הבית ומקימים את הטיול – כשלוש דקות. היעדים והחודש כבר ממולאים מהבקשה.',
+  months:['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'],sep:' · '
+ },
+ en:{
+  closedT:'Requests are closed right now',
+  langGroup:'Language / שפה',
+  heroT:'Want to plan a trip?',heroS:'Tell us where and when. Once approved, you\'ll get an email with a link to set up your trip.',
+  name:'Your name',email:'Email',emailHelp:'We\'ll send a 6-digit verification code.',
+  where:'Where to?',wherePh:'Add a country…',remove:'Remove ',suggest:'Matching countries',noMatch:'No country found',
+  countriesFail:'We couldn\'t load the list of countries. Please try again.',
+  when:'Roughly when?',whenPh:'Choose a month',unsure:'Not sure yet',
+  count:'How many travelers, roughly?',fewer:'Fewer',more:'More',
+  note:'Anything we should know?',optional:'(optional)',
+  info:'<b>Good to know:</b> the trip app is in Hebrew for now. Emails about your request, including your invitation, will be in English.',
+  send:'Send verification code',sending:'Sending…',
+  privacy:'Your email is used only to handle this request and is never shown to anyone. Declined or unverified requests are deleted after 5 days.',
+  eName:'Enter a name of up to 40 characters.',eEmail:'That email address doesn\'t look right.',eCountries0:'Choose at least one country.',eCountries11:'You can choose up to 10 countries.',
+  eMonth:'Choose a month, or tick "Not sure yet".',eCount:'Travelers: between 1 and 30.',eNote:'Up to 200 characters.',
+  eTs:'The security check isn\'t complete yet. Please try again in a moment.',
+  tRate:'Too many requests today. Please try again tomorrow.',tTs:'The security check failed. Please try again.',tOffline:'No connection. Try again when you\'re back online.',tGeneric:'Something went wrong. Please try again.',
+  tResent:'A new code was sent.',tLocked:'Too many attempts. Let\'s start again.',tUnknown:'We couldn\'t find this request. Let\'s start again.',
+  inT:'Open in your regular browser',inP:'The form opened inside another app. We\'ll send you a code by email, and switching to your email from here closes this page and erases what you filled in.',
+  safari:'Open in Safari',manualT:'Button didn\'t work?',manual1:'Tap <b>⋯</b> in the top corner of the page',manual2:'Choose <b>"Open in Safari"</b>',
+  hop:'Switching to Chrome automatically…',chrome:'Didn\'t open? Open in Chrome',here:'Continue here anyway',
+  codeT:'Check your email',codeLead1:'We sent a 6-digit code to ',codeLead2:'. Type it here.',codeLbl:'Verification code',digit:'Digit ',
+  codeHelp1:'The code is valid for 10 minutes. Pasting fills all the boxes.',codeHelp2:'Went to check your email? Come back to the same link – this page remembers you and won\'t send a new code.',
+  whereT:'Where\'s the code? In the email notification',now:'now',subj:' – your Lonely Planner verification code',
+  resendIn:'Resend in ',resend:'Resend code',fix:'Fix the email',
+  codeFoot:'Your request goes for approval only after verification. Didn\'t get it? Check your spam folder.',
+  verify:'Verify and send',verifying:'Verifying…',
+  resumed:n=>'You\'re back – the code we sent '+(n<=1?'a minute ago':n+' minutes ago')+' is still valid.',
+  cWrong:n=>'Wrong code. '+(n===1?'1 attempt left.':n+' attempts left.'),cWrong0:'Wrong code.',cExpired:'The code has expired. Send a new one.',
+  limT:'Please try again tomorrow',limP:'We\'ve already sent a lot of verification codes today, so we can\'t send another one until tomorrow.',
+  lim1:'Open this same link tomorrow and send your request.',lim2:'A request you\'ve already sent and verified isn\'t affected.',back:'Back to the form',
+  sentT:'Your request was sent',sentP:'No need to wait on this screen. The answer will come by email.',
+  rWhere:'Where',rWhen:'When',rCount:'Travelers',rEmail:'Email',notSure:'Not sure yet',
+  nowT:'What now?',s1:'We review your request.',s2:'If it\'s approved, you\'ll get an email with a link to set up your trip.',
+  s3:'From the link you add the app to your home screen and set up the trip – about three minutes. Your destinations and month are already filled in from the request.',
+  months:['January','February','March','April','May','June','July','August','September','October','November','December'],sep:' · '
+ }
+};
+const ICON={
+ alert:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b42318" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
+ info:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d4f8a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5v.5"/></svg>',
+ clock:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8a4b05" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+ tick:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+ big:'<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+ mail:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5f6861" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+ browser:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8a4b05" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M14 14l3 3m0-3l-3 3"/></svg>',
+ compass:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>',
+ closed:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#4b524c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+};
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
+function online(){return navigator.onLine!==false}
+const $=id=>document.getElementById(id);
+const app=$('rqApp'),toastEl=$('rqToast');
+
+/* ---------- language (§1.0): link → stored choice → device ---------- */
+function linkLang(){
+ let l='';
+ try{l=new URLSearchParams(location.search).get('lang')||''}catch(e){}
+ if(!l){const m=/[#&]lang=(he|en)\b/.exec(String(location.hash||''));if(m)l=m[1]}
+ return l==='he'||l==='en'?l:'';
+}
+function deviceLang(){
+ const ls=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||'']).map(x=>String(x||'').toLowerCase());
+ return ls.some(x=>/^(he|iw)(-|$)/.test(x))?'he':'en';
+}
+function storedLang(){const v=lsGet(LANG_KEY);return v==='he'||v==='en'?v:''}
+const S={lang:linkLang()||storedLang()||deviceLang(),screen:'',
+ f:{name:'',email:'',countries:[],month:'',unsure:false,travellers:2,note:''},hasForm:false,
+ rq:null,resumed:false,codeErr:'',codeBad:false,busy:false,lastAuto:'',timer:null,
+ list:null,listP:null,tsId:null,tsToken:'',tsLoading:false,hopped:false,inAppDone:false,sent:null};
+function tx(){return T[S.lang]}
+
+function setDoc(){
+ const h=document.documentElement;h.lang=S.lang;h.dir=S.lang==='he'?'rtl':'ltr';
+ document.title=S.lang==='he'?'בקשה להקמת טיול · Lonely Planner':'Request a trip · Lonely Planner';
+}
+let toastT=null;
+function toast(msg){toastEl.textContent=msg;toastEl.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{toastEl.hidden=true},4200)}
+
+/* ---------- flag off: one neutral card, no network (§1, AC 1) ---------- */
+if(REQUEST_FEATURE!=='on'){
+ setDoc();
+ app.dataset.screen='closed';app.className='';
+ app.innerHTML='<main class="rq-closed"><div class="rq-brand">Lonely Planner</div><section class="rq-card" role="status"><div class="rq-ring" style="background:#f1f0ea">'+ICON.closed+'</div>'+
+  '<h1 lang="he" dir="rtl">'+T.he.closedT+'</h1><p lang="en" dir="ltr">'+T.en.closedT+'</p></section></main>';
+ return;
+}
+
+/* ---------- months (C3: calendar month in Asia/Jerusalem) ---------- */
+function nowYM(){
+ try{
+  const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit'}).formatToParts(new Date());
+  const y=+p.find(x=>x.type==='year').value,m=+p.find(x=>x.type==='month').value;
+  if(y&&m)return{y,m};
+ }catch(e){}
+ const d=new Date();return{y:d.getFullYear(),m:d.getMonth()+1};
+}
+function monthList(){
+ const s=nowYM(),out=[];
+ for(let i=0;i<MONTHS_AHEAD;i++){const k=s.m-1+i,y=s.y+Math.floor(k/12),m=k%12+1;out.push({v:y+'-'+(m<10?'0':'')+m+'-01',y,m})}
+ return out;
+}
+function monthLabel(v){const m=/^(\d{4})-(\d{2})-01$/.exec(String(v||''));return m?tx().months[+m[2]-1]+' '+m[1]:''}
+
+/* ---------- countries (../app/countries.json) ---------- */
+function loadCountries(){
+ if(S.list)return Promise.resolve(S.list);
+ if(S.listP)return S.listP;
+ S.listP=fetch(COUNTRIES_URL,{cache:'force-cache'}).then(r=>{if(!r.ok)throw new Error('http '+r.status);return r.json()})
+  .then(a=>{S.list=(Array.isArray(a)?a:[]).filter(c=>c&&/^[A-Z]{2}$/.test(c.code));return S.list})
+  .catch(e=>{S.listP=null;throw e});
+ return S.listP;
+}
+function cByCode(code){return(S.list||[]).find(c=>c.code===code)||null}
+function cName(code){const c=cByCode(code);return c?(c[S.lang]||c.en||code):code}
+function cFlag(code){const c=cByCode(code);return c&&c.flag?c.flag:''}
+function matches(q){
+ const L=S.list||[],lang=S.lang;q=String(q||'').trim().toLowerCase();
+ const pool=L.filter(c=>S.f.countries.indexOf(c.code)<0);
+ let res;
+ if(!q)res=pool.filter(c=>c.popular);
+ else res=pool.filter(c=>String(c.he||'').toLowerCase().indexOf(q)>=0||String(c.en||'').toLowerCase().indexOf(q)>=0||c.code.toLowerCase()===q);
+ const nm=c=>String(c[lang]||c.en||'');
+ const starts=c=>q&&(String(c.he||'').toLowerCase().indexOf(q)===0||String(c.en||'').toLowerCase().indexOf(q)===0||c.code.toLowerCase()===q)?0:1;
+ res.sort((a,b)=>(starts(a)-starts(b))||((b.popular?1:0)-(a.popular?1:0))||nm(a).localeCompare(nm(b),lang));
+ return res.slice(0,8);
+}
+
+/* ---------- network ---------- */
+function call(body){
+ if(!online())return Promise.resolve({ok:false,code:'offline'});
+ const ac=typeof AbortController!=='undefined'?new AbortController():null;
+ const t=setTimeout(()=>{try{ac&&ac.abort()}catch(e){}},CALL_TIMEOUT_MS);
+ return fetch(FN_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify(body),signal:ac?ac.signal:undefined,cache:'no-store'})
+  .then(r=>r.json().then(j=>j&&typeof j==='object'?j:{ok:false,code:'server_error'},()=>({ok:false,code:'server_error'})))
+  .catch(()=>({ok:false,code:online()?'network':'offline'}))
+  .finally(()=>clearTimeout(t));
+}
+function genericToast(code){toast(code==='offline'?tx().tOffline:code==='rate_limited'?tx().tRate:tx().tGeneric)}
+
+/* ---------- resume (F04-HOME §3.3 pattern; never the code) ---------- */
+function readResume(){
+ let o=null;try{o=JSON.parse(lsGet(RESUME_KEY)||'null')}catch(e){o=null}
+ if(!o||o.v!==1||typeof o.request_id!=='string'||!o.request_id||typeof o.email!=='string'||typeof o.sentAt!=='number'){if(o)lsDel(RESUME_KEY);return null}
+ const age=Date.now()-o.sentAt;
+ if(age>=RESUME_TTL_MS||age<-60000){lsDel(RESUME_KEY);return null}
+ return o;
+}
+function writeResume(){if(S.rq)lsSet(RESUME_KEY,JSON.stringify({request_id:S.rq.id,email:S.rq.email,sentAt:S.rq.sentAt,lang:S.rq.lang,v:1}))}
+function clearResume(){lsDel(RESUME_KEY)}
+
+/* ---------- in-app browser (§1.1) ---------- */
+/* CHANGE 2026-10-27 F21-REQ-05, copy of /invite/ inApp() (F04H-INV-03): same UA detection — Gmail/Google app (GSA), Facebook,
+   Instagram, LINE, LinkedIn, Outlook, any Android WebView ("; wv)"), and any iOS browser without the "Safari/" token. The hop
+   carries only ?lang=<l> (no token exists here). New vs /invite/: "להמשיך כאן בכל זאת" → the form. */
+const UA=String(navigator.userAgent||'');
+const IS_IOS=/iPhone|iPad|iPod/i.test(UA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const IS_ANDROID=/Android/i.test(UA);
+const IN_APP=/\b(GSA|FBAN|FBAV|Instagram|Line|LinkedInApp|Outlook|; wv\))/i.test(UA)||(IS_IOS&&!/Safari\//.test(UA));
+function here(){return location.host+location.pathname}
+function safariUrl(){return 'x-safari-https://'+here()+'?lang='+S.lang}
+function intentUrl(){return 'intent://'+here()+'?lang='+S.lang+'#Intent;scheme=https;package=com.android.chrome;end'}
+
+/* ---------- frame ---------- */
+function langSwitch(){
+ const he=S.lang==='he';
+ return '<div class="rq-lang" role="group" aria-label="'+esc(tx().langGroup)+'">'+
+  '<button type="button" id="rqLangHe" lang="he" aria-pressed="'+he+'">עב</button>'+
+  '<button type="button" id="rqLangEn" lang="en" aria-pressed="'+!he+'">EN</button></div>';
+}
+/* the switch sits at the top-right corner in both languages (D9): first child in RTL, last child in LTR */
+function topRow(){return '<div class="rq-top">'+(S.lang==='he'?langSwitch()+'<span class="rq-brand">Lonely Planner</span>':'<span class="rq-brand">Lonely Planner</span>'+langSwitch())+'</div>'}
+function paint(screen,html){
+ stopTimer();
+ S.screen=screen;app.dataset.screen=screen;setDoc();app.setAttribute('dir',S.lang==='he'?'rtl':'ltr');
+ app.innerHTML=html;
+ const he=$('rqLangHe'),en=$('rqLangEn');
+ if(he)he.onclick=()=>switchLang('he');
+ if(en)en.onclick=()=>switchLang('en');
+}
+function switchLang(l){
+ if(l===S.lang)return;
+ if(S.screen==='form')collect();
+ const code=S.screen==='code'?codeValue():'';
+ const focusId=document.activeElement&&document.activeElement.id;
+ S.lang=l;lsSet(LANG_KEY,l);
+ if(S.screen==='inapp')showInApp(true);
+ else if(S.screen==='form')showForm();
+ else if(S.screen==='code'){showCode();if(code)fillFrom(0,code,true)}
+ else if(S.screen==='limit')showLimit();
+ else if(S.screen==='sent')showSent();
+ const f=focusId&&$(focusId);if(f&&/^rqLang/.test(focusId))try{f.focus()}catch(e){}
+}
+
+/* ---------- 1.1 in-app ---------- */
+function showInApp(rerender){
+ const t=tx();
+ paint('inapp','<div class="rq-bar">'+topRow()+'</div><div class="rq-pad" style="padding-top:14px">'+
+  '<section class="rq-card rq-inapp"><div class="rq-ring" style="width:56px;height:56px;background:#fef3e2">'+ICON.browser+'</div><h1>'+t.inT+'</h1><p>'+t.inP+'</p></section>'+
+  (IS_IOS?'<button type="button" class="rq-btn" id="rqSafari">'+ICON.compass+esc(t.safari)+'</button>'+
+    '<section class="rq-card rq-manual"><b>'+t.manualT+'</b><div class="rq-mstep"><span class="rq-n">1</span><span>'+t.manual1+'</span></div>'+
+    '<div class="rq-mstep"><span class="rq-n">2</span><span>'+t.manual2+'</span></div></section>'
+   :'<section class="rq-card rq-hop"><span class="rq-spin" aria-hidden="true"></span><span style="font-size:13px;color:#0b5841;line-height:1.5">'+t.hop+'</span></section>'+
+    '<button type="button" class="rq-btn out" id="rqChrome">'+esc(t.chrome)+'</button>')+
+  '<button type="button" class="rq-btn out" id="rqHere" style="min-height:44px;font-size:13.5px">'+esc(t.here)+'</button></div>');
+ const sf=$('rqSafari');if(sf)sf.onclick=()=>{location.href=safariUrl()};
+ const ch=$('rqChrome');if(ch)ch.onclick=()=>{location.href=intentUrl()};
+ $('rqHere').onclick=()=>{S.inAppDone=true;showForm()};
+ if(!rerender&&IS_ANDROID&&!S.hopped){S.hopped=true;location.href=intentUrl()}
+}
+
+/* ---------- 1.2 form ---------- */
+function errHtml(id,msg){return msg?'<div class="rq-err" id="'+id+'" role="alert">'+ICON.alert+'<span>'+esc(msg)+'</span></div>':''}
+function showForm(){
+ const t=tx(),f=S.f,en=S.lang==='en';
+ const months=monthList();
+ const mOpts='<option value="">'+esc(t.whenPh)+'</option>'+months.map(m=>'<option value="'+m.v+'"'+(f.month===m.v?' selected':'')+'>'+esc(t.months[m.m-1]+' '+m.y)+'</option>').join('');
+ paint('form','<header class="rq-hero">'+topRow()+'<h1 id="rqTitle">'+t.heroT+'</h1><div class="rq-sub">'+t.heroS+'</div></header>'+
+  '<div class="rq-body"><section class="rq-card lift" id="rqForm">'+
+  '<div><label class="rq-lbl" for="rqName">'+t.name+'</label><input id="rqName" class="rq-in" maxlength="40" autocomplete="name" value="'+esc(f.name)+'" aria-describedby="rqNameErr"><div id="rqNameErrBox"></div></div>'+
+  '<div><label class="rq-lbl" for="rqEmail">'+t.email+'</label><input id="rqEmail" class="rq-in rq-ltr" dir="ltr" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" value="'+esc(f.email)+'" aria-describedby="rqEmailHelp rqEmailErr">'+
+   '<p class="rq-help" id="rqEmailHelp">'+t.emailHelp+'</p><div id="rqEmailErrBox"></div></div>'+
+  '<div><label class="rq-lbl" for="rqWhere">'+t.where+'</label><div class="rq-chips" id="rqChips"></div>'+
+   '<input id="rqWhere" class="rq-in" autocomplete="off" placeholder="'+esc(t.wherePh)+'" aria-controls="rqWhereList" aria-expanded="false" aria-describedby="rqCountriesErr">'+
+   '<div class="rq-list" id="rqWhereList" role="group" aria-label="'+esc(t.suggest)+'" hidden></div><div id="rqCountriesErrBox"></div></div>'+
+  '<div><label class="rq-lbl" for="rqWhen">'+t.when+'</label><select id="rqWhen" class="rq-in"'+(f.unsure?' disabled':'')+' aria-describedby="rqMonthErr">'+mOpts+'</select>'+
+   '<label class="rq-chk"><input type="checkbox" id="rqUnsure"'+(f.unsure?' checked':'')+'> '+t.unsure+'</label><div id="rqMonthErrBox"></div></div>'+
+  '<div><span class="rq-lbl" id="rqCountLbl">'+t.count+'</span><div class="rq-step" role="group" aria-labelledby="rqCountLbl">'+
+   '<button type="button" id="rqMinus" aria-label="'+esc(t.fewer)+'">−</button>'+
+   '<input id="rqCount" type="number" inputmode="numeric" min="1" max="30" step="1" value="'+esc(f.travellers)+'" aria-labelledby="rqCountLbl" aria-describedby="rqTravellersErr">'+
+   '<button type="button" id="rqPlus" aria-label="'+esc(t.more)+'">+</button></div><div id="rqTravellersErrBox"></div></div>'+
+  '<div><label class="rq-lbl" for="rqNote">'+t.note+' <span class="opt">'+t.optional+'</span></label><textarea id="rqNote" class="rq-in" rows="3" maxlength="200" aria-describedby="rqNoteCount rqNoteErr">'+esc(f.note)+'</textarea>'+
+   '<div class="rq-count" id="rqNoteCount" dir="ltr">'+f.note.length+'/200</div><div id="rqNoteErrBox"></div></div>'+
+  (en?'<section class="rq-info" id="rqEnInfo" role="note">'+ICON.info+'<span>'+t.info+'</span></section>':'')+
+  '<div><div class="rq-ts" id="rqTurnstile"></div><div id="rqTsErrBox"></div></div>'+
+  '<button type="button" class="rq-btn" id="rqSend">'+t.send+'</button></section>'+
+  '<p class="rq-privacy">'+t.privacy+'</p></div>');
+ S.hasForm=true;
+ paintChips();
+ const w=$('rqWhere'),list=$('rqWhereList');
+ const openList=()=>{loadCountries().then(()=>paintList()).catch(()=>{list.innerHTML='<div class="none">'+esc(tx().countriesFail)+'</div>';list.hidden=false})};
+ w.addEventListener('focus',openList);
+ w.addEventListener('input',openList);
+ w.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();const b=list.querySelector('button[data-code]');if(b)addCountry(b.dataset.code)}
+  else if(e.key==='ArrowDown'){const b=list.querySelector('button[data-code]');if(b){e.preventDefault();b.focus()}}
+  else if(e.key==='Escape'){hideList()}
+ });
+ list.addEventListener('keydown',e=>{
+  const bs=[...list.querySelectorAll('button[data-code]')],i=bs.indexOf(document.activeElement);
+  if(e.key==='ArrowDown'&&i>=0&&i<bs.length-1){e.preventDefault();bs[i+1].focus()}
+  else if(e.key==='ArrowUp'){e.preventDefault();if(i>0)bs[i-1].focus();else w.focus()}
+  else if(e.key==='Escape'){e.preventDefault();hideList();w.focus()}
+ });
+ list.addEventListener('mousedown',e=>{if(e.target.closest('button'))e.preventDefault()});
+ list.addEventListener('click',e=>{const b=e.target.closest('button[data-code]');if(b)addCountry(b.dataset.code)});
+ $('rqUnsure').onchange=()=>{const s=$('rqUnsure').checked;$('rqWhen').disabled=s;S.f.unsure=s;if(s)setErr('month','')};
+ $('rqWhen').onchange=()=>{S.f.month=$('rqWhen').value;if(S.f.month)setErr('month','')};
+ const cnt=$('rqCount');
+ const step=d=>{let n=parseInt(cnt.value,10);if(!isFinite(n))n=2;n=Math.min(30,Math.max(1,n+d));cnt.value=n;S.f.travellers=n;setErr('travellers','')};
+ $('rqMinus').onclick=()=>step(-1);
+ $('rqPlus').onclick=()=>step(1);
+ const note=$('rqNote');
+ note.addEventListener('input',()=>{$('rqNoteCount').textContent=note.value.length+'/200';if(note.value.length<=200)setErr('note','')});
+ $('rqName').addEventListener('input',()=>setErr('name',''));
+ $('rqEmail').addEventListener('input',()=>setErr('email',''));
+ $('rqSend').onclick=submit;
+ loadCountries().then(()=>paintChips()).catch(()=>{});
+ mountTurnstile();
+}
+document.addEventListener('click',e=>{if(S.screen!=='form')return;const w=$('rqWhere'),l=$('rqWhereList');if(l&&!l.hidden&&e.target!==w&&!l.contains(e.target))hideList()});
+function hideList(){const l=$('rqWhereList'),w=$('rqWhere');if(l)l.hidden=true;if(w)w.setAttribute('aria-expanded','false')}
+function paintList(){
+ const l=$('rqWhereList'),w=$('rqWhere');if(!l||!w)return;
+ const r=matches(w.value);
+ l.innerHTML=r.length?r.map(c=>'<button type="button" data-code="'+c.code+'"><span aria-hidden="true">'+esc(c.flag||'')+'</span><span>'+esc(c[S.lang]||c.en)+'</span></button>').join('')
+  :(String(w.value||'').trim()?'<div class="none">'+esc(tx().noMatch)+'</div>':'');
+ l.hidden=!l.innerHTML;w.setAttribute('aria-expanded',String(!l.hidden));
+}
+function paintChips(){
+ const box=$('rqChips');if(!box)return;
+ box.innerHTML=S.f.countries.map(code=>{const n=cName(code),fl=cFlag(code);
+  return '<span class="rq-chip" data-code="'+code+'"><span>'+(fl?esc(fl)+' ':'')+esc(n)+'</span><button type="button" data-rm="'+code+'" aria-label="'+esc(tx().remove+n)+'">×</button></span>'}).join('');
+ box.querySelectorAll('button[data-rm]').forEach(b=>{b.onclick=()=>{
+  const i=S.f.countries.indexOf(b.dataset.rm);if(i>=0)S.f.countries.splice(i,1);
+  paintChips();liveCountriesErr();const w=$('rqWhere');if(w)try{w.focus({preventScroll:true})}catch(e){}
+ }});
+}
+function addCountry(code){
+ if(S.f.countries.indexOf(code)<0)S.f.countries.push(code);
+ const w=$('rqWhere');if(w){w.value='';try{w.focus({preventScroll:true})}catch(e){}}
+ paintChips();paintList();liveCountriesErr();
+}
+function liveCountriesErr(){const n=S.f.countries.length;setErr('countries',n>10?tx().eCountries11:'')}
+function fieldEl(k){return $({name:'rqName',email:'rqEmail',countries:'rqWhere',month:'rqWhen',travellers:'rqCount',note:'rqNote',ts:'rqTurnstile'}[k])}
+function setErr(k,msg){
+ const box=$('rq'+k.charAt(0).toUpperCase()+k.slice(1)+'ErrBox'),el=fieldEl(k);
+ if(!box)return;
+ box.innerHTML=errHtml('rq'+k.charAt(0).toUpperCase()+k.slice(1)+'Err',msg);
+ if(el&&el.tagName!=='DIV'){if(msg)el.setAttribute('aria-invalid','true');else el.removeAttribute('aria-invalid')}
+}
+function collect(){
+ const f=S.f,v=id=>{const e=$(id);return e?e.value:''};
+ if(!$('rqName'))return;
+ f.name=String(v('rqName')).trim().replace(/\s+/g,' ');
+ f.email=String(v('rqEmail')).trim().toLowerCase();
+ f.month=v('rqWhen');f.unsure=!!($('rqUnsure')&&$('rqUnsure').checked);
+ const n=String(v('rqCount')).trim();f.travellers=/^\d+$/.test(n)?parseInt(n,10):NaN;
+ f.note=String(v('rqNote'));
+}
+function validEmail(e){return e.length<=254&&/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(e)}
+function validate(){
+ const f=S.f,t=tx(),errs={};
+ if(!f.name||f.name.length>40)errs.name=t.eName;
+ if(!validEmail(f.email))errs.email=t.eEmail;
+ if(f.countries.length<1)errs.countries=t.eCountries0;else if(f.countries.length>10)errs.countries=t.eCountries11;
+ if(!f.unsure&&!monthList().some(m=>m.v===f.month))errs.month=t.eMonth;
+ if(!(Number.isInteger(f.travellers)&&f.travellers>=1&&f.travellers<=30))errs.travellers=t.eCount;
+ if(f.note.length>200)errs.note=t.eNote;
+ return errs;
+}
+const ORDER=['name','email','countries','month','travellers','note'];
+function showErrs(errs){
+ ORDER.forEach(k=>setErr(k,errs[k]||''));
+ const first=ORDER.find(k=>errs[k]);
+ if(first){const el=fieldEl(first);if(el)try{el.focus();el.scrollIntoView({block:'center'})}catch(e){}}
+ return !!first;
+}
+function setBusy(id,busy,label){const b=$(id);if(b){b.disabled=!!busy;b.textContent=label}}
+async function submit(){
+ if(S.busy)return;
+ collect();
+ setErr('ts','');
+ if(showErrs(validate()))return;
+ if(!online()){toast(tx().tOffline);return}
+ if(!S.tsToken){setErr('ts',tx().eTs);if(!window.turnstile)mountTurnstile();return}
+ const f=S.f,body={action:'start',lang:S.lang,name:f.name,email:f.email,countries:f.countries.slice(),month:f.unsure?null:f.month,
+  travellers:f.travellers,note:f.note.trim()?f.note.trim():null,turnstile_token:S.tsToken};
+ S.busy=true;setBusy('rqSend',true,tx().sending);
+ const r=await call(body);
+ S.busy=false;
+ S.tsToken='';   /* a Turnstile token is single-use */
+ if(r.ok===true&&r.request_id){
+  S.rq={id:String(r.request_id),email:f.email,sentAt:Date.now(),lang:S.lang};S.resumed=false;S.codeErr='';S.codeBad=false;
+  writeResume();removeTurnstile();showCode();return;
+ }
+ setBusy('rqSend',false,tx().send);
+ resetTurnstile();
+ const c=r.code;
+ if(c==='daily_limit'){removeTurnstile();showLimit();return}
+ if(c==='turnstile_failed'){toast(tx().tTs);return}
+ if(c==='invalid_request'&&r.field&&ORDER.indexOf(r.field)>=0){const e={};e[r.field]=fieldMsg(r.field);showErrs(e);return}
+ if(c==='invalid_request'&&r.field==='travelers'){showErrs({travellers:tx().eCount});return}
+ genericToast(c);
+}
+function fieldMsg(k){const t=tx();return{name:t.eName,email:t.eEmail,countries:S.f.countries.length>10?t.eCountries11:t.eCountries0,month:t.eMonth,travellers:t.eCount,note:t.eNote}[k]}
+
+/* ---------- Turnstile (managed, explicit render, language = page language) ---------- */
+function mountTurnstile(){
+ const box=$('rqTurnstile');if(!box)return;
+ if(window.turnstile&&typeof window.turnstile.render==='function'){renderTurnstile();return}
+ if(S.tsLoading)return;
+ S.tsLoading=true;
+ window.rqTurnstileReady=()=>{S.tsLoading=false;renderTurnstile()};
+ const s=document.createElement('script');s.src=TS_SRC;s.async=true;s.defer=true;
+ s.onerror=()=>{S.tsLoading=false;try{s.remove()}catch(e){}};
+ document.head.appendChild(s);
+}
+function renderTurnstile(){
+ const box=$('rqTurnstile');if(!box||!window.turnstile)return;
+ removeTurnstile();
+ S.tsToken='';
+ try{
+  S.tsId=window.turnstile.render(box,{sitekey:TURNSTILE_SITE_KEY,language:S.lang,theme:'light',
+   callback:tok=>{S.tsToken=String(tok||'');setErr('ts','')},
+   'expired-callback':()=>{S.tsToken=''},
+   'error-callback':()=>{S.tsToken=''}});
+ }catch(e){S.tsId=null}
+}
+function resetTurnstile(){S.tsToken='';if(window.turnstile&&S.tsId!=null){try{window.turnstile.reset(S.tsId)}catch(e){}}}
+function removeTurnstile(){if(window.turnstile&&S.tsId!=null){try{window.turnstile.remove(S.tsId)}catch(e){}}S.tsId=null;S.tsToken=''}
+
+/* ---------- 1.3 code ---------- */
+function stopTimer(){if(S.timer){clearInterval(S.timer);S.timer=null}}
+function showCode(){
+ const t=tx(),rq=S.rq;
+ const boxes=[0,1,2,3,4,5].map(i=>'<input class="rq-otp" id="rqOtp'+i+'" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="'+(i===0?6:1)+'" aria-label="'+esc(t.digit+(i+1))+'" autocomplete="'+(i===0?'one-time-code':'off')+'">').join('');
+ paint('code','<div class="rq-bar">'+topRow()+'<h1 class="rq-h1" id="rqTitle">'+t.codeT+'</h1>'+
+  '<p class="rq-lead">'+esc(t.codeLead1)+'<b dir="ltr" id="rqCodeEmail">'+esc(rq.email)+'</b>'+esc(t.codeLead2)+'</p></div>'+
+  '<div class="rq-pad">'+
+  (S.resumed?'<p class="rq-banner" id="rqResumed" role="status"'+(online()?'':' hidden')+'>'+esc(t.resumed(Math.max(1,Math.floor((Date.now()-rq.sentAt)/60000))))+'</p>':'')+
+  '<div><span class="rq-lbl" id="rqCodeLbl">'+t.codeLbl+'</span><div class="rq-otp-row'+(S.codeBad?' bad':'')+'" id="rqOtpRow" role="group" aria-labelledby="rqCodeLbl">'+boxes+'</div>'+
+  '<p class="rq-codeerr" id="rqCodeErr" role="alert"'+(S.codeErr?'':' hidden')+'>'+esc(S.codeErr)+'</p>'+
+  '<p class="rq-tiny">'+esc(t.codeHelp1)+'<br>'+esc(t.codeHelp2)+'</p></div>'+
+  '<section class="rq-where"><b>'+t.whereT+'</b><div class="rq-notif" aria-hidden="true"><div class="ic">'+ICON.mail+'</div><div class="tx"><div class="from">Lonely Planner · '+t.now+'</div>'+
+   '<div class="subj"><span dir="ltr">••••••</span>'+esc(t.subj)+'</div></div></div></section>'+
+  '<div class="rq-links"><button type="button" class="rq-link" id="rqResend" disabled>'+esc(t.resend)+'</button><span class="rq-dot" aria-hidden="true">·</span>'+
+  '<button type="button" class="rq-link" id="rqFix">'+esc(t.fix)+'</button></div>'+
+  '<p class="rq-tiny" style="margin:0 4px;font-size:12px">'+esc(t.codeFoot)+'</p></div>'+
+  '<div class="rq-foot"><button type="button" class="rq-btn" id="rqVerify" disabled>'+esc(t.verify)+'</button></div>');
+ const ins=otpInputs();
+ ins.forEach((inp,i)=>{
+  inp.addEventListener('input',()=>{
+   const v=String(inp.value||'').replace(/\D/g,'');
+   if(v.length>1){fillFrom(i,v);return}
+   inp.value=v;clearCodeErr();
+   if(v&&i<5)ins[i+1].focus();
+   paintVerify();autoSubmit();
+  });
+  inp.addEventListener('keydown',e=>{
+   if(e.key==='Backspace'&&!inp.value&&i>0){e.preventDefault();ins[i-1].value='';ins[i-1].focus();paintVerify()}
+   else if(e.key==='ArrowLeft'&&i>0){e.preventDefault();ins[i-1].focus()}
+   else if(e.key==='ArrowRight'&&i<5){e.preventDefault();ins[i+1].focus()}
+   else if(e.key==='Enter'){e.preventDefault();verify()}
+  });
+  inp.addEventListener('paste',e=>{
+   const cd=e.clipboardData||window.clipboardData;
+   const d=String(cd&&cd.getData('text')||'').replace(/\D/g,'');
+   if(d){e.preventDefault();fillFrom(d.length>=6?0:i,d)}
+  });
+  inp.addEventListener('focus',()=>{try{inp.select()}catch(e){}});
+ });
+ $('rqVerify').onclick=verify;
+ $('rqResend').onclick=resend;
+ $('rqFix').onclick=()=>{clearResume();const em=S.rq&&S.rq.email;S.rq=null;S.resumed=false;S.codeErr='';S.codeBad=false;if(!S.f.email&&em)S.f.email=em;showForm();const e=$('rqEmail');if(e)try{e.focus()}catch(x){}};
+ paintCooldown();
+ S.timer=setInterval(paintCooldown,1000);
+ try{ins[0].focus({preventScroll:true})}catch(e){}
+}
+function otpInputs(){return[0,1,2,3,4,5].map(i=>$('rqOtp'+i)).filter(Boolean)}
+function codeValue(){return otpInputs().map(x=>x.value).join('')}
+function fillFrom(i,v,quiet){
+ const ins=otpInputs();if(!ins.length)return;
+ const d=String(v).replace(/\D/g,'').slice(0,6-i).split('');
+ d.forEach((x,k)=>{ins[i+k].value=x});
+ if(!quiet)clearCodeErr();
+ const nx=Math.min(5,i+d.length);try{ins[nx].focus()}catch(e){}
+ paintVerify();if(!quiet)autoSubmit();
+}
+function clearCodeErr(){if(!S.codeErr&&!S.codeBad)return;S.codeErr='';S.codeBad=false;const e=$('rqCodeErr');if(e){e.hidden=true;e.textContent=''}const r=$('rqOtpRow');if(r)r.classList.remove('bad')}
+function setCodeErr(msg,bad){S.codeErr=msg;S.codeBad=!!bad;const e=$('rqCodeErr');if(e){e.textContent=msg;e.hidden=!msg}const r=$('rqOtpRow');if(r)r.classList.toggle('bad',!!bad)}
+function paintVerify(){const b=$('rqVerify');if(b)b.disabled=S.busy||!/^\d{6}$/.test(codeValue())}
+function autoSubmit(){const v=codeValue();if(/^\d{6}$/.test(v)&&v!==S.lastAuto){S.lastAuto=v;verify()}}
+function paintCooldown(){
+ const b=$('rqResend');if(!b||!S.rq)return;
+ const left=S.rq.expired?0:Math.ceil((S.rq.sentAt+RESEND_S*1000-Date.now())/1000);
+ if(left>0){const m=Math.floor(left/60),s=left%60;b.disabled=true;b.textContent=tx().resendIn+m+':'+(s<10?'0':'')+s}
+ else{b.disabled=S.busy;b.textContent=tx().resend}
+ const rb=$('rqResumed');if(rb)rb.hidden=!online();
+}
+function restart(msgKey){
+ /* code_locked / request_unknown: the request row is gone → back to the form (values kept when they are in memory) */
+ clearResume();const em=S.rq&&S.rq.email;S.rq=null;S.resumed=false;S.codeErr='';S.codeBad=false;S.lastAuto='';
+ if(!S.f.email&&em)S.f.email=em;
+ showForm();toast(tx()[msgKey]);
+}
+async function verify(){
+ if(S.busy||!S.rq)return;
+ const code=codeValue();
+ if(!/^\d{6}$/.test(code))return;
+ if(!online()){toast(tx().tOffline);return}
+ S.busy=true;setBusy('rqVerify',true,tx().verifying);
+ const r=await call({action:'verify',request_id:S.rq.id,code});
+ S.busy=false;
+ if(S.screen!=='code')return;
+ setBusy('rqVerify',false,tx().verify);paintVerify();
+ if(r.ok===true){clearResume();S.sent={rq:S.rq,f:S.hasForm?JSON.parse(JSON.stringify(S.f)):null,server:r.request||null};S.rq=null;S.resumed=false;showSent();return}
+ const c=r.code;
+ if(c==='code_wrong'){const n=Number(r.attempts_left);setCodeErr(Number.isFinite(n)?tx().cWrong(n):tx().cWrong0,true);return}
+ if(c==='code_expired'){S.rq.expired=true;setCodeErr(tx().cExpired,false);paintCooldown();return}
+ if(c==='code_locked'){restart('tLocked');return}
+ if(c==='request_unknown'){restart('tUnknown');return}
+ S.lastAuto='';
+ genericToast(c);
+}
+async function resend(){
+ if(S.busy||!S.rq)return;
+ if(!online()){toast(tx().tOffline);return}
+ S.busy=true;const b=$('rqResend');if(b)b.disabled=true;
+ const r=await call({action:'resend',request_id:S.rq.id});
+ S.busy=false;
+ if(S.screen!=='code')return;
+ if(r.ok===true){
+  S.rq.sentAt=Date.now();S.rq.expired=false;S.lastAuto='';writeResume();
+  otpInputs().forEach(x=>{x.value=''});clearCodeErr();paintVerify();paintCooldown();toast(tx().tResent);
+  try{otpInputs()[0].focus()}catch(e){}
+  return;
+ }
+ const c=r.code;
+ if(c==='daily_limit'){showLimit();return}
+ if(c==='code_locked'){restart('tLocked');return}
+ if(c==='request_unknown'){restart('tUnknown');return}
+ paintCooldown();genericToast(c);
+}
+window.addEventListener('online',()=>{if(S.screen==='code')paintCooldown()});
+window.addEventListener('offline',()=>{if(S.screen==='code')paintCooldown()});
+
+/* ---------- 1.4 daily cap ---------- */
+function showLimit(){
+ const t=tx();
+ paint('limit','<div class="rq-bar">'+topRow()+'</div>'+
+  '<div class="rq-center" style="padding-top:40px"><div class="rq-ring" style="background:#fef3e2">'+ICON.clock+'</div><h1 id="rqTitle">'+t.limT+'</h1><p>'+t.limP+'</p></div>'+
+  '<div class="rq-pad" style="padding-top:24px"><section class="rq-card rq-ticks"><div class="rq-tick">'+ICON.tick+'<span>'+t.lim1+'</span></div><div class="rq-tick">'+ICON.tick+'<span>'+t.lim2+'</span></div></section>'+
+  '<button type="button" class="rq-btn out" id="rqBack">'+esc(t.back)+'</button></div>');
+ $('rqBack').onclick=()=>{if(S.rq&&!S.rq.email)S.rq=null;showForm()};
+}
+
+/* ---------- 1.5 sent ---------- */
+function showSent(){
+ const t=tx(),sn=S.sent||{},f=sn.f,sv=sn.server||{};
+ const countries=f?f.countries:(Array.isArray(sv.countries)?sv.countries:null);
+ const month=f?(f.unsure?null:f.month):(sv.month!==undefined?sv.month:undefined);
+ const trav=f?f.travellers:(sv.travellers!=null?sv.travellers:null);
+ const email=(sn.rq&&sn.rq.email)||(f&&f.email)||'';
+ const rows=[];
+ if(countries&&countries.length)rows.push('<div class="rq-row"><span>'+t.rWhere+'</span><b id="rqSumWhere">'+countries.map(c=>esc((cFlag(c)?cFlag(c)+' ':'')+cName(c))).join(t.sep)+'</b></div>');
+ if(month!==undefined)rows.push('<div class="rq-row"><span>'+t.rWhen+'</span><b id="rqSumWhen">'+esc(month?monthLabel(String(month).slice(0,7)+'-01'):t.notSure)+'</b></div>');
+ if(trav!=null)rows.push('<div class="rq-row"><span>'+t.rCount+'</span><b id="rqSumCount">'+esc(trav)+'</b></div>');
+ rows.push('<div class="rq-row"><span>'+t.rEmail+'</span><b dir="ltr" id="rqSumEmail">'+esc(email)+'</b></div>');
+ paint('sent','<div class="rq-bar">'+topRow()+'</div>'+
+  '<div class="rq-center"><div class="rq-ring" style="background:#edf8f3">'+ICON.big+'</div><h1 id="rqTitle">'+t.sentT+'</h1><p>'+t.sentP+'</p></div>'+
+  '<div class="rq-pad"><section class="rq-card" style="padding:8px 16px">'+rows.join('')+'</section>'+
+  '<section class="rq-card rq-steps"><b>'+t.nowT+'</b>'+
+  '<div class="rq-tick"><span class="rq-n">1</span><span>'+t.s1+'</span></div>'+
+  '<div class="rq-tick"><span class="rq-n">2</span><span>'+t.s2+'</span></div>'+
+  '<div class="rq-tick"><span class="rq-n">3</span><span>'+t.s3+'</span></div></section></div>');
+ if(countries&&countries.length&&!S.list)loadCountries().then(()=>{if(S.screen==='sent')showSent()}).catch(()=>{});
+}
+
+/* ---------- boot ---------- */
+const res=readResume();
+if(res){
+ if(!linkLang()&&(res.lang==='he'||res.lang==='en'))S.lang=res.lang;
+ S.rq={id:res.request_id,email:res.email,sentAt:res.sentAt,lang:res.lang};S.resumed=true;
+ showCode();
+}else if(IN_APP&&(IS_IOS||IS_ANDROID)&&!S.inAppDone){
+ showInApp(false);
+}else showForm();
+})();
+</script>
+</body>
+</html>
