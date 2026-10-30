@@ -73,6 +73,12 @@ const MEMBERS_FEATURE='on';
    trip (C3), and "הטיול נוצר" offers to add the app to the home screen when not standalone. The /invite/ page has its own
    HOME_INSTALL_FEATURE. 'off' = exactly the 3.0.0-alpha.7 behaviour: every F04H line is a no-op. Needs WIZARD_FEATURE='on'. */
 const HOME_INSTALL_FEATURE='on';
+/* CHANGE 2026-10-27 F21-FLAG-01: new flag (no alpha.7.2 equivalent). 'on' = F21 app side (docs/F21_spec.md): the super-admin's
+   "ניהול מערכת" gets a "בקשות" tab (verified trip requests from /request/, approve = F03 manager invite pre-filled, reject with
+   an optional polite email), the start chooser shows "<N> בקשות חדשות", and the wizard opens pre-filled when the invite came
+   from a request. The /request/ page has its own REQUEST_FEATURE. 'off' = exactly the 3.0.0-alpha.7.2 behaviour: every F21
+   line is a no-op (no tab, no badge, no admin_trip_requests call, wizard unchanged). Needs ADMIN_FEATURE and SWITCH_FEATURE. */
+const REQUEST_FEATURE='on';
 </script>
 <!-- CHANGE 2026-10-05 F03-UI-01: NEW block (no 3.0.0-alpha.2 equivalent) — F03 "super-admin invites a manager"
      (docs/F03_spec.md). Style + one classic script, placed after the flags script and BEFORE the F02 gate block so it
