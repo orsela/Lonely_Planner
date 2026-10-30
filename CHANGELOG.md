@@ -17,6 +17,22 @@
   English invite and reject emails (Hebrew invite byte-identical); `create-trip` lookup returns prefill.
 - QA (independent): browser 101 pass / 1 skip, functions 33/33, integration 10/10, DB 67/67; full regression green.
   See docs/qa/F21_QA.md.
+## 3.0.0-alpha.7.2 — hotfix (2026-10-26 → 2026-10-30)
+
+### Four app bugs found by the QA-DEBT pass
+<!-- CHANGE 2026-10-30 FIX-DOCS-01: new entry. -->
+- FIX-01 (high): Supabase Realtime does not filter DELETE events, so the membership watch treated ANY deleted
+  `trip_members` row (a rejected / cancelled request) as "my row" → every open phone showed "כבר אינך חבר/ה" and wiped
+  the trip's local data. Now only a DELETE whose `old.id` is my member id counts; any other DELETE re-reads my row.
+- FIX-02: approve-member `not_manager` hides the pending card (F05 §1.5).
+- FIX-03: pending-card role buttons 40 → 44 px.
+- FIX-04: `/join/` error screen no longer holds `#joinTitle` twice.
+- Versions: app 3.0.0-alpha.7.2; `/invite/` and `/join/` version comments aligned. No DB / Edge Function change.
+- Tests: `tests/run_all.sh` full regression green (every suite PASS, 0 failures); new runtime test
+  `test_s02_join_fatal_single_title`; dev check `scripts/dev/fix772_static_check.py`. QA-DEBT pass:
+  docs/qa/QA-DEBT_2026-10-26.md. Phone check (Or, 2026-10-30, trip "F04-HOME"): manager on the Android app rejected a
+  pending request while the app was open → no "כבר אינך חבר/ה", trip stays; the requester saw "הבקשה לא אושרה"; DB: both
+  active members intact. <!-- CHANGE 2026-10-30 FIX-DOCS-02: FIX-01 confirmed on a real phone. -->
 
 ## 3.0.0-alpha.7.1 — F04-HOME (2026-10-26)
 
