@@ -89,6 +89,15 @@ The smoke reuses `tests/f06/harness.py` (→ F05 → F20 → F04 → F03 → F02
 `admin_trip_requests`, `approve_request` / `reject_request` and lookup `prefill`. Results at the time of writing: static ALL OK,
 smoke 93/93.
 
+Regression (`tests/run_all.sh --only "f03on f04 f20 f06"`, clone deepened to full history, 2026-10-30):
+
+| Job | Result | Failures |
+|---|---|---|
+| f03on | 47 passed, 1 failed, 1 skipped | `test_ac18_static[app_version]` — version pin (qa_versions.json = alpha.7.2) |
+| f04 | 116 passed, 2 failed, 1 skipped | `test_c21_static[app_version|pt_version]` — version pins |
+| f06 | 70 passed | — |
+| f20 | 74 passed, 6 failed | 2 version pins; 4 intended §1.6 changes: `test_b01…`, `test_c01…` ("כל הקבוצות והזמנת מנהלים" → "בקשות, קבוצות והזמנת מנהלים"), `test_c02_pending_badge[two]` ("2 ממתינות" → "2 הזמנות ממתינות"), `test_d01_network_reads_only_spec_tables` (new RPC `admin_trip_requests`). The same 4 (6 cases) pass on a copy with `REQUEST_FEATURE='off'`. |
+
 ## 5. Deviations from the mockup (spec wins)
 
 - Approve-replace line: spec's common line "<name> יקבל/תקבל מייל הזמנה להקמת הטיול, כמו הזמנת מנהל רגילה (תוקף 7 ימים)." (artboard: "…מייל הזמנה חדש, ממולא מהבקשה…").
@@ -104,3 +113,10 @@ smoke 93/93.
    These cases need a flag-off supplementary job (like `sup_f04_home`) or an F21 update of the expectations.
 4. Should an empty draft name be allowed on approve (server accepts `null` for F03 `create`)? Implemented: required.
 5. Reject success toasts other than the cap one are not in the spec (texts in §3 above).
+
+## Architect answers (2026-10-30)
+1. Wizard date picker: no `min` (it would forbid an earlier start). Instead a help line under the start-date field, "בבקשה: <month year>", while no date is picked (F21-WZ fix).
+2. `tests/qa_versions.json` bumped to alpha.8 / alpha.8.0 (e2d0d13).
+3. F20 §1.6 changes: the QA team adds a flag-off supplementary job (as `sup_f04_home`) and updates expectations.
+4. Draft name required on approve: accepted.
+5. Reject toasts "הבקשה נדחתה ונשלחה הודעה במייל" / "הבקשה נדחתה" / "הבקשה נדחתה, המייל לא נשלח": accepted.
