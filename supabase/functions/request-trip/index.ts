@@ -26,7 +26,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 import { corsHeaders, gmailSender, htmlEscape, isValidEmail, type MailMessage, mailErr, normalizeEmail, sha256Hex } from "../invite-manager/index.ts";
 
-export const FN_VERSION = "3.0.0-alpha.8.0";
+export const FN_VERSION = "3.0.0-alpha.8.1"; // CHANGE 2026-10-30 F21-FN-03: Turnstile failure reason logged (was "3.0.0-alpha.8.0")
 export const ACTIONS = ["start", "verify", "resend"] as const;
 export const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 export const TURNSTILE_HOST = "orsela.github.io";
@@ -141,15 +141,26 @@ export function validateStart(body: Record<string, unknown>, nowMs: number): { o
 export async function verifyTurnstile(
   fetchFn: Deps["fetch"], secret: string, token: string, ip: string, allowLocalhost: boolean,
 ): Promise<boolean> {
-  if (!secret || !token || token.length > 2048) return false;
+  if (!secret || !token || token.length > 2048) { // CHANGE 2026-10-30 F21-FN-03: reason logged (was a silent false)
+    log({ action: "start", event: "turnstile_reject", codes: [!secret ? "no_secret" : !token ? "no_token" : "token_too_long"] });
+    return false;
+  }
   try {
     const form = new URLSearchParams({ secret, response: token });
     if (ip) form.set("remoteip", ip);
     const r = await fetchFn(SITEVERIFY_URL, { method: "POST", body: form });
-    const d = await r.json() as { success?: boolean; hostname?: string };
-    if (d?.success !== true) return false;
-    return d.hostname === TURNSTILE_HOST || (allowLocalhost && d.hostname === "localhost");
-  } catch {
+    const d = await r.json() as { success?: boolean; hostname?: string; "error-codes"?: unknown };
+    // CHANGE 2026-10-30 F21-FN-03: one diagnostic log line when the check fails — Cloudflare's error-codes and the
+    //   hostname only (never the secret, the token or the address). Was: a silent false (live failure on 30/10).
+    if (d?.success !== true) {
+      log({ action: "start", event: "turnstile_reject", codes: Array.isArray(d?.["error-codes"]) ? d["error-codes"] : [] });
+      return false;
+    }
+    const okHost = d.hostname === TURNSTILE_HOST || (allowLocalhost && d.hostname === "localhost");
+    if (!okHost) log({ action: "start", event: "turnstile_host", host: String(d.hostname || "").slice(0, 80) });
+    return okHost;
+  } catch (e) {
+    log({ action: "start", event: "turnstile_error", name: e instanceof Error ? e.name : "unknown" });
     return false;
   }
 }

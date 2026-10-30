@@ -111,7 +111,7 @@ function captureLogs<T>(fn: () => Promise<T>): Promise<{ out: T; lines: string[]
 
 // ---------------------------------------------------------------------------------------------------
 Deno.test("version, CORS, method, unknown action, version header", async () => {
-  eq(FN_VERSION, "3.0.0-alpha.8.0");
+  eq(FN_VERSION, "3.0.0-alpha.8.1"); // CHANGE 2026-10-30 F21-FN-03: was alpha.8.0
   const s = setup();
   const pre = await handler(new Request("https://x/f", { method: "OPTIONS", headers: { origin: "http://localhost:5173" } }));
   eq([pre.status, pre.headers.get("access-control-allow-origin")], [204, "http://localhost:5173"]);
