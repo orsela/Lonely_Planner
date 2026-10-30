@@ -1758,6 +1758,7 @@ async function prefillMe(){
    REQUEST_FEATURE 'on'. wz.f21pre = {countries, month 'YYYY-MM' | null, name, applied} from create-trip lookup's `prefill`
    (memory only); null without prefill → today's wizard. Everything stays editable. */
 const REQ=typeof REQUEST_FEATURE!=='undefined'&&REQUEST_FEATURE==='on';
+const F21_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];   /* CHANGE 2026-10-30 F21-WZ-02: new line (no alpha.7.2 equivalent): Hebrew month names for F21-WZ-01 (same list as the admin side) */
 function f21Prefill(res){
  const p=res&&res.prefill;
  if(!p||typeof p!=='object'){wz.f21pre=null;return}
@@ -1779,10 +1780,15 @@ function f21Step1(){
  const nm=$('ptWzName'),me=$('ptWzMe');
  if(nm&&nm.value&&wz.invite&&nm.value===String(wz.invite.draft_name||'').slice(0,80)){tag(nm);const h=nm.parentNode.querySelector('.pt-wz-help');if(h)h.remove()}
  if(me&&p.name&&me.value===p.name)tag(me);
- /* the native date picker opens on the first allowed date: min = 1st of the requested month while no date is chosen yet,
-    removed at the first change (null month: the picker opens on today = the current month, as today) */
- const fr=$('ptWzFrom');
- if(fr&&!fr.value&&p.month){fr.min=p.month+'-01';fr.addEventListener('change',()=>fr.removeAttribute('min'),{once:true})}
+ /* CHANGE 2026-10-30 F21-WZ-01: what changed from the first F21 draft (no alpha.7.2 equivalent): no `min` on the start date any
+    more (it forbade an earlier start, architect Q1); instead, while no start date is picked and the request has a month, a help
+    line "בבקשה: <month year>" under the start-date field; hidden once a date is picked (shown again if it is cleared). */
+ const fr=$('ptWzFrom'),mi=/^(\d{4})-(\d{2})$/.exec(String(p.month||''));
+ if(fr&&mi&&+mi[2]>=1&&+mi[2]<=12){
+  fr.insertAdjacentHTML('afterend','<p class="pt-wz-help" id="ptWzF21Month">בבקשה: '+F21_MONTHS[+mi[2]-1]+' '+mi[1]+'</p>');
+  const hm=$('ptWzF21Month'),sync=()=>{hm.hidden=!!fr.value};
+  sync();fr.addEventListener('input',sync);fr.addEventListener('change',sync);
+ }
 }
 function f21Countries(){
  const p=wz.f21pre;if(!p||p.applied||!data.byCode)return;

@@ -457,12 +457,14 @@ def main():
         check("name in group = requester", page.locator("#ptWzMe").input_value() == "דנה כהן")
         tags = page.evaluate("()=>[...document.querySelectorAll('#ptWizard .pt-f21-tag')].map(t=>t.closest('label').htmlFor)")
         check("'מהבקשה' tags on name + me", tags == ["ptWzName", "ptWzMe"], tags)
-        check("date picker opens on April 2027 (min)", page.locator("#ptWzFrom").get_attribute("min") == "2027-04-01")
+        check("no min on the start date", page.locator("#ptWzFrom").get_attribute("min") is None)
+        check("help 'בבקשה: אפריל 2027' under the start date", page.locator("#ptWzF21Month").is_visible() and text(page, "#ptWzF21Month") == "בבקשה: אפריל 2027"
+              and page.evaluate("()=>document.getElementById('ptWzFrom').nextElementSibling.id") == "ptWzF21Month")
         check("390: no h-scroll", not page.evaluate("()=>document.documentElement.scrollWidth>document.documentElement.clientWidth+1"))
         shot(page, "08_wizard_prefill")
         page.locator("#ptWzMe").fill("דנה")
         f04.fill_step1(page, start="2027-04-03", end="2027-04-12")
-        check("min removed after the first date", page.locator("#ptWzFrom").get_attribute("min") is None)
+        check("help hidden once a date is picked", page.locator("#ptWzF21Month").is_hidden())
         page.locator("#ptWzNext").click()
         page.wait_for_selector('#ptWizard[data-screen="step2"]', timeout=10000)
         page.wait_for_timeout(500)
@@ -496,8 +498,8 @@ def main():
         f04.type_code(page, be.otp_code)
         page.wait_for_selector('#ptWizard[data-screen="step1"]', timeout=15000)
         page.wait_for_timeout(500)
-        check("no box, no tags, no min", page.locator("#ptWzF21Box").count() == 0 and page.locator(".pt-f21-tag").count() == 0
-              and page.locator("#ptWzFrom").get_attribute("min") is None)
+        check("no box, no tags, no month help", page.locator("#ptWzF21Box").count() == 0 and page.locator(".pt-f21-tag").count() == 0
+              and page.locator("#ptWzF21Month").count() == 0)
         check("today's help line kept", "מולא מההזמנה, אפשר לשנות" in text(page, "#ptWizard"))
         env.close()
 

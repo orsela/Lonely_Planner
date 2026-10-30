@@ -16,7 +16,7 @@ from f05_static_check import PROTECTED, extract, node_check, scripts  # noqa: E4
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = sys.argv[1] if len(sys.argv) > 1 else "313eb14"
-MARK = re.compile(r"CHANGE 2026-10-2\d F21-[A-Z0-9]+-\d+")
+MARK = re.compile(r"CHANGE 2026-10-(?:2\d|3[01]) F21-[A-Z0-9]+-\d+")
 EXP, WAS = "3.0.0-alpha.8", "3.0.0-alpha.7.2"
 APPF = "app/index.html"
 

@@ -68,10 +68,10 @@ simply absent when its host block is off.
   (meter `mail_today ≥ cap`) the box is disabled + unchecked with the cap line and `send_mail:false` is sent.
 - **Sheets** have no × (the artboards have none); close = "ביטול", backdrop, Escape (F03 sheet layer).
 - **Offline**: as F03 — notice "אין חיבור — הרשימה תתעדכן כשהרשת תחזור", list kept if it was loaded, approve/reject disabled; `online` reloads.
-- **Wizard date picker** (§1.11 "opens on the requested month"): a native `<input type=date>` cannot be told which month to open
-  on. With a requested month and no date chosen yet, `min` = the 1st of that month (Chrome's picker opens on the first allowed
-  date); `min` is removed at the first change. Side effect: the first pick cannot be before that month (the user can pick, then
-  change). Null month → nothing (the picker opens on today = current month, as today). iOS Safari's wheel may ignore it.
+- **Wizard date picker** (§1.11 "opens on the requested month"; changed 2026-10-30, F21-WZ-01/02, architect answer to Q1): a native
+  `<input type=date>` cannot be told which month to open on, and a `min` would forbid an earlier start, so no `min` is set.
+  Instead, while no start date is picked and the request has a month, a help line `#ptWzF21Month` "בבקשה: <month year>"
+  (Hebrew month names) sits under the start-date field; it hides once a date is picked (shows again if cleared). Null month → no line.
 - **Wizard tags**: "מהבקשה" on שם הטיול (when it equals the invite's draft name) and on השם שלך בקבוצה (when it equals the
   requester name); the green field tint goes away at the first edit; the existing help "מולא מההזמנה, אפשר לשנות" is removed when
   the tag is shown (the artboard has the tag instead). Requested countries are added once per wizard (a removed country does not
@@ -87,7 +87,7 @@ PYTHONPATH=/root/.local/share/uv/tools/pytest/lib/python3.13/site-packages \
 ```
 The smoke reuses `tests/f06/harness.py` (→ F05 → F20 → F04 → F03 → F02) unchanged and subclasses its backend with
 `admin_trip_requests`, `approve_request` / `reject_request` and lookup `prefill`. Results at the time of writing: static ALL OK,
-smoke 93/93.
+smoke 94/94 (2026-10-30, after F21-WZ-01).
 
 Regression (`tests/run_all.sh --only "f03on f04 f20 f06"`, clone deepened to full history, 2026-10-30):
 
