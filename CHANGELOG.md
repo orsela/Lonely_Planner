@@ -1,5 +1,23 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.8 — F21 (2026-10-30)
+
+### F21 · Anyone can request to open a trip; the super-admin approves
+<!-- CHANGE 2026-10-30 F21-DOCS-02: new entry. Base: hotfix 3.0.0-alpha.7.2 (QA-DEBT-BUG-01..04) is included in this release. -->
+- New page `/request/` (3.0.0-alpha.8, flag `REQUEST_FEATURE`): bilingual form (עב / EN), in-app-browser hop, Cloudflare
+  Turnstile, our own 6-digit email code (10 min, resume after reload, never stored), daily cap screen "נסו שוב מחר",
+  "הבקשה נשלחה". F21-REQ-05: the code boxes are emptied after a wrong/expired code (QA bug F21-QA-BUG-01).
+- App 3.0.0-alpha.8 (flag `REQUEST_FEATURE`): chooser badge "<N> בקשות חדשות" + "<M> הזמנות ממתינות"; admin tab
+  "בקשות" with mail meter (N מתוך 50), markers (EN / כבר מנהל / יש הזמנה פעילה); approve sheet (draft name D16, replaces an
+  active invite D12) and reject sheet (polite mail optional, D4); wizard pre-filled from the request (name, countries,
+  "בבקשה: <month>"). Protected functions byte-identical.
+- DB 0016_f21 (+ QA 0017): `private.trip_requests`, `request_attempts`, `mail_log`; `manager_invites.request_id/lang`;
+  `request_*` service-role functions, `admin_trip_requests()`, `find_invite_for_email` + prefill. Live `qa.f21_run()` 101/101.
+- Edge Functions alpha.8.0: new `request-trip` (start/verify/resend); `invite-manager` approve_request / reject_request +
+  English invite and reject emails (Hebrew invite byte-identical); `create-trip` lookup returns prefill.
+- QA (independent): browser 101 pass / 1 skip, functions 33/33, integration 10/10, DB 67/67; full regression green.
+  See docs/qa/F21_QA.md.
+
 ## 3.0.0-alpha.7.1 — F04-HOME (2026-10-26)
 
 ### F04-HOME · An invited manager ends up with the app on the home screen, and the email code never gets lost
