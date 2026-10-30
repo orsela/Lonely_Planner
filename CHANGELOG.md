@@ -13,7 +13,9 @@
 - Versions: app 3.0.0-alpha.7.2; `/invite/` and `/join/` version comments aligned. No DB / Edge Function change.
 - Tests: `tests/run_all.sh` full regression green (every suite PASS, 0 failures); new runtime test
   `test_s02_join_fatal_single_title`; dev check `scripts/dev/fix772_static_check.py`. QA-DEBT pass:
-  docs/qa/QA-DEBT_2026-10-26.md. Still to confirm on two real phones: FIX-01.
+  docs/qa/QA-DEBT_2026-10-26.md. Phone check (Or, 2026-10-30, trip "F04-HOME"): manager on the Android app rejected a
+  pending request while the app was open → no "כבר אינך חבר/ה", trip stays; the requester saw "הבקשה לא אושרה"; DB: both
+  active members intact. <!-- CHANGE 2026-10-30 FIX-DOCS-02: FIX-01 confirmed on a real phone. -->
 
 ## 3.0.0-alpha.7.1 — F04-HOME (2026-10-26)
 
