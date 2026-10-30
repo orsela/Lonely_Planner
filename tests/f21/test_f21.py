@@ -1432,7 +1432,8 @@ def _scripts(src):
 
 
 @pytest.mark.parametrize("check", ["protected:" + n for n in qa_refs.PROTECTED] + ["app_version", "pt_version", "request_version_comment",
-                                   "flags_declared", "change_comments", "node_check", "no_duplicate_ids", "no_live_project_ref"])
+                                   "flags_declared", "change_comments", "node_check", "no_duplicate_ids", "no_live_project_ref",
+                                   "invite_unchanged", "join_unchanged"])
 def test_c20_static(check, tmp_path):
     """C20: protected functions byte-identical to v2.15.2; APP_VERSION / PT_VERSION = tests/qa_versions.json; /request/ version
     comment alpha.8; REQUEST_FEATURE declared in both; 'CHANGE 2026-10-2x F21-…' comments saying what changed; node --check on
@@ -1483,6 +1484,12 @@ def test_c20_static(check, tmp_path):
         assert not dups(markup), "duplicate ids in /request/ markup: %r" % sorted(dups(markup))
     elif check == "no_live_project_ref":
         assert f02.LIVE_REF not in html and f02.LIVE_REF not in req
+    elif check in ("invite_unchanged", "join_unchanged"):
+        # spec §0: no change to /join/ (out of scope); /invite/ is not touched by F21 (its version comment stays alpha.7.x —
+        # replaces F04-HOME F4H-13[invite_version_comment], deselected in tests/run_all.sh)
+        sub = "invite" if check == "invite_unchanged" else "join"
+        cur = (H.REPO_DIR / sub / "index.html").read_text(encoding="utf-8")
+        assert cur == qa_refs.git_show(BASE_REF, sub + "/index.html"), "%s/index.html differs from alpha.7.2 (%s)" % (sub, BASE_REF)
 
 
 DUP_JS = "()=>{const c={};for(const e of document.querySelectorAll('[id]'))c[e.id]=(c[e.id]||0)+1;return Object.keys(c).filter(k=>c[k]>1)}"

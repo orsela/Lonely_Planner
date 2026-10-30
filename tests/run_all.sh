@@ -49,7 +49,10 @@
 #             test_b01_superadmin_online_sees_chooser_no_trip_started, test_c01_chooser_rows_order_content_flags_last_badge,
 #             test_c02_pending_badge[two], test_d01_network_reads_only_spec_tables. They RUN in job sup_f20_req_off and must
 #             pass there; the new texts / RPC are tested by tests/f21/test_f21.py test_c11_chooser_badges / _omitted.
-#   f04h      F04-HOME suite.
+#   f04h      F04-HOME suite. CHANGE 2026-10-30 F21-QA-08: deselected test_f4h_13_static[invite_version_comment] — a version pin:
+#             it expects /invite/'s version comment = the app version (tests/qa_versions.json, now 3.0.0-alpha.8), but F21 does
+#             not change /invite/ (byte-identical to alpha.7.2 313eb14; F21 spec §0 out of scope). Now tested by
+#             tests/f21/test_f21.py test_c20_static[invite_unchanged] (byte-identical to 313eb14).
 #   f21       F21 suite (tests/f21/test_f21.py: /request/, chooser badges, requests tab, sheets, wizard pre-fill).
 #   sup_f20_req_off  the F20 cases deselected from f20 because of F21 §1.6, on a copy with REQUEST_FEATURE='off' in app/ (F21
 #             criterion 1: flag off = alpha.7.2) — they must pass there.
@@ -58,7 +61,8 @@
 #             qa.f05 #100/#101 (F06 D2, as in db) and qa.f06 #910/#911 — they pin the exact contents of schema private
 #             (f06_* helpers only; tables join_attempts + transfer_codes); F21 §2 adds trip_requests, request_attempts,
 #             mail_log and private.f21_* on purpose. Now tested by tests/f21/db_test.py DB-03.private / DB-03.private_fn.
-#   static    dev self-check of the latest feature: scripts/dev/f04home_static_check.py ee5c723 (each suite above also runs
+#   static    dev self-check of the latest feature — CHANGE 2026-10-30 F21-QA-08: F21 (alpha.8): scripts/dev/f21_static_check.py +
+#             scripts/dev/f21_request_static_check.py (was fix772_static_check.py d148d74, which pins alpha.7.2); history: f04home_static_check.py ee5c723 (each suite above also runs
 #             its own static cases: protected functions == v2.15.2, versions from tests/qa_versions.json, node --check …).
 #   fn        Deno-style function tests on Node (scripts/dev/deno_test_node.mjs + tests/f05/deno_shim.mjs): QA F04/F05/F06 and
 #             the 5 functions' own unit tests. A failure whose message starts "KNOWN-BUG" is counted as xfail.
@@ -179,13 +183,14 @@ run_job() {
     sup_f20_req_off) pyjob sup_f20_req_off "$WORK/req_off" tests/f20 "test_f20.py::test_b01_superadmin_online_sees_chooser_no_trip_started" \
            "F21-superseded F20 cases, REQUEST_FEATURE=off copy" "test_f20.py::test_c01_chooser_rows_order_content_flags_last_badge" \
            "test_f20.py::test_c02_pending_badge[two]" "test_f20.py::test_d01_network_reads_only_spec_tables";;  # CHANGE 2026-10-30 F21-QA-08: new job
-    f04h) pyjob f04h "$REPO" tests/f04home test_f04home.py "";;
+    f04h) pyjob f04h "$REPO" tests/f04home test_f04home.py "desel: 1 version pin (/invite/ comment; F21 leaves /invite/ unchanged)" \
+           --deselect "test_f04home.py::test_f4h_13_static[invite_version_comment]";;  # CHANGE 2026-10-30 F21-QA-08
     f21) pyjob f21 "$REPO" tests/f21 test_f21.py "";;  # CHANGE 2026-10-30 F21-QA-08
     static)
       local log="$OUT/static.txt"
-      (cd "$REPO" && $PY scripts/dev/fix772_static_check.py d148d74) >"$log" 2>&1  # CHANGE 2026-10-26 FIX-RUN-01: dev check of the latest release (was f04home_static_check.py ee5c723, which pins alpha.7.1 and F04H-only markers)
+      (cd "$REPO" && $PY scripts/dev/f21_static_check.py && $PY scripts/dev/f21_request_static_check.py) >"$log" 2>&1  # CHANGE 2026-10-30 F21-QA-08: F21 dev checks (was fix772_static_check.py d148d74, alpha.7.2). CHANGE 2026-10-26 FIX-RUN-01: was f04home_static_check.py ee5c723
       local rc=$?
-      echo "$([ $rc = 0 ] && echo PASS || echo FAIL)|1|$([ $rc = 0 ] && echo 1 || echo 0)|$([ $rc = 0 ] && echo 0 || echo 1)|0|0|0|fix772_static_check.py d148d74" >"$OUT/static.res";;
+      echo "$([ $rc = 0 ] && echo PASS || echo FAIL)|1|$([ $rc = 0 ] && echo 1 || echo 0)|$([ $rc = 0 ] && echo 0 || echo 1)|0|0|0|f21_static_check.py + f21_request_static_check.py" >"$OUT/static.res";;
     fn)
       local log="$OUT/fn.txt" P=0 F=0 X=0 rc=0
       : >"$log"
