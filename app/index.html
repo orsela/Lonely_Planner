@@ -10078,7 +10078,7 @@ if(CUR_ON){
 .currow.f10-n3{grid-template-columns:repeat(3,minmax(0,1fr))}.currow.f10-n5{grid-template-columns:repeat(5,minmax(0,1fr))}.currow.f10-n6{grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
 #expenseCurRow .curchip,#budgetFxRow .curchip,#quickFxRow .curchip,#f10MoreList .curchip{min-height:44px;min-width:0;padding-inline:2px}
 #qeCurRow .qe-chip,#f10MoreList .qe-chip{min-height:44px;min-width:44px}
-.curchip.f10-more,.qe-chip.f10-more{border-style:dashed}.curchip.f10-more .code{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* CHANGE 2026-11-07 F10-BUG-01: the dashed border also under html.ui-kit (was: only the unprefixed rule, which the UI-kit solid border overrode). */.curchip.f10-more,.qe-chip.f10-more,html.ui-kit .curchip.f10-more,html.ui-kit .qe-chip.f10-more{border-style:dashed}.curchip.f10-more .code{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .qe-row.f10-wrap{flex-wrap:wrap}.qe-row.f10-wrap #qeCurRow{flex-basis:100%;flex-wrap:wrap}
 #f10MoreSheet{position:fixed;inset:0;z-index:1150;display:flex;align-items:flex-end;justify-content:center}#f10MoreSheet[hidden]{display:none}
 #f10MoreSheet .f10-scrim{position:absolute;inset:0;background:#0f172a66}

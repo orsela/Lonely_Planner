@@ -4,6 +4,7 @@
 
 ### F10 · Every trip converts in its own currencies
 <!-- CHANGE 2026-11-07 F10-DOCS-03: new entry. Base: main 4ca777b (3.0.0-alpha.8). -->
+- QA (independent, tests/f10, 33 tests): 33/33 after F10-BUG-01 fix (the "עוד" chip's dashed border lost to the UI-kit solid border). Report: docs/qa/F10_QA.md.
 - App only (flag `CURRENCY_FEATURE`, 'off' = alpha.8). The trip's currency model TRIPCUR is built from `trips.home_currency`,
   `trip_countries`, `trip_currencies` + countries.json / currencies.json, cached per trip (`pt:<trip>:tripcur`), exposed
   read-only as `window.__PT.tripcur`. Fallback = the Vietnam converter (VND ILS USD EUR).
