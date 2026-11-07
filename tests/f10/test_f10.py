@@ -33,7 +33,7 @@ from playwright.sync_api import Error as PWError  # noqa: E402
 
 f02, f04, f05, f20 = H.f02, H.f04, H.f05, H.f20
 REPO = H.REPO_DIR
-VERSION = "3.0.0-alpha.9"
+VERSION = os.environ.get("QA_EXPECTED_VERSION", "3.0.0-alpha.10")  # CHANGE 2026-11-07 F10B-QA-FIX-01: reads QA_EXPECTED_VERSION, default alpha.10 (was: hardcoded "3.0.0-alpha.9")
 TX = {
     "more_aria_re": r"^עוד\s+(\d+)\s+מטבעות:\s*(.+)$",
     "no_rate": "אין שער",

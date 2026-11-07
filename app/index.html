@@ -10132,10 +10132,10 @@ if(F10B_ON)(function(){
 const MAX=10,BASES=['ILS','USD','EUR'];
 const TX={ro:'רק מנהל הטיול יכול להוסיף, להחליף או להסיר מטבעות.',off:'אין חיבור. צריך חיבור כדי לשנות מטבעות – הרשימה מוצגת כפי שנשמרה.',
  full:'הטיול הגיע ל-10 מטבעות – בחרו מטבע להחלפה',dup:c=>c+' כבר בטיול',base:'מטבע בסיס קבוע',notMgr:'רק מנהל הטיול יכול לשנות מטבעות',net:'אין חיבור – נסו שוב'};
-let rows=null,countries=[],cd=null,busy=false,tripNm='';
+let rows=null,countries=[],cd=null,busy=false,tripNm='',lostMgr=false;   /* CHANGE 2026-11-07 F10B-BUG-02: lostMgr = the server refused a write as not-manager (was: no such state) */
 const A=()=>{try{return window.__ptF10b.api()}catch{return null}};
 const online=()=>{try{return navigator.onLine!==false}catch{return true}};
-const isMgr=()=>{const a=A();return!!a&&a.role()==='manager'};
+const isMgr=()=>{const a=A();return!lostMgr&&!!a&&a.role()==='manager'};   /* CHANGE 2026-11-07 F10B-BUG-02: false after a 401/403/RLS refusal, so the screen repaints read-only (spec §7) (was: the gate role only) */
 const tc=()=>{try{return window.__ptF10.get()}catch{return null}};
 function curDataP(){
  if(cd)return Promise.resolve(cd);
@@ -10295,6 +10295,7 @@ async function openPicker(oldCode){
   '<label for="ptF10bSearch" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">חיפוש מטבע</label><input id="ptF10bSearch" class="p10-in" type="search" placeholder="חיפוש: שם, קוד או מדינה" autocomplete="off">'+
   '<div id="ptF10bList" style="display:flex;flex-direction:column;gap:5px"></div>'+
   '<div style="position:sticky;bottom:0;background:#fff;padding-top:6px"><button type="button" class="p10-btn" id="ptF10bConfirm" disabled>'+(oldCode?'החלפה':'הוספה')+'</button></div>',oldCode?'החלפת מטבע':'הוספת מטבע');
+ l.querySelector('.p10-sheet').id='ptF10bPicker';   /* CHANGE 2026-11-07 F10B-BUG-01: the picker dialog carries its spec id (was: no id) */
  function norm(s){return String(s||'').toLowerCase().trim()}
  function paintList(){
   const q=norm($('ptF10bSearch').value);
@@ -10361,7 +10362,7 @@ async function write(build,code,okMsg){
   if(!err&&res&&Array.isArray(res.data)&&!res.data.length)err={code:'42501',message:'no row changed'}}
  catch(e){err=e||{message:'network'}}
  busy=false;closeLayer();
- if(err){ciToast('⚠️ '+errText(err,code));await load();paintPanel();paintMore();return}
+ if(err){const m=errText(err,code);if(m===TX.notMgr)lostMgr=true;/* CHANGE 2026-11-07 F10B-BUG-02: role lost → read-only (was: toast only) */ciToast('⚠️ '+m);await load();paintPanel();paintMore();return}
  try{await window.__ptF10.refresh()}catch{}
  await load();paintPanel();paintMore();
  ciToast('✅ '+okMsg);

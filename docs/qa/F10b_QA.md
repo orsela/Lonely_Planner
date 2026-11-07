@@ -57,3 +57,10 @@ not an app bug. Running F10 also needed the alpha.8 base commit 4ca777b, which t
 - Criterion 17 (Or's Android phone) and the "שמור" on a real er-api: er-api is stubbed.
 - A forced DELETE/PATCH of a base row from outside the UI (criterion 9 only covers that the UI offers none). The server-side lock is emulated, and an injected
   `base_currency_locked` shows "מטבע בסיס קבוע" (PASS).
+
+## Re-run after fix (2026-11-07, architect)
+<!-- CHANGE 2026-11-07 F10B-QA-FIX-02: new section. -->
+- F10B-BUG-01 fixed (`F10B-BUG-01`: the picker dialog has id `#ptF10bPicker`). F10B-BUG-02 fixed (`F10B-BUG-02`: after a
+  401/403/RLS refusal the screen repaints read-only until reload).
+- `tests/f10b/run.sh -k "c04 or c12"`: **7 passed / 0 failed** → suite 23/23.
+- `tests/f10/test_f10.py` VERSION now reads `QA_EXPECTED_VERSION` (default 3.0.0-alpha.10) — the F10 32/33 failure was this pin.
