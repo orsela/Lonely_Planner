@@ -1,4 +1,6 @@
-"""Lonely Planner F10 QA · Playwright black-box suite (trip currencies) · version 1.0.0
+"""Lonely Planner F10 QA · Playwright black-box suite (trip currencies) · version 1.0.1
+CHANGE 2026-11-07 F10-QA-FIX-00: 1.0.0 → 1.0.1 — two test-side fixes after the implementation landed (FIX-01, FIX-02 below);
+  no assertion about behaviour was weakened. Selectors needed no dev-notes ids.
 CHANGE 2026-11-07 F10-QA-02: new file (no previous version).
 
 Contract: docs/F10_spec.md (§1 TRIPCUR, §2 rates, §3 places P1–P10, §4 expenses, §5 flag, §6 criteria 1–13) ONLY. The F10
@@ -381,7 +383,9 @@ def test_c02_live_defaults_label(env):
 # =====================================================================================================
 def p9_texts(page):
     out = {}
-    for sel in ("#budgetSpentAmt", "#budgetAvailAmt", "#budgetAvailSub", "#catChips", "#expenseList", "#budgetBurn",
+    # CHANGE 2026-11-07 F10-QA-FIX-01: #budgetBurn removed from this list — no such element exists in alpha.8 (4ca777b) or
+    #   alpha.9 (renderDailyBurn skips it); the burn widget is #homeBurn, asserted at the end of test_c03. Was: listed here.
+    for sel in ("#budgetSpentAmt", "#budgetAvailAmt", "#budgetAvailSub", "#catChips", "#expenseList",
                 "#personalSpentSummary", "#qeRecent"):
         out[sel] = text(page, sel) or ""
     return out
@@ -826,7 +830,11 @@ def test_c08_fallback_no_cache_no_network(env):
     # first boot online only to sign in (identity), then wipe the trip cache keys and boot offline
     st = H.reboot(dev)
     assert st == "app"
+    # CHANGE 2026-11-07 F10-QA-FIX-02: the cache is wiped from the raw blank page (not the running app page, which wrote it
+    #   back before the reload — a harness bug, the device still had a cache). Was: removeItem on the app page.
+    dev.page.goto(env.server.origin + f02.BLANK_PATH, wait_until="commit")
     dev.page.evaluate("(p)=>{for(const k of Object.keys(localStorage))if(k.startsWith(p)&&/tripcur/.test(k))localStorage.removeItem(k)}", "pt:%s:" % tid)
+    assert not [k for k in H.f06.ls_page(dev) if "tripcur" in k], "harness: tripcur cache not wiped"
     H.go_offline(env, dev, True)
     st = H.reboot(dev)
     assert st == "app", "offline boot %r" % st
@@ -1072,3 +1080,24 @@ def test_c13_static(check):
     elif check == "sw_precache":
         sw = (REPO / "app" / "sw.js").read_text(encoding="utf-8")
         assert "countries.json" not in sw and "currencies.json" not in sw, "sw.js precaches the JSON files"
+
+
+def test_c11_flag_off_behaviour_equals_alpha8(env):
+    """C11 / §5 (behaviour, beyond the DOM): with CURRENCY_FEATURE='off' the full V capture of P1–P10 (texts, numbers, chip
+    sets, placeholders, totals, chat fx) is identical to alpha.8 — no §3 text applies when the flag is off."""
+    be = env.backend
+    tid = be.fixture("V", expenses=H.V_EXPENSES, budget=23000, fxrates=H.V_LEGACY_RATES)
+    H.serve_src(env, H.flip_chat(H.base_html(), "on"))
+    old = H.boot(env, tid, name="OLD")
+    base, base_fx = capture_v(env, old), chat_fx(env, old)
+    env.server.reset()
+    H.serve_src(env, H.flip_chat(H.flip_currency(H.app_html(), "off"), "on"))
+    dev = H.boot(env, tid, name="OFF")
+    off, off_fx = capture_v(env, dev), chat_fx(env, dev)
+    P = ["%s: alpha.8 %r / off %r" % (k, base[k], off.get(k)) for k in base if norm(str(base[k])) != norm(str(off.get(k)))]
+    if base_fx != off_fx:
+        P.append("chat fx: alpha.8 %r / off %r" % (base_fx, off_fx))
+    if H.tripcur(dev.page) not in (None,):
+        P.append("window.__PT.tripcur exposed with the flag off: %r" % H.tripcur(dev.page))
+    P += ["page error: %s" % e for e in errors(dev)]
+    assert not P, "\n".join(P)
