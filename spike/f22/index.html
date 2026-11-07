@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>F22 · ניסוי כניסה עם Google</title>
+<!--
+  F22 spike v0.1.0 (2026-11-07)
+  CHANGE 2026-11-07 F22-SPIKE-01: new file (no previous version).
+  Throwaway test page for F22a. Checks on Or's Android phone that:
+    1. an anonymous identity can link Google (linkIdentity) and keep the same uid;
+    2. after sign-out ("new phone"), signing in with Google returns that same uid;
+    3. linking a Google account that already belongs to another user fails cleanly (D7).
+  Uses its OWN storage key, so it never touches the real app's session in /app/.
+  Not linked from anywhere; delete after F22a ships.
+-->
+<style>
+:root{--bg:#f7f6f1;--card:#fff;--ink:#17211b;--muted:#5f6861;--line:#e4e6df;--accent:#0f6b4f;--ok:#146c43;--bad:#a8261b}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#111614;--card:#1a211d;--ink:#eef2ee;--muted:#a7b0a9;--line:#2c3530;--accent:#5fc49b;--ok:#7ee2a8;--bad:#ff8d80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,'Segoe UI',sans-serif;font-size:15px;line-height:1.5}
+main{max-width:480px;margin:0 auto;padding:18px 16px 40px;display:flex;flex-direction:column;gap:12px}
+h1{font-size:20px;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.k{color:var(--muted);font-size:13px}
+.v{font-weight:700;font-size:13px;direction:ltr;text-align:left;word-break:break-all}
+button{font-family:inherit;width:100%;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:15px;font-weight:700;margin-top:8px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.45}
+.ok{color:var(--ok);font-weight:800}
+.bad{color:var(--bad);font-weight:800}
+.small{font-size:12.5px;color:var(--muted)}
+pre{white-space:pre-wrap;direction:ltr;text-align:left;font-size:12px;background:var(--bg);border-radius:10px;padding:10px;margin:8px 0 0}
+</style>
+</head>
+<body>
+<main>
+<h1>F22 · ניסוי כניסה עם Google</h1>
+<p class="small" style="margin:0">דף ניסוי בלבד. לא נוגע באפליקציה האמיתית ובטיולים שלך.</p>
+
+<section class="card" aria-label="מצב">
+<div class="row"><span class="k">שלב</span><span class="v" id="step">…</span></div>
+<div class="row"><span class="k">uid נוכחי</span><span class="v" id="uid">—</span></div>
+<div class="row"><span class="k">uid המקורי (אנונימי)</span><span class="v" id="first">—</span></div>
+<div class="row"><span class="k">אנונימי?</span><span class="v" id="anon">—</span></div>
+<div class="row"><span class="k">דרכי כניסה</span><span class="v" id="prov">—</span></div>
+<div class="row"><span class="k">מצב תצוגה</span><span class="v" id="mode">—</span></div>
+<div id="verdict" style="margin-top:8px"></div>
+</section>
+
+<section class="card" aria-label="פעולות">
+<button class="primary" id="bStart">1 · התחלה: זהות אנונימית חדשה</button>
+<button class="primary" id="bLink">2 · חיבור Google לזהות הזו</button>
+<button id="bOut">3 · יציאה (מדמה טלפון חדש)</button>
+<button class="primary" id="bIn">4 · כניסה עם Google</button>
+<button id="bReset">איפוס הניסוי</button>
+</section>
+
+<section class="card" aria-label="תוצאה להעתקה">
+<b>תוצאה לשליחה ל-Claude</b>
+<pre id="log"></pre>
+<button id="bCopy">העתקת התוצאה</button>
+</section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// F22 spike v0.1.0 — see header comment.
+const URL_ = 'https://zwufpxnioqaweobnvffs.supabase.co';
+const KEY = 'sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
+const sb = supabase.createClient(URL_, KEY, { auth: { storageKey: 'f22-spike-auth', flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
+const $ = id => document.getElementById(id);
+const back = location.origin + location.pathname;
+const LOG = 'f22-spike-log', FIRST = 'f22-spike-first';
+const store = { get(k){ try { return localStorage.getItem(k) } catch(e){ return null } }, set(k,v){ try { localStorage.setItem(k,v) } catch(e){} }, del(k){ try { localStorage.removeItem(k) } catch(e){} } };
+const short = u => u ? u.slice(0,8) : '—';
+function log(line){ const t = new Date().toTimeString().slice(0,8); const all = (store.get(LOG)||'') + t + ' ' + line + '\n'; store.set(LOG, all); $('log').textContent = all; }
+function busy(b){ ['bStart','bLink','bOut','bIn','bReset'].forEach(id => $(id).disabled = b); }
+
+async function render(){
+  const { data: { session } } = await sb.auth.getSession();
+  const u = session?.user;
+  const first = store.get(FIRST);
+  $('uid').textContent = short(u?.id);
+  $('first').textContent = short(first);
+  $('anon').textContent = u ? (u.is_anonymous ? 'כן' : 'לא') : '—';
+  $('prov').textContent = u ? ((u.identities||[]).map(i => i.provider).join(', ') || 'אין') : '—';
+  $('mode').textContent = matchMedia('(display-mode: standalone)').matches ? 'אפליקציה מותקנת' : 'דפדפן';
+  $('bStart').disabled = !!u;
+  $('bLink').disabled = !(u && u.is_anonymous);
+  $('bOut').disabled = !u;
+  $('bIn').disabled = !!u;
+  $('step').textContent = !u ? (first ? 'מחכה לכניסה עם Google (4)' : 'מתחילים (1)') : (u.is_anonymous ? 'אנונימי – לחבר Google (2)' : 'מחובר עם Google');
+  let v = '';
+  if (u && !u.is_anonymous && first) v = u.id === first ? '<span class="ok">✓ אותו uid – החברויות היו נשמרות</span>' : '<span class="bad">✗ uid אחר – זהות חדשה נוצרה</span>';
+  $('verdict').innerHTML = v;
+  return u;
+}
+
+async function init(){
+  $('log').textContent = store.get(LOG) || '';
+  const q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1));
+  const err = q.get('error_code') || h.get('error_code') || q.get('error') || h.get('error');
+  if (err) { log('שגיאה בחזרה מ-Google: ' + err + ' · ' + (q.get('error_description') || h.get('error_description') || '')); history.replaceState(null, '', back); }
+  const u = await render();
+  if (u && (q.has('code') || sessionStorage.getItem('f22-pending'))) {
+    const p = sessionStorage.getItem('f22-pending'); sessionStorage.removeItem('f22-pending');
+    log('חזרה מ-Google (' + (p||'?') + '): uid ' + short(u.id) + ', אנונימי=' + u.is_anonymous + ', ספקים=' + (u.identities||[]).map(i=>i.provider).join('+') + ', תצוגה=' + $('mode').textContent + (store.get(FIRST) ? (u.id === store.get(FIRST) ? ' → אותו uid ✓' : ' → uid אחר ✗') : ''));
+    history.replaceState(null, '', back);
+  }
+}
+
+$('bStart').onclick = async () => { busy(true); const { data, error } = await sb.auth.signInAnonymously(); if (error) log('אנונימי נכשל: ' + error.message); else { store.set(FIRST, data.user.id); log('זהות אנונימית: ' + short(data.user.id)); } busy(false); render(); };
+$('bLink').onclick = async () => { busy(true); sessionStorage.setItem('f22-pending', 'link'); log('מתחיל חיבור Google…'); const { error } = await sb.auth.linkIdentity({ provider: 'google', options: { redirectTo: back } }); if (error) { log('חיבור נכשל: ' + error.message); sessionStorage.removeItem('f22-pending'); busy(false); render(); } };
+$('bOut').onclick = async () => { busy(true); await sb.auth.signOut({ scope: 'local' }); log('יציאה – מדמה טלפון חדש'); busy(false); render(); };
+$('bIn').onclick = async () => { busy(true); sessionStorage.setItem('f22-pending', 'signin'); log('מתחיל כניסה עם Google…'); const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: back } }); if (error) { log('כניסה נכשלה: ' + error.message); sessionStorage.removeItem('f22-pending'); busy(false); render(); } };
+$('bReset').onclick = async () => { await sb.auth.signOut({ scope: 'local' }); store.del(FIRST); store.del(LOG); $('log').textContent = ''; render(); };
+$('bCopy').onclick = async () => { try { await navigator.clipboard.writeText($('log').textContent); $('bCopy').textContent = 'הועתק ✓'; } catch(e) { $('bCopy').textContent = 'לא הצליח – סמן והעתק ידנית'; } };
+init();
+</script>
+</body>
+</html>
