@@ -1,5 +1,18 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.10 — F10b (2026-11-07)
+
+### F10b · Trip currencies screen: add, swap, remove (cap 10)
+<!-- CHANGE 2026-11-07 F10B-DOCS-02: new entry. Base: main 43394ff (3.0.0-alpha.9). -->
+- App only (flag `CURMGR_FEATURE`, 'off' = alpha.9). "עוד → 💱 מטבעות · N מתוך 10" for every member and a "ניהול מטבעות"
+  link in the quick FX sheet (D1). Screen: base currencies locked ("קבוע"), the others with ⋯ (manager online).
+- Managers: add (search + "מוצעים" = trip-country currencies not in the trip, D5), swap via ⋯ or, at 10, "מה יוצא?" (D3) —
+  one atomic UPDATE of the row; remove with the expense-count warning (D4). Editors / viewers read only (D2); offline =
+  cached list, actions off (D6). Converters rebuild at once (TRIPCUR refresh); a new code gets its live rate and, when shared
+  rates are saved, is added to them (spec §6).
+- Server unchanged: the existing RLS (managers), cap-10 trigger and base-lock trigger enforce the rules. No migration.
+  Spec: docs/F10b_spec.md; dev notes: docs/F10b_dev_notes.md.
+
 ## 3.0.0-alpha.9 — F10 (2026-11-07)
 
 ### F10 · Every trip converts in its own currencies
