@@ -48,6 +48,10 @@ h10.FIX.setdefault("F", ("דרום-מזרח אסיה מלא", "ILS", ["TH", "VN"
                          [("THB", "destination"), ("VND", "destination"), ("KHR", "destination"),
                           ("MYR", "added"), ("SGD", "added"), ("IDR", "added"), ("PHP", "added")]))
 
+def FIX_NAME(key):
+    return h10.FIX[key][0]
+
+
 ERR = {
     "currency_limit": ("23514", "currency_limit: a trip can have at most 10 currencies", 400),
     "dup": ("23505", 'duplicate key value violates unique constraint "trip_currencies_pkey"', 409),
@@ -226,9 +230,15 @@ def click_option(page, sel, code):
     return ok
 
 
+# Sheets by spec id; when the id is missing (F10B-BUG-01) fall back to the dialog that contains the spec-named control,
+# so the remaining behaviour can still be tested. test_c04_sheet_ids asserts the ids themselves.
+PICK = "#ptF10bPicker, [role=dialog]:has(#ptF10bSearch)"
+SWAP = "#ptF10bSwap, [role=dialog]:has(#ptF10bSwapGo)"
+
+
 def open_picker(page):
     page.locator("#ptF10bAdd").click()
-    assert wait_vis(page, "#ptF10bPicker"), "#ptF10bPicker did not open"
+    assert wait_vis(page, PICK), "#ptF10bPicker did not open"
     page.wait_for_timeout(300)
 
 
@@ -241,8 +251,8 @@ def search(page, q):
 def pick(page, code):
     """Choose `code` in the picker (search first so the row is on screen) and press confirm when the picker stays."""
     search(page, code)
-    assert click_option(page, "#ptF10bPicker", code), "picker: option %s not found / enabled (%r)" % (
-        code, [b["text"] for b in sheet_buttons(page, "#ptF10bPicker")][:12])
+    assert click_option(page, PICK, code), "picker: option %s not found / enabled (%r)" % (
+        code, [b["text"] for b in sheet_buttons(page, PICK)][:12])
 
 
 def confirm(page):
