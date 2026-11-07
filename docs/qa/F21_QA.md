@@ -125,3 +125,15 @@ Overall: every job green except `f21`, whose only failure is F21-QA-BUG-01.
   manual); dev checks `/request/` static 30/30, smoke 130/130.
 - Deployed so far: migration 0016 + 0017 on `plan-travel` (`qa.f21_run()` 101/101 live; f01–f04 all pass, f05 #100/101 and
   f06 #910/911 superseded as expected; no F21 rows left behind), Edge Function `request-trip` v1 (alpha.8.0).
+
+## Phone check (Or, Android / Chrome, 2026-10-30 → 2026-11-07) — passed
+- Hebrew request from a WhatsApp link → Chrome hop, real Turnstile, code from the notification, "הבקשה נשלחה" (after
+  `TURNSTILE_SECRET` was re-saved under the right name; request-trip alpha.8.1 now logs the Turnstile failure reason).
+- App: chooser badge, requests tab, "כבר מנהל" marker, approve → invite email → (on the phone) `/invite/` → wizard
+  pre-filled → trip "איחוד האמירויות · ינואר 2027" created (AE; USD/ILS/EUR base + AED destination).
+  Note: opened first on the PC browser of the test identity "בודק" → refused by design (F04 D6, email belongs to another
+  account and the device already has a trip); the invite expired before use and was re-sent once (F03 resend).
+- English request: wrong code first (boxes emptied, attempts left), then the right code → verified (BUG-01 fix confirmed);
+  rejected with mail → English reject email received.
+- Not checked on a phone: iPhone; approve that replaces an active invite (covered by automated tests).
+- Known limitation outside F21: the in-trip currency converter is still the v2.15 Vietnam one (VND) → F10.
