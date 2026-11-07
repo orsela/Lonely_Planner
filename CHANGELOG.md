@@ -17,6 +17,11 @@
   English invite and reject emails (Hebrew invite byte-identical); `create-trip` lookup returns prefill.
 - QA (independent): browser 101 pass / 1 skip, functions 33/33, integration 10/10, DB 67/67; full regression green.
   See docs/qa/F21_QA.md.
+- request-trip alpha.8.1 (F21-FN-03): logs the Turnstile failure reason (Cloudflare error-codes / hostname only).
+- Phone check (Or, Android, 2026-10-30 → 11-07): passed — Hebrew request → approve → pre-filled wizard → trip created;
+  English request with a wrong code first → reject with English mail. Known limitation outside F21: the in-trip currency
+  converter still shows VND (→ F10).
+
 ## 3.0.0-alpha.7.2 — hotfix (2026-10-26 → 2026-10-30)
 
 ### Four app bugs found by the QA-DEBT pass
