@@ -5799,7 +5799,10 @@ function f10Missing(f,t,R){R=R||f10R;if(R.source==='init')return null;return[f,t
 /* D4: an expense without homeCurrency is ILS; in a trip whose home is not ILS it is shown converted with the current rate
    (never rewritten). f10R is the last rates read (f10Rates) — renderBudget / calcDailyBurn refresh it first. */
 function f10Legacy(e){try{if(!CUR_ON)return false}catch{return false}return !!e&&f10Home()!=='ILS'&&(e.homeCurrency||'ILS')!==f10Home()}
-function f10Amt(e){const a=Number(e&&e.amount||0);if(!f10Legacy(e))return a;const v=f10Conv(a,e.homeCurrency||'ILS',f10Home());return v==null?a:v}
+/* no rate for the old currency yet: the expense counts 0 in the totals and is shown in its own currency (f10AmtTxt) */
+function f10Amt(e){const a=Number(e&&e.amount||0);if(!f10Legacy(e))return a;const v=f10Conv(a,e.homeCurrency||'ILS',f10Home());return v==null?0:v}
+function f10AmtTxt(e,opts){if(!f10Legacy(e))return fmtHome(Number(e&&e.amount||0),opts);const c=e.homeCurrency||'ILS',v=f10Conv(Number(e.amount||0),c,f10Home());
+ return(v==null?`${Number(e.amount||0).toLocaleString('he-IL')} ${f10Sym(c)}`:fmtHome(v,{maximumFractionDigits:0}))+' '+F10_MARK}
 const F10_MARK='(₪ מקורי)';
 /* §3: a remembered code that is not in the list falls back to local */
 function f10Pick(v){return v&&f10TC.list.indexOf(v)>-1?v:f10TC.local}
@@ -7077,12 +7080,12 @@ async function renderBudget(){if(CUR_ON)await f10Rates({noLive:true}).catch(()=>
  if(!expenseFormDayInited){expenseFormDayIndex=expenseDefaultDayIndex();expenseFormDayInited=true}
  renderExpenseDaySlider();
  const lodgingRows=[];tripData.forEach((d,i)=>{if(d.isBooked)lodgingRows.push({dateStr:d.date,dateIso:iso(d.date)||'',category:'lodging',detail:d.bookedHotel||d.hotel||'',amount:Number(d.actualCost||0),source:'lodging',dayIndex:i})});
- const expenseRows=items.map((e,idx)=>{const di=e.dayIndex!=null&&tripData[e.dayIndex]?e.dayIndex:null;return{dateStr:di!=null?tripData[di].date:'',dateIso:di!=null?(iso(tripData[di].date)||''):'',category:normalizeCategory(e.category)||'other',detail:e.description||'',amount:f10Amt(e),legacy:f10Legacy(e),source:'expense',expenseIdx:idx}});
+ const expenseRows=items.map((e,idx)=>{const di=e.dayIndex!=null&&tripData[e.dayIndex]?e.dayIndex:null;return{dateStr:di!=null?tripData[di].date:'',dateIso:di!=null?(iso(tripData[di].date)||''):'',category:normalizeCategory(e.category)||'other',detail:e.description||'',amount:f10Amt(e),legacy:f10Legacy(e)?f10AmtTxt(e):null,source:'expense',expenseIdx:idx}});
  const detailRowsAll=[...lodgingRows,...expenseRows].sort((a,b)=>(a.dateIso||'9999-99-99').localeCompare(b.dateIso||'9999-99-99'));
  const detailRows=budgetCatFilter?detailRowsAll.filter(r=>r.category===budgetCatFilter):detailRowsAll;
  const detailTotal=detailRows.reduce((s,r)=>s+r.amount,0);
  $('expenseList').innerHTML=`<table class="budget-detail-table"><thead><tr><th>תאריך</th><th>סעיף</th><th>פרוט</th><th>עלות</th><th></th></tr></thead><tbody>${
-  detailRows.map(r=>`<tr class="${r.source==='lodging'?'lodging-row':''}"><td class="bd-date">${esc(r.dateStr||'—')}</td><td class="bd-cat">${esc(CATEGORIES[r.category]||r.category)}</td><td class="bd-detail" title="${esc(r.detail)}">${esc(r.detail)}${r.source==='lodging'?' <span class="muted">🏨</span>':''}</td><td class="bd-amount">${fmtHome(r.amount,r.legacy?{maximumFractionDigits:0}:undefined)}${r.legacy?' <small class="muted">'+F10_MARK+'</small>':''}</td><td class="bd-actions">${r.source==='expense'?`<button class="btn outline" data-edit-expense="${r.expenseIdx}">✎</button><button class="btn outline" data-delete-expense="${r.expenseIdx}">🗑️</button>`:''}</td></tr>`).join('')||`<tr><td colspan="5" class="muted" style="text-align:center;padding:14px">${budgetCatFilter?'אין הוצאות בקטגוריה זו':'אין עדיין הוצאות רשומות'}</td></tr>`
+  detailRows.map(r=>`<tr class="${r.source==='lodging'?'lodging-row':''}"><td class="bd-date">${esc(r.dateStr||'—')}</td><td class="bd-cat">${esc(CATEGORIES[r.category]||r.category)}</td><td class="bd-detail" title="${esc(r.detail)}">${esc(r.detail)}${r.source==='lodging'?' <span class="muted">🏨</span>':''}</td><td class="bd-amount">${r.legacy?esc(r.legacy):fmtHome(r.amount)}</td><td class="bd-actions">${r.source==='expense'?`<button class="btn outline" data-edit-expense="${r.expenseIdx}">✎</button><button class="btn outline" data-delete-expense="${r.expenseIdx}">🗑️</button>`:''}</td></tr>`).join('')||`<tr><td colspan="5" class="muted" style="text-align:center;padding:14px">${budgetCatFilter?'אין הוצאות בקטגוריה זו':'אין עדיין הוצאות רשומות'}</td></tr>`
  }</tbody>${detailRows.length?`<tfoot><tr><td colspan="3">סה״כ</td><td class="bd-amount">${fmtHome(detailTotal)}</td><td></td></tr></tfoot>`:''}</table>`;
  renderPersonalBudget();
 }
@@ -9233,7 +9236,7 @@ async function qeRenderRecent(){
  const items=(await getExpenses()).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,3);
  const today=new Date();today.setHours(0,0,0,0);
  const when=t=>{if(!t)return'';const d=new Date(t);d.setHours(0,0,0,0);const diff=Math.round((today-d)/864e5);return diff===0?'היום':diff===1?'אתמול':new Date(t).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})};
- el.innerHTML=items.length?items.map(e=>{const m=qeCatMeta(e.category);const amt=e.originalCurrency&&e.originalAmount?qeFmt(Number(e.originalAmount),e.originalCurrency):CUR_ON?fmtHome(Math.round(f10Amt(e))):qeFmt(Number(e.amount||0),'ILS');/* CHANGE 2026-11-07 F10-P9-07: home amount via fmtHome (was qeFmt(…,'ILS')) */return`<div class="qe-item"><span>${m[1]} ${esc(e.description||m[2])} · ${when(e.createdAt)}</span><b>${esc(amt)}</b></div>`}).join(''):'<div class="qe-item muted">עוד אין הוצאות</div>';
+ el.innerHTML=items.length?items.map(e=>{const m=qeCatMeta(e.category);const amt=e.originalCurrency&&e.originalAmount?qeFmt(Number(e.originalAmount),e.originalCurrency):CUR_ON?(f10Legacy(e)?f10AmtTxt(e):qeFmt(Number(e.amount||0),f10Home())||fmtHome(Math.round(Number(e.amount||0)))):qeFmt(Number(e.amount||0),'ILS');/* CHANGE 2026-11-07 F10-P9-07: home amount via fmtHome (was qeFmt(…,'ILS')) */return`<div class="qe-item"><span>${m[1]} ${esc(e.description||m[2])} · ${when(e.createdAt)}</span><b>${esc(amt)}</b></div>`}).join(''):'<div class="qe-item muted">עוד אין הוצאות</div>';
 }
 if(QUICK_EXPENSE==='on'){const _qeOrigRenderBudget=renderBudget;renderBudget=async function(){const r=await _qeOrigRenderBudget.apply(this,arguments);qeRenderRecent();return r};qeRenderRecent()}
 function qeOpen(){switchPanel('budget');const c=$('quickExpenseCard');if(!c)return;c.scrollIntoView({block:'start',behavior:'smooth'});setTimeout(()=>{try{$('qeAmount').focus({preventScroll:true})}catch{}},250)}
@@ -9754,7 +9757,7 @@ if(EDIT_MENU==='on'){
   // expenses
   let b=t.closest('[data-ui-exp-more]');
   if(b){e.preventDefault();e.stopPropagation();const idx=Number(b.dataset.uiExpMore);const ex=(await getExpenses())[idx];if(!ex)return;
-   const amt=fmtHome(f10Amt(ex),f10Legacy(ex)?{maximumFractionDigits:0}:undefined)+(f10Legacy(ex)?' '+F10_MARK:''),orig=ex.originalCurrency&&ex.originalAmount?` (${qeFmt(Number(ex.originalAmount),ex.originalCurrency)})`:'';/* CHANGE 2026-11-07 F10-P9-06: fmtHome + D4 marker (was `${…} ₪`) */
+   const amt=f10Legacy(ex)?f10AmtTxt(ex):fmtHome(Number(ex.amount||0)),orig=ex.originalCurrency&&ex.originalAmount?` (${qeFmt(Number(ex.originalAmount),ex.originalCurrency)})`:'';/* CHANGE 2026-11-07 F10-P9-06: fmtHome + D4 marker (was `${…} ₪`) */
    uiSheetOpen({title:`${ex.description||CATEGORIES[normalizeCategory(ex.category)]||'הוצאה'} · ${amt}`,sub:[CATEGORIES[normalizeCategory(ex.category)],ex.by?`נרשם ע"י ${ex.by}`:'',uiWhen(ex.editedAt||ex.createdAt)].filter(Boolean).join(' · ')+orig,actions:[
     {icon:'✏️',label:'עריכה',run:()=>expEdit(idx)},
     {icon:'🗑️',label:'מחיקה',danger:true,confirm:{title:`למחוק את "${ex.description||'ההוצאה'}" (${amt})?`,text:'ההוצאה תימחק אצל כל בני המשפחה.'},run:()=>expDelete(idx)}]});return}
@@ -10066,7 +10069,7 @@ async function f10ChatFx(){try{const R=await f10Rates({noLive:true});return{base
 /* boot: rows, texts and the first (saved / cached) rates; a DB refresh of TRIPCUR rebuilds everything (F20 switch reloads) */
 if(CUR_ON){
  window.__ptF10.onChange(m=>{f10TC=m;
-  try{expenseSelectedCur=f10Pick(expenseSelectedCur);qeCur=f10Pick(qeCur);[budgetFxFromCur,budgetFxToCur]=f10FxDefault();[quickFxFromCur,quickFxToCur]=f10FxDefault()}catch{}
+  try{expenseSelectedCur=f10Pick(localStorage.getItem('planner:lastExpenseCurrency'));qeCur=f10Pick(localStorage.getItem('planner:qe:cur'));[budgetFxFromCur,budgetFxToCur]=f10FxDefault();[quickFxFromCur,quickFxToCur]=f10FxDefault()}catch{}
   f10Rates({noLive:true}).then(()=>{f10RowsAll();f10RefreshTexts();try{applyExpenseCurrencyUI()}catch{}if(currentPanel()==='budget'){renderBudget();refreshFxInputs();renderDailyBurn()}}).catch(()=>{});
  });
 }
