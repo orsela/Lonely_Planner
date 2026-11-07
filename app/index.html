@@ -79,6 +79,14 @@ const HOME_INSTALL_FEATURE='on';
    from a request. The /request/ page has its own REQUEST_FEATURE. 'off' = exactly the 3.0.0-alpha.7.2 behaviour: every F21
    line is a no-op (no tab, no badge, no admin_trip_requests call, wizard unchanged). Needs ADMIN_FEATURE and SWITCH_FEATURE. */
 const REQUEST_FEATURE='on';
+/* CHANGE 2026-11-07 F10-FLAG-01: new flag (no alpha.8 equivalent). 'on' = F10 (docs/F10_spec.md): every trip converts in its
+   own currencies — the trip's currency model TRIPCUR (trips.home_currency + trip_countries + trip_currencies, cached per trip)
+   drives the add-expense chips, the budget converter + rate rows, the quick FX sheet, the floating FX button, the quick
+   expense chips, the reservation cost placeholder and every display of a stored amount (fmtHome, the trip's home currency);
+   rates are shared in the v2 format (legacy USD/EUR/VND fields kept for ILS trips). 'off' = exactly the 3.0.0-alpha.8
+   behaviour: the F10 block returns on its first line and every F10 line in the main script is a no-op (Vietnam converter,
+   amounts in ₪). No server part. */
+const CURRENCY_FEATURE='on';
 </script>
 <!-- CHANGE 2026-10-05 F03-UI-01: NEW block (no 3.0.0-alpha.2 equivalent) — F03 "super-admin invites a manager"
      (docs/F03_spec.md). Style + one classic script, placed after the flags script and BEFORE the F02 gate block so it
@@ -2311,7 +2319,12 @@ try{
 function attach(a){if(!api&&a&&typeof a==='object')api=a}
 /* CHANGE 2026-10-26 F04H-CORE-02: what changed from alpha.7: two more read-only members, gateTop (F04H-GATE-02) and resumeBoot
    (F04H-RES-10); both are no-ops with HOME_INSTALL_FEATURE='off'. */
-try{Object.defineProperty(window,'__ptF04',{value:Object.freeze({version:F04_VERSION,attach,fromInvite,gateCard,emptyTrip,gateTop,resumeBoot}),writable:false,configurable:false})}catch{}
+/* CHANGE 2026-11-07 F10-F04-01: new function (no alpha.8 equivalent): hands the F10 block (TRIPCUR) the wizard's own lazy
+   countries.json / currencies.json loader (loadData, unchanged) — resolves {byCode, curByCode} or null on failure. */
+function curData(){return loadData().then(ok=>ok?{byCode:data.byCode,curByCode:data.curByCode}:null,()=>null)}
+/* CHANGE 2026-11-07 F10-F04-02: one more read-only member, curData (F10-F04-01) (was: {version, attach, fromInvite, gateCard,
+   emptyTrip, gateTop, resumeBoot}). The wizard itself is unchanged. */
+try{Object.defineProperty(window,'__ptF04',{value:Object.freeze({version:F04_VERSION,attach,fromInvite,gateCard,emptyTrip,gateTop,resumeBoot,curData}),writable:false,configurable:false})}catch{}
 })();
 </script>
 <!-- CHANGE 2026-10-13 F20-UI-01: NEW block (no 3.0.0-alpha.4.2 equivalent) — F20 "the super-admin entry is separate from the
@@ -4005,6 +4018,122 @@ function attach(a){
 try{Object.defineProperty(window,'__ptF06',{value:Object.freeze({version:F06_VERSION,attach}),writable:false,configurable:false})}catch{}
 })();
 </script>
+<script>
+/* CHANGE 2026-11-07 F10-CUR-01 (3.0.0-alpha.9): new script (no alpha.8 equivalent). One IIFE; exposes only the frozen,
+   read-only object window.__ptF10 {version, attach, get, snapshot, onChange, setUnit, refresh, source} used by the gate bridge
+   (F10-GATE-01, which also adds the read-only window.__PT.tripcur) and by the F10 lines of the main script. It builds the
+   trip's currency model TRIPCUR (docs/F10_spec.md §1) from trips.home_currency + trip_countries + trip_currencies (read-only,
+   existing RLS) and countries.json / currencies.json (the F04 wizard's lazy loader, window.__ptF04.curData; same-origin, not
+   precached). The built model is kept device-only per trip (localStorage key 'tripcur' = pt:<trip>:tripcur through the F02
+   namespacing) and used at once on the next open, then refreshed from the database when online.
+   With CURRENCY_FEATURE='off' the script returns on its first line: nothing at all (alpha.8). */
+(function(){
+'use strict';
+if(typeof CURRENCY_FEATURE==='undefined'||CURRENCY_FEATURE!=='on')return;      /* off: nothing at all (alpha.8) */
+const F10_VERSION='3.0.0-alpha.9';
+const CACHE_KEY='tripcur',DATA_TIMEOUT_MS=15000;
+/* spec §1 fallback (no cache and no network, or the migrated Vietnam trip without rows) = today's behaviour */
+const FALLBACK={home:'ILS',local:'VND',list:['VND','ILS','USD','EUR']};
+/* symbols / Hebrew names known without currencies.json (the alpha.8 converter's four) */
+const KNOWN_SYM={ILS:'₪',USD:'$',EUR:'€',VND:'₫'},KNOWN_HE={ILS:'שקל',USD:'דולר',EUR:'יורו',VND:'דונג'};
+let api=null,model=null,src='none',refreshing=null,lastKey='',listeners=[],onlineHooked=false;
+const CODE3=/^[A-Z]{3}$/;
+function online(){try{return navigator.onLine!==false}catch{return true}}
+function readCache(){
+ try{const v=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');if(v&&CODE3.test(v.home)&&Array.isArray(v.list)&&v.list.length)return v}catch{}
+ return null;
+}
+function writeCache(m){try{localStorage.setItem(CACHE_KEY,JSON.stringify(m))}catch{}}
+function keyOf(m){return JSON.stringify([m.home,m.local,m.list,m.sym,m.he])}
+/* sym / he / unit for every listed code: currencies.json, else `prev` (the cached or current model), else built-in, else the
+   code. unit (C2) defaults to 1 (VND: 1000, as alpha.8) until the main script decides it from the rates (setUnit). */
+function fill(m,cur,prev){
+ prev=prev||model||{};
+ const sym={},he={},unit={};
+ m.list.forEach(c=>{
+  const k=cur&&cur[c];
+  sym[c]=(k&&k.symbol)||(prev.sym&&prev.sym[c])||KNOWN_SYM[c]||c;
+  he[c]=(k&&k.he)||(prev.he&&prev.he[c])||KNOWN_HE[c]||c;
+  const u=prev.unit&&prev.unit[c];
+  unit[c]=u===1000||u===1?u:(c==='VND'?1000:1);
+ });
+ return{home:m.home,local:m.local,list:m.list.slice(),sym,he,unit};
+}
+function fallback(){return fill({home:FALLBACK.home,local:FALLBACK.local,list:FALLBACK.list},null,{})}
+/* spec §1: local = currency of the first trip country that has one (and is listed); list (D6) = destination currencies in
+   trip-country order, then home, then the other base currencies, then the added ones (trip_currencies.sort); no duplicates;
+   a destination currency that trip_currencies lacks (cap reached) is skipped. */
+function build(home,countries,currencies,byCode,curByCode){
+ home=CODE3.test(String(home||''))?String(home):'ILS';
+ const cs=(countries||[]).filter(x=>x&&/^[A-Z]{2}$/.test(String(x.country_code||''))).slice().sort((a,b)=>(Number(a.sort)||0)-(Number(b.sort)||0));
+ const tc=(currencies||[]).filter(x=>x&&CODE3.test(String(x.currency_code||''))).slice().sort((a,b)=>(Number(a.sort)||0)-(Number(b.sort)||0));
+ if(!cs.length&&!tc.length&&home==='ILS')return null;   /* the migrated Vietnam trip without rows → fallback */
+ const inTc=new Set(tc.map(x=>x.currency_code));
+ const allowed=c=>c===home||!tc.length||inTc.has(c);
+ let dest=[];
+ if(byCode)cs.forEach(x=>{const k=byCode[x.country_code];const c=k&&CODE3.test(String(k.currency||''))?k.currency:null;if(c&&allowed(c)&&dest.indexOf(c)<0)dest.push(c)});
+ else tc.filter(x=>x.kind==='destination').forEach(x=>{if(dest.indexOf(x.currency_code)<0)dest.push(x.currency_code)});   /* countries.json unavailable */
+ const list=dest.slice();
+ const add=c=>{if(list.indexOf(c)<0)list.push(c)};
+ add(home);
+ tc.filter(x=>x.kind==='base').forEach(x=>add(x.currency_code));
+ tc.filter(x=>x.kind==='added').forEach(x=>add(x.currency_code));
+ const local=dest.length?dest[0]:home;
+ return fill({home,local,list},curByCode);
+}
+function loadCurData(){
+ if(window.__ptF04&&typeof window.__ptF04.curData==='function')return window.__ptF04.curData();
+ /* WIZARD_FEATURE='off' (no F04 block): the same two same-origin files, fetched the same way */
+ const get=u=>fetch(u,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error('http '+r.status);return r.json()});
+ return Promise.all([get('countries.json'),get('currencies.json')]).then(([c,k])=>{
+  const byCode={},curByCode={};
+  (Array.isArray(c)?c:[]).forEach(x=>{if(x&&/^[A-Z]{2}$/.test(x.code))byCode[x.code]=x});
+  (Array.isArray(k)?k:[]).forEach(x=>{if(x&&CODE3.test(x.code))curByCode[x.code]=x});
+  return{byCode,curByCode};
+ }).catch(()=>null);
+}
+function set(m,how){
+ const k=keyOf(m),changed=!!model&&k!==lastKey;
+ model=m;src=how;lastKey=k;
+ if(how==='db')writeCache(m);
+ if(changed)listeners.slice().forEach(fn=>{try{fn(snapshot())}catch(e){console.warn('[pt] F10 listener',e)}});
+}
+function get(){
+ if(!model&&!(api&&api.tripId&&api.tripId()))return fallback();   /* trip not known yet: nothing is cached or remembered */
+ if(!model){const c=readCache();if(c){model=fill(c,null,c);src='cache'}else{model=fallback();src='fallback'}lastKey=keyOf(model);refresh()}
+ return model;
+}
+function snapshot(){const m=get();return JSON.parse(JSON.stringify({home:m.home,local:m.local,list:m.list,sym:m.sym,he:m.he,unit:m.unit}))}
+function refresh(){
+ if(refreshing)return refreshing;
+ const c=api&&api.client&&api.client(),t=api&&api.tripId&&api.tripId();
+ if(!c||!t||t==='local'||!online()){hookOnline();return Promise.resolve(false)}
+ const T=p=>api.withTimeout(p,api.timeoutMs);
+ refreshing=(async()=>{
+  const[tr,cc,tc,cd]=await Promise.all([
+   T(c.from('trips').select('home_currency').eq('id',t).maybeSingle()),
+   T(c.from('trip_countries').select('country_code,sort').eq('trip_id',t)),
+   T(c.from('trip_currencies').select('currency_code,kind,sort').eq('trip_id',t)),
+   Promise.race([loadCurData(),new Promise(r=>setTimeout(()=>r(null),DATA_TIMEOUT_MS))])]);
+  if(!tr||tr.error||!tr.data||!cc||cc.error||!tc||tc.error)throw new Error('tripcur');
+  const m=build(tr.data.home_currency,cc.data,tc.data,cd&&cd.byCode,cd&&cd.curByCode);
+  if(api.tripId&&api.tripId()!==t)return false;          /* the trip changed meanwhile */
+  set(m||fallback(),'db');return true;
+ })().catch(()=>{hookOnline();return false}).finally(()=>{refreshing=null});
+ return refreshing;
+}
+function hookOnline(){if(onlineHooked)return;onlineHooked=true;window.addEventListener('online',()=>{setTimeout(refresh,1500)})}
+function onChange(fn){if(typeof fn==='function')listeners.push(fn)}
+/* units (C2) are decided by the main script from the rates; kept in the model + cache so an offline open shows the same rows */
+function setUnit(u){
+ const m=get();let ch=false;
+ Object.keys(u||{}).forEach(c=>{const v=u[c]===1000?1000:1;if(m.list.indexOf(c)>-1&&m.unit[c]!==v){m.unit[c]=v;ch=true}});
+ if(ch&&src!=='fallback')writeCache(m);
+}
+function attach(a){if(!api&&a&&typeof a==='object')api=a}
+try{Object.defineProperty(window,'__ptF10',{value:Object.freeze({version:F10_VERSION,attach,get:snapshot,snapshot,onChange,setUnit,refresh,source:()=>src}),writable:false,configurable:false})}catch{}
+})();
+</script>
 <!-- CHANGE 2026-10-04 F02-GATE-01: the v2.15.2 GM-08 block (static supabase-js <script> tag + the inline IIFE that
      created a client for the old live project and defined window.storage on its key-value table) is REMOVED and
      replaced by this block. This replacement is unavoidable: that IIFE held the old project's URL/key, which must
@@ -4041,7 +4170,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.8'; /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.9'; /* CHANGE 2026-11-07 F10-VER-02: was '3.0.0-alpha.8' (F10: every trip converts in its own currencies) */ /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -4391,6 +4520,16 @@ if(window.__ptF06&&STORAGE_BACKEND==='cloud'){
   enterTrip:(tripId,role)=>{writeCached({trip_id:String(tripId),role:role||null});if(state.started){location.reload();return}setTrip(tripId,role);installStorage();start()},
   started:()=>state.started,phase:()=>state.phase
  });
+}
+
+/* CHANGE 2026-11-07 F10-GATE-01: new lines (no alpha.8 equivalent), additive — no existing statement changed. Placed before
+   the F03 bridge (which may leave this IIFE for the #invite= landing). Hands the F10 block (head, window.__ptF10; absent when
+   CURRENCY_FEATURE='off') read-only access to this gate's client, the timeout helper and the current trip, and adds
+   window.__PT.tripcur = a read-only copy of the trip's currency model (spec §1; a getter, so every read is a fresh copy).
+   'off': no-op, window.__PT has no tripcur (alpha.8). */
+if(window.__ptF10){
+ window.__ptF10.attach({withTimeout,timeoutMs:PT_TIMEOUT_MS,client:()=>sb,tripId:()=>state.tripId});
+ try{Object.defineProperty(state,'tripcur',{enumerable:true,configurable:false,get(){try{return state.tripId?window.__ptF10.snapshot():null}catch{return null}}})}catch{}
 }
 
 /* CHANGE 2026-10-05 F03-GATE-01: new lines (no alpha.2 equivalent), additive — no existing statement changed.
@@ -5595,6 +5734,156 @@ const SS={
   }catch{return[]}
  }
 };
+/* CHANGE 2026-11-07 F10-CORE-01: new lines (no alpha.8 equivalent), additive. F10 (docs/F10_spec.md) main-script core:
+   CUR_ON = CURRENCY_FEATURE 'on' and the head block window.__ptF10 present; every F10 line below checks it ('off' = alpha.8).
+   - f10TC = the trip's currency model (copy of TRIPCUR, §1); rows are rebuilt on window.__ptF10.onChange (DB refresh).
+   - fmtHome(n, opts, tight) = the ONE formatter of a stored amount (P9): `${n.toLocaleString('he-IL',opts)} ₪` for an ILS
+     trip (byte-identical to alpha.8; tight = no space, as the category tiles), the home symbol otherwise. With CUR_ON false
+     it always gives ₪, i.e. exactly alpha.8.
+   - rates (§2): f10Parse reads v2 {v:2,base,rates,updatedAt,source} whose base = home, or the legacy {USD,EUR,VND} object
+     (ILS per unit, VND per 1,000) when home is ILS; f10Rates() = saved rates, then live rates fetched once per session and
+     kept in memory (missing codes only), then (home ILS, nothing saved) FX_DEFAULTS; f10Hpu(code) = homePerUnit (null = "אין
+     שער"); f10Conv(a,from,to); units (C2) = 1000 when homePerUnit < 0.01, else 1 (kept in TRIPCUR through setUnit).
+   - chip rows (P1/P4/P5/P7): f10Row(key) builds #expenseCurRow / #budgetFxRow / #quickFxRow / #qeCurRow from f10TC.list:
+     at most 5 chips, then "עוד" (#<row id>More, dashed) opening the sheet #f10MoreSheet (chips [data-f10-pick]); a pick from
+     the sheet shows that currency in the 5th slot until the row is rebuilt. Clicks are delegated on the row element. */
+const CUR_ON=typeof CURRENCY_FEATURE!=='undefined'&&CURRENCY_FEATURE==='on'&&!!window.__ptF10;
+let f10TC=CUR_ON?window.__ptF10.get():null;
+const F10_SYM0={ILS:'₪',USD:'$',EUR:'€',VND:'₫'};
+const F10_WORD={ILS:'שקלים',USD:'דולרים',EUR:'אירו'};
+function f10Home(){try{return CUR_ON?f10TC.home:'ILS'}catch{return'ILS'}}   /* try: safe before this line runs (TDZ) */
+function f10Sym(c){try{return(CUR_ON&&f10TC.sym&&f10TC.sym[c])||F10_SYM0[c]||c}catch{return{ILS:'₪',USD:'$',EUR:'€',VND:'₫'}[c]||c}}
+function f10Unit(c){return CUR_ON&&f10TC.unit&&(f10TC.unit[c]===1000||f10TC.unit[c]===1)?f10TC.unit[c]:(c==='VND'?1000:1)}
+/* P2: "חשב לשקלים" / "חשב לדולרים" / "חשב לאירו" / "חשב ל-<CODE>" */
+function f10ToWord(c){return F10_WORD[c]?'ל'+F10_WORD[c]:'ל-'+c}
+function f10InWord(c){return F10_WORD[c]?'ב'+F10_WORD[c]:'ב-'+c}
+function fmtHome(n,opts,tight){return`${Number(n).toLocaleString('he-IL',opts)}${tight?'':' '}${f10Sym(f10Home())}`}
+function f10NoRateMsg(c){return`אין שער ל-${c} – עדכנו שערים בתקציב`}
+let f10Mem=null,f10LiveTried=false,f10R={rates:{},source:'init',home:'ILS'};   /* 'init' = not read yet: nothing is reported missing */
+function f10Parse(raw,home){
+ try{
+  const v=typeof raw==='string'?JSON.parse(raw):raw;if(!v||typeof v!=='object')return null;
+  const out={};
+  if(v.v===2){if(v.base===home&&v.rates&&typeof v.rates==='object')Object.keys(v.rates).forEach(c=>{const n=Number(v.rates[c]);if(/^[A-Z]{3}$/.test(c)&&c!==home&&Number.isFinite(n)&&n>0)out[c]=n})}
+  else if(home==='ILS'&&Number.isFinite(v.USD)&&Number.isFinite(v.EUR)&&Number.isFinite(v.VND)){out.USD=v.USD;out.EUR=v.EUR;out.VND=v.VND/1000}
+  return Object.keys(out).length?out:null;
+ }catch{return null}
+}
+/* live fetch (same URL / 6 s timeout as alpha.8): homePerUnit(c) = usd[home] / usd[c] for every listed currency */
+async function f10Live(){
+ try{
+  const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),6000);let r;
+  try{r=await fetch('https://open.er-api.com/v6/latest/USD',{cache:'no-store',signal:ctrl.signal})}finally{clearTimeout(timer)}
+  if(!r.ok)throw new Error('fx '+r.status);const x=await r.json();if(x.result!=='success')throw new Error('fx result');
+  const usd=x.rates||{},home=f10Home(),uh=home==='USD'?1:Number(usd[home]);if(!(Number.isFinite(uh)&&uh>0))throw new Error('fx data');
+  const rates={};f10TC.list.forEach(c=>{if(c===home)return;const uc=c==='USD'?1:Number(usd[c]);if(Number.isFinite(uc)&&uc>0)rates[c]=uh/uc});
+  return{base:home,rates,updatedAt:x.time_last_update_utc||null};
+ }catch{return null}
+}
+/* opts.noLive: never waits for the network (totals, boot); the once-per-session live fetch runs from the converters */
+async function f10Rates(opts){
+ const home=f10Home();let saved=null;
+ try{saved=f10Parse(await SS.get(FX_KEY),home)}catch{}
+ const rates=saved?Object.assign({},saved):{};let source=saved?'saved':'none';
+ const missing=()=>f10TC.list.filter(c=>c!==home&&!(rates[c]>0));
+ if(!saved&&missing().length&&!f10LiveTried&&!(opts&&opts.noLive)&&navigator.onLine!==false){f10LiveTried=true;const l=await f10Live();if(l)f10Mem=l}
+ if(!saved&&f10Mem&&f10Mem.base===home){missing().forEach(c=>{if(f10Mem.rates[c]>0)rates[c]=f10Mem.rates[c]});if(Object.keys(rates).length)source='live'}
+ if(source==='none'&&home==='ILS'){try{rates.USD=FX_DEFAULTS.USD;rates.EUR=FX_DEFAULTS.EUR;rates.VND=FX_DEFAULTS.VND/1000;source='defaults'}catch{}}
+ const unit={};f10TC.list.forEach(c=>{const h=c===home?1:rates[c];if(h>0)unit[c]=h<0.01?1000:1});
+ try{window.__ptF10.setUnit(unit);f10TC=window.__ptF10.get()}catch{}
+ f10R={rates,source,home};return f10R;
+}
+function f10Hpu(c,R){R=R||f10R;if(c===f10Home())return 1;const n=R.rates&&R.rates[c];return n>0?n:null}
+function f10Conv(a,f,t,R){if(f===t)return a;const x=f10Hpu(f,R),y=f10Hpu(t,R);return x&&y?a*x/y:null}
+function f10Missing(f,t,R){R=R||f10R;if(R.source==='init')return null;return[f,t].find(c=>c&&!f10Hpu(c,R))||null}
+/* D4: an expense without homeCurrency is ILS; in a trip whose home is not ILS it is shown converted with the current rate
+   (never rewritten). f10R is the last rates read (f10Rates) — renderBudget / calcDailyBurn refresh it first. */
+function f10Legacy(e){try{if(!CUR_ON)return false}catch{return false}return !!e&&f10Home()!=='ILS'&&(e.homeCurrency||'ILS')!==f10Home()}
+/* no rate for the old currency yet: the expense counts 0 in the totals and is shown in its own currency (f10AmtTxt) */
+function f10Amt(e){const a=Number(e&&e.amount||0);if(!f10Legacy(e))return a;const v=f10Conv(a,e.homeCurrency||'ILS',f10Home());return v==null?0:v}
+function f10AmtTxt(e,opts){if(!f10Legacy(e))return fmtHome(Number(e&&e.amount||0),opts);const c=e.homeCurrency||'ILS',v=f10Conv(Number(e.amount||0),c,f10Home());
+ return(v==null?`${Number(e.amount||0).toLocaleString('he-IL')} ${f10Sym(c)}`:fmtHome(v,{maximumFractionDigits:0}))+' '+F10_MARK}
+const F10_MARK='(₪ מקורי)';
+/* §3: a remembered code that is not in the list falls back to local */
+function f10Pick(v){return v&&f10TC.list.indexOf(v)>-1?v:f10TC.local}
+/* P4/P5 default: from local to home (from = to → from the next currency in the list) */
+function f10FxDefault(){const h=f10TC.home;let f=f10TC.local;if(f===h)f=f10TC.list.find(c=>c!==h)||h;return[f,h]}
+/* the alpha.8 sequential 2-click rule (FX-QUICK-01 / FX-BUDGET-01), as a pure function: [from,to] after a click on `picked` */
+function f10TwoClick(from,to,picked){if(picked===from)return[null,null];if(picked===to)return[from,null];if(from===null)return[picked,to];if(to===null)return[from,picked];return[picked,null]}
+const F10_ROWS={};
+function f10ChipHtml(style,c,attr){
+ const s=esc(f10Sym(c)),k=esc(c);
+ if(style==='qe')return`<button type="button" class="qe-chip" ${attr}="${k}" aria-pressed="false">${c==='VND'?'VND':s}</button>`;
+ if(style==='fx')return`<button type="button" class="curchip" ${attr}="${k}">${s}<span class="tag tag-src">מקור</span><span class="tag tag-dst">יעד</span><span class="code">${k}</span></button>`;
+ return`<button type="button" class="curchip" ${attr}="${k}">${s}<span class="code">${k}</span></button>`;
+}
+function f10Row(key){
+ const cfg=F10_ROWS[key];if(!CUR_ON||!cfg)return;const row=$(cfg.id);if(!row)return;
+ const list=f10TC.list,sel=cfg.sel().filter(Boolean);
+ if(cfg.extra&&list.indexOf(cfg.extra)<0)cfg.extra=null;
+ let vis=list.slice(),hid=[];
+ if(list.length>5){
+  if(!cfg.extra||list.indexOf(cfg.extra)<5){const h=sel.filter(c=>list.indexOf(c)>4);cfg.extra=h.length?h[h.length-1]:(cfg.extra&&list.indexOf(cfg.extra)>4?cfg.extra:null)}
+  vis=cfg.extra?list.slice(0,4).concat(cfg.extra):list.slice(0,5);
+  hid=list.filter(c=>vis.indexOf(c)<0);
+ }
+ const attr=cfg.style==='qe'?'data-qe-cur':'data-cur';
+ let html=vis.map(c=>f10ChipHtml(cfg.style,c,attr)).join('');
+ if(hid.length){
+  const syms=hid.map(c=>esc(f10Sym(c))).join(' '),aria=esc(`עוד ${hid.length} מטבעות: ${hid.join(', ')}`);
+  html+=cfg.style==='qe'?`<button type="button" class="qe-chip f10-more" id="${cfg.id}More" data-f10-more aria-label="${aria}">עוד <small>${syms}</small></button>`
+   :`<button type="button" class="curchip f10-more" id="${cfg.id}More" data-f10-more aria-label="${aria}">עוד<span class="code">${syms}</span></button>`;
+ }
+ row.innerHTML=html;
+ const n=vis.length+(hid.length?1:0);
+ if(cfg.style!=='qe'){row.classList.toggle('f10-n3',n<=3);row.classList.toggle('f10-n5',n===5);row.classList.toggle('f10-n6',n>=6)}
+ else{const r=row.closest('.qe-row');if(r)r.classList.toggle('f10-wrap',n>4)}
+ if(!row.__f10){row.__f10=true;row.addEventListener('click',e=>{
+  const m=e.target.closest('[data-f10-more]');if(m){e.preventDefault();f10OpenMore(key);return}
+  if(cfg.style!=='qe'){const ch=e.target.closest('.curchip[data-cur]');if(ch)cfg.pick(ch.dataset.cur)}
+ })}
+ cfg.paint();
+}
+function f10RowsAll(){Object.keys(F10_ROWS).forEach(f10Row)}
+function f10OpenMore(key){
+ const cfg=F10_ROWS[key],row=$(cfg&&cfg.id);if(!row)return;
+ const shown=[...row.querySelectorAll('[data-cur],[data-qe-cur]')].map(b=>b.dataset.cur||b.dataset.qeCur);
+ const hid=f10TC.list.filter(c=>shown.indexOf(c)<0);
+ let sh=$('f10MoreSheet');
+ if(!sh){
+  sh=document.createElement('div');sh.id='f10MoreSheet';sh.hidden=true;sh.setAttribute('dir','rtl');
+  sh.innerHTML='<div class="f10-scrim" data-f10-close></div><div class="f10-sheet" role="dialog" aria-modal="true" aria-labelledby="f10MoreTitle"><div class="f10-sheet-h"><b id="f10MoreTitle">מטבעות נוספים</b><button type="button" class="f10-x" id="f10MoreClose" data-f10-close aria-label="סגירה">×</button></div><div class="f10-more-list" id="f10MoreList"></div></div>';
+  document.body.appendChild(sh);
+  sh.addEventListener('click',e=>{
+   if(e.target.closest('[data-f10-close]')){sh.hidden=true;return}
+   const p=e.target.closest('[data-f10-pick]');if(!p)return;
+   const k=sh.dataset.row,c=F10_ROWS[k],code=p.dataset.f10Pick;sh.hidden=true;if(!c)return;
+   c.extra=code;f10Row(k);
+   const r=$(c.id),b=r&&[...r.querySelectorAll('[data-cur],[data-qe-cur]')].find(x=>(x.dataset.cur||x.dataset.qeCur)===code);if(b)b.click();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!sh.hidden)sh.hidden=true});
+ }
+ sh.dataset.row=key;
+ $('f10MoreList').className='f10-more-list '+(cfg.style==='qe'?'qe-chips wrap':'currow');
+ $('f10MoreList').innerHTML=hid.map(c=>f10ChipHtml(cfg.style,c,'data-f10-pick')).join('');
+ sh.hidden=false;
+ try{$('f10MoreClose').focus({preventScroll:true})}catch{}
+}
+/* static texts that name the home / local currency: P6 floating button, P8 reservation cost; for a non-ILS home also the
+   budget-target / personal-target / booking-total placeholders and the quick-FX hint (ILS trips keep the alpha.8 texts) */
+function f10RefreshTexts(){
+ if(!CUR_ON)return;
+ const h=f10Home(),hs=f10Sym(h),ls=f10Sym(f10TC.local);
+ const other=f10TC.local!==h?ls:f10Sym(f10TC.list.find(c=>c!==h)||h);
+ if($('globalFxBtn'))$('globalFxBtn').textContent=`${hs} ⇄ ${other}`;
+ if($('resCost'))$('resCost').placeholder=f10TC.local!==h?`עלות (${hs} / ${ls})`:`עלות (${hs})`;
+ if(h!=='ILS'){
+  if($('budgetTarget'))$('budgetTarget').placeholder=`תקציב יעד (${hs})`;
+  if($('personalBudgetTarget'))$('personalBudgetTarget').placeholder=`יעד אישי (${hs})`;
+  if($('bookTotal'))$('bookTotal').placeholder=`מחיר כולל ${f10InWord(h)}`;
+  if($('quickFxAddExpenseHint'))$('quickFxAddExpenseHint').textContent=`מופיע רק כשהיעד הוא ${hs}`;
+ }
+}
 /* CHANGE 2026-09-30 SYNC-MERGE-01 (v2.11.2): see the PERF-01 + SYNC-MERGE-01 note near the end of this script.
    Placed right after SS so that EVERY read of a shared list (including the first ones at boot) records the merge base. */
 const SYNC_MERGE='on';
@@ -5746,7 +6035,7 @@ function daysInRange(checkinISO,checkoutISO){if(!checkinISO||!checkoutISO)return
 function renderManualDaysList(containerId,selectedSet){const el=$(containerId);if(!el)return;el.innerHTML=tripData.map((d,i)=>`<label class="day-check"><input type="checkbox" data-day-i="${i}" ${selectedSet.has(i)?'checked':''}><span><b>יום ${d.day}</b> · ${esc(d.date)} · <span class="muted">${esc(d.region)}</span></span></label>`).join('')}
 function readManualDaysList(containerId){const el=$(containerId);if(!el)return[];return[...el.querySelectorAll('input[type=checkbox]')].filter(c=>c.checked).map(c=>Number(c.dataset.dayI))}
 function updateDaysMatchHint(hintId,days){const el=$(hintId);if(!el)return;el.textContent=days.length?`✓ נמצאו ${days.length} ימים תואמים בטיול: ${days.map(i=>`יום ${tripData[i].day} (${tripData[i].date})`).join(', ')}`:'⚠️ לא נמצאו ימים בטווח הזה — ניתן לבחור ידנית למטה'}
-function fillSelects(){['daySelect','journalDay','editSelect'].forEach(id=>{$(id).innerHTML=tripData.map((d,i)=>`<option value="${i}">יום ${d.day} — ${esc(d.title)}</option>`).join('');$(id).value=globalDayIndex})}function updateDates(){const t=`${tripData[0].date} – ${tripData.at(-1).date} · ${tripData.length} ימים`;$('homeDates').textContent=t}function render(){const d=tripData[globalDayIndex];$('dayBadge').textContent=`יום ${d.day}`;$('dateBadge').textContent=d.date;$('regionBadge').textContent=d.region;$('title').textContent=d.title;$('activities').textContent=d.activities;$('hotel').textContent=d.bookedHotel||d.hotel;{const hu=d.bookingLink||bookingUrl(globalDayIndex);if(hu){$('hotel').href=hu}else{$('hotel').removeAttribute('href')}}$('notes').textContent=d.notes;$('dayCost').textContent=`${Number(d.actualCost??d.cost).toLocaleString('he-IL')} ₪`;$('bookingInfo').textContent=d.isBooked?`✅ הוזמן · ${d.bookingRef||''}`:'טרם הוזמן';$('bookingBadge').textContent=d.isBooked?'✅':'טרם';const u=bookingUrl(globalDayIndex);$('bookingLink').style.display=u?'inline-flex':'none';$('bookingLink').href=u;const wp=d.waypoints||[];$('waypointBadge').textContent=wp.length||'';$('waypointBadge').style.display=wp.length?'':'none';$('waypoints').innerHTML=wp.map((w,i)=>`<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--border);padding:6px 0"><span>${esc(w.name)} <small class="muted">${esc(w.addedBy||'')}</small></span><button class="btn outline" data-delete-waypoint="${i}">🗑️</button></div>`).join('')||'<span class="muted">אין נקודות</span>';loadForm();loadJournal();drawMap();renderHome();renderBudget();renderRouteDayWeather();renderDayReservations();renderTimelineCard();
+function fillSelects(){['daySelect','journalDay','editSelect'].forEach(id=>{$(id).innerHTML=tripData.map((d,i)=>`<option value="${i}">יום ${d.day} — ${esc(d.title)}</option>`).join('');$(id).value=globalDayIndex})}function updateDates(){const t=`${tripData[0].date} – ${tripData.at(-1).date} · ${tripData.length} ימים`;$('homeDates').textContent=t}function render(){const d=tripData[globalDayIndex];$('dayBadge').textContent=`יום ${d.day}`;$('dateBadge').textContent=d.date;$('regionBadge').textContent=d.region;$('title').textContent=d.title;$('activities').textContent=d.activities;$('hotel').textContent=d.bookedHotel||d.hotel;{const hu=d.bookingLink||bookingUrl(globalDayIndex);if(hu){$('hotel').href=hu}else{$('hotel').removeAttribute('href')}}$('notes').textContent=d.notes;$('dayCost').textContent=fmtHome(Number(d.actualCost??d.cost));/* CHANGE 2026-11-07 F10-P9-01: fmtHome (was `${…toLocaleString('he-IL')} ₪`) */$('bookingInfo').textContent=d.isBooked?`✅ הוזמן · ${d.bookingRef||''}`:'טרם הוזמן';$('bookingBadge').textContent=d.isBooked?'✅':'טרם';const u=bookingUrl(globalDayIndex);$('bookingLink').style.display=u?'inline-flex':'none';$('bookingLink').href=u;const wp=d.waypoints||[];$('waypointBadge').textContent=wp.length||'';$('waypointBadge').style.display=wp.length?'':'none';$('waypoints').innerHTML=wp.map((w,i)=>`<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--border);padding:6px 0"><span>${esc(w.name)} <small class="muted">${esc(w.addedBy||'')}</small></span><button class="btn outline" data-delete-waypoint="${i}">🗑️</button></div>`).join('')||'<span class="muted">אין נקודות</span>';loadForm();loadJournal();drawMap();renderHome();renderBudget();renderRouteDayWeather();renderDayReservations();renderTimelineCard();
  /* CHANGE 2026-08-26 GM-17: keep the chat panel's day-badge and suggestion chips in sync if the
     day changes while it's open (e.g. via the day-strip) rather than only when it's opened. */
  if(typeof isChatOpen==='function'&&isChatOpen()){updateChatDayBadge();renderChatBody()}}
@@ -6156,8 +6445,10 @@ function drawHomeV2Map(){
   imgEl.src=buildHomeStaticMapUrl(pts);
 }
 
-async function calcDailyBurn(){const target=await getBudgetTarget(),items=await getExpenses();let spent=items.reduce((s,e)=>s+Number(e.amount||0),0);tripData.forEach(d=>{if(d.isBooked)spent+=Number(d.actualCost||0)});const today=globalDayIndex;const catBudgets=await getCatBudgets();const plannedLodgingBudget=Number(catBudgets.lodging||0);const bookedLodging=tripData.reduce((s,d)=>s+(d.isBooked?Number(d.actualCost||0):0),0);const futureLodging=Math.max(0,plannedLodgingBudget-bookedLodging);const daysLeft=Math.max(1,tripData.length-today);const available=Math.max(0,target-spent-futureLodging);const perDay=available/daysLeft;return{target,spent,futureLodging,daysLeft,available,perDay}}
-function burnMarkup(b){const level=b.perDay<0?'danger':b.perDay<Math.max(1,b.target/Math.max(1,tripData.length))*0.7?'warning':'ok';return `<div class="row" style="justify-content:space-between"><div><div class="muted">ארנק יומי</div><div class="burn-amount">${Math.max(0,b.perDay).toLocaleString('he-IL',{maximumFractionDigits:0})} ₪</div><div class="muted">נשאר להוציא ליום</div></div><span class="badge">${level==='ok'?'✓ במסגרת':level==='warning'?'⚠️ כדאי להאט':'🔴 חריגה'}</span></div><div class="burn-meta"><span>${b.daysLeft} ימים נותרו</span><span>${b.available.toLocaleString('he-IL',{maximumFractionDigits:0})} ₪ זמינים</span></div>`}
+/* CHANGE 2026-11-07 F10-P9-02: calcDailyBurn reads the rates first (CUR_ON) and sums f10Amt(e) — an old ILS expense in a non-ILS trip is
+   converted (D4); for an ILS trip f10Amt(e) = Number(e.amount||0) (was: Number(e.amount||0)). */
+async function calcDailyBurn(){if(CUR_ON)await f10Rates({noLive:true}).catch(()=>{});const target=await getBudgetTarget(),items=await getExpenses();let spent=items.reduce((s,e)=>s+f10Amt(e),0);tripData.forEach(d=>{if(d.isBooked)spent+=Number(d.actualCost||0)});const today=globalDayIndex;const catBudgets=await getCatBudgets();const plannedLodgingBudget=Number(catBudgets.lodging||0);const bookedLodging=tripData.reduce((s,d)=>s+(d.isBooked?Number(d.actualCost||0):0),0);const futureLodging=Math.max(0,plannedLodgingBudget-bookedLodging);const daysLeft=Math.max(1,tripData.length-today);const available=Math.max(0,target-spent-futureLodging);const perDay=available/daysLeft;return{target,spent,futureLodging,daysLeft,available,perDay}}
+function burnMarkup(b){const level=b.perDay<0?'danger':b.perDay<Math.max(1,b.target/Math.max(1,tripData.length))*0.7?'warning':'ok';return `<div class="row" style="justify-content:space-between"><div><div class="muted">ארנק יומי</div><div class="burn-amount">${fmtHome(Math.max(0,b.perDay),{maximumFractionDigits:0})}</div><div class="muted">נשאר להוציא ליום</div></div><span class="badge">${level==='ok'?'✓ במסגרת':level==='warning'?'⚠️ כדאי להאט':'🔴 חריגה'}</span></div><div class="burn-meta"><span>${b.daysLeft} ימים נותרו</span><span>${fmtHome(b.available,{maximumFractionDigits:0})} זמינים</span></div>`}/* CHANGE 2026-11-07 F10-P9-03: burnMarkup amounts through fmtHome (was `… ₪`) */
 async function renderDailyBurn(){const b=await calcDailyBurn();for(const id of ['homeBurn','budgetBurn']){const el=$(id);if(!el)continue;el.innerHTML=burnMarkup(b);el.className='daily-burn'+(b.perDay<0?' danger':b.perDay<Math.max(1,b.target/Math.max(1,tripData.length))*0.7?' warning':'')}; if($('homeBurn'))$('homeBurn').style.display='block'; if($('budgetBurn'))$('budgetBurn').style.display='block';}
 function updateRouteDayStrip(){const el=$('routeDayStrip');if(!el)return;el.innerHTML=tripData.map((d,i)=>{const date=String(d.date).slice(0,5);return `<button type="button" class="day-chip ${i===globalDayIndex?'active':''}" data-route-day="${i}"><strong>יום ${d.day}</strong>${esc(date)}</button>`}).join('');el.querySelectorAll('[data-route-day]').forEach(b=>b.onclick=()=>{globalDayIndex=Number(b.dataset.routeDay);fillSelects();render()});const active=el.querySelector('.active');if(active)active.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});if($('dayProgress'))$('dayProgress').textContent=tripData.length?`יום ${globalDayIndex+1} מתוך ${tripData.length}`:''}
 /* CHANGE 2026-08-26 GM-16: let a vertical mouse-wheel gesture over the day-strip scroll it
@@ -6415,7 +6706,7 @@ function reservationRowHtml(r){const m=resMeta(r.type),st=resStatus(r);return `<
 async function renderReservationsList(){const items=await getReservations();const filtered=currentResFilter==='all'?items:items.filter(r=>r.type===currentResFilter||(currentResFilter==='insurance'&&r.type==='visa'));const sorted=[...filtered].sort((a,b)=>resSortKey(a).localeCompare(resSortKey(b)));$('reservationsList').innerHTML=sorted.length?sorted.map(reservationRowHtml).join(''):'<p class="muted" style="padding:12px 4px">אין עדיין הזמנות בקטגוריה זו</p>';const confirmed=items.filter(r=>resStatus(r)==='confirmed').length;$('resReadinessText').textContent=items.length?`${confirmed} מתוך ${items.length} הזמנות מאושרות`:'עדיין אין הזמנות';$('resReadinessFill').style.width=items.length?Math.round(confirmed/items.length*100)+'%':'0%'}
 async function renderDayReservations(){const el=$('dayReservations');if(!el)return;const items=(await getReservations()).filter(r=>r.linkedDayStart===globalDayIndex&&r.type!=='hotel');el.innerHTML=items.length?`<div class="subsection" style="margin-top:0;padding-top:0;border-top:0"><b style="font-size:.95rem">🎫 הזמנות מקושרות ליום זה</b>`+items.map(r=>{const m=resMeta(r.type),st=resStatus(r);return `<div class="day-res-item" data-res-open="${esc(r.id)}"><span class="ic2">${m.icon}</span><div style="flex:1;min-width:0"><b style="font-size:.85rem">${esc(r.title||m.label)}</b>${r.provider?`<div class="muted" style="font-size:.72rem">${esc(r.provider)}</div>`:''}</div>${resStatusBadge(st)}</div>`}).join('')+'</div>':''}
 $('dayReservations').onclick=e=>{const row=e.target.closest('[data-res-open]');if(!row)return;openReservationDetail(row.dataset.resOpen)};
-async function upsertExpenseForReservation(rec){let items=await getExpenses();const idx=items.findIndex(e=>e.linkedReservationId===rec.id);if(!rec.cost||rec.cost<=0){if(idx>-1){items.splice(idx,1);await saveExpenses(items)}return}const entry={description:rec.title||resMeta(rec.type).label,amount:rec.cost,category:rec.budgetCategory||resMeta(rec.type).budgetCat||'other',by:activeUser,dayIndex:rec.linkedDayStart!=null?rec.linkedDayStart:null,createdAt:idx>-1?items[idx].createdAt:Date.now(),editedAt:Date.now(),linkedReservationId:rec.id,confirmationRef:rec.confirmationRef||''};if(idx>-1)items[idx]=entry;else items.push(entry);await saveExpenses(items)}
+async function upsertExpenseForReservation(rec){let items=await getExpenses();const idx=items.findIndex(e=>e.linkedReservationId===rec.id);if(!rec.cost||rec.cost<=0){if(idx>-1){items.splice(idx,1);await saveExpenses(items)}return}const entry={description:rec.title||resMeta(rec.type).label,amount:rec.cost,category:rec.budgetCategory||resMeta(rec.type).budgetCat||'other',by:activeUser,dayIndex:rec.linkedDayStart!=null?rec.linkedDayStart:null,createdAt:idx>-1?items[idx].createdAt:Date.now(),editedAt:Date.now(),linkedReservationId:rec.id,confirmationRef:rec.confirmationRef||''};if(CUR_ON)entry.homeCurrency=f10Home();/* CHANGE 2026-11-07 F10-EXP-03: + homeCurrency (D4) */if(idx>-1)items[idx]=entry;else items.push(entry);await saveExpenses(items)}
 async function removeLinkedExpense(resId){let items=await getExpenses();const idx=items.findIndex(e=>e.linkedReservationId===resId);if(idx>-1){items.splice(idx,1);await saveExpenses(items)}}
 async function writeHotelReservationToDays(rec,applyAllOverride){let targets;if(Array.isArray(rec.linkedDays)&&rec.linkedDays.length){targets=rec.linkedDays.map(i=>tripData[i]).filter(Boolean)}else{if(rec.linkedDayStart==null||!tripData[rec.linkedDayStart])return;const block=stayBlock(rec.linkedDayStart);const applyAll=applyAllOverride!=null?applyAllOverride:($('resApplyStay')?$('resApplyStay').checked:true);targets=applyAll&&block?tripData.slice(block.start,block.end+1):[tripData[rec.linkedDayStart]]}if(!targets.length)return;const total=rec.cost||0;targets.forEach((x,i)=>{Object.assign(x,{isBooked:true,bookedHotel:rec.title||x.hotel,bookingRef:rec.confirmationRef||'',bookingNotes:rec.notes||'',bookingLink:rec.link||'',actualCost:Math.floor(total/targets.length)+(i===targets.length-1?total%targets.length:0),bookingUpdatedBy:activeUser,bookingUpdatedAt:Date.now(),bookingSourceReservationId:rec.id})});await saveTrip()}
 async function clearHotelDaysById(resId){let changed=false;tripData.forEach(d=>{if(d.bookingSourceReservationId===resId){d.isBooked=false;delete d.bookedHotel;delete d.bookingRef;delete d.actualCost;delete d.bookingNotes;delete d.bookingLink;delete d.bookingSourceReservationId;changed=true}});if(changed)await saveTrip()}
@@ -6673,13 +6964,15 @@ async function renderRouteDayWeather(){const el=$('routeDayWeather');if(!el)retu
    destination again clears just the destination; clicking a third chip once both are set
    restarts the sequence with that chip as the new source. */
 let quickFxFromCur='ILS',quickFxToCur='USD';
+/* CHANGE 2026-11-07 F10-P5-01: default from TRIPCUR.local to home; chips from TRIPCUR.list (F10_ROWS.qfx) (was: ILS → USD, ₪ $ € ₫). 'off': no-op. */
+if(CUR_ON){[quickFxFromCur,quickFxToCur]=f10FxDefault();F10_ROWS.qfx={id:'quickFxRow',style:'fx',sel:()=>[quickFxFromCur,quickFxToCur],pick:c=>f10QuickPick(c),paint:()=>applyQuickFxUI()}}
 function applyQuickFxUI(){
  document.querySelectorAll('#quickFxRow .curchip').forEach(c=>{
   c.classList.toggle('src',c.dataset.cur===quickFxFromCur);
   c.classList.toggle('dst',c.dataset.cur===quickFxToCur&&c.dataset.cur!==quickFxFromCur);
  });
 }
-document.querySelectorAll('#quickFxRow .curchip').forEach(chip=>{
+if(!CUR_ON)document.querySelectorAll('#quickFxRow .curchip').forEach(chip=>{/* CHANGE 2026-11-07 F10-P5-02: alpha.8 binding only when 'off' */
  chip.onclick=()=>{
   const picked=chip.dataset.cur;
   if(picked===quickFxFromCur){quickFxFromCur=null;quickFxToCur=null}
@@ -6697,12 +6990,13 @@ document.querySelectorAll('#quickFxRow .curchip').forEach(chip=>{
 applyQuickFxUI();
 
 let quickFxLastResult=null;
-async function quickFxCalculate(){$('quickFxAddExpenseBtn').style.display='none';$('quickFxAddExpenseHint').style.display='none';quickFxLastResult=null;if(!quickFxFromCur||!quickFxToCur){$('quickFxResult').textContent='⚠️ בחרו מטבע מקור ומטבע יעד';return}const a=Number($('quickFxAmount').value),f=quickFxFromCur,t=quickFxToCur;if(!Number.isFinite(a)||a<0){$('quickFxResult').textContent='⚠️ סכום לא תקין';return}const rates=await getFxRates();const v=f===t?a:a*ilsPerUnit(rates,f)/ilsPerUnit(rates,t);$('quickFxResult').textContent=`${a.toLocaleString()} ${f} = ${v.toLocaleString(undefined,{maximumFractionDigits:2})} ${t}`;$('quickFxInfo').textContent='השערים נשמרים במכשיר ומשותפים למשפחה. לעדכון שערים מלא עברו לתקציב.';quickFxLastResult={amount:a,from:f,to:t,converted:v};if(t==='ILS'){$('quickFxAddExpenseBtn').style.display='block'}else{$('quickFxAddExpenseHint').style.display='block'}}
+async function quickFxCalculate(){if(CUR_ON)return f10QuickCalc();/* CHANGE 2026-11-07 F10-P5-03: symbols in the result, "הוסף כהוצאה" when target = home (was: codes, ILS) */$('quickFxAddExpenseBtn').style.display='none';$('quickFxAddExpenseHint').style.display='none';quickFxLastResult=null;if(!quickFxFromCur||!quickFxToCur){$('quickFxResult').textContent='⚠️ בחרו מטבע מקור ומטבע יעד';return}const a=Number($('quickFxAmount').value),f=quickFxFromCur,t=quickFxToCur;if(!Number.isFinite(a)||a<0){$('quickFxResult').textContent='⚠️ סכום לא תקין';return}const rates=await getFxRates();const v=f===t?a:a*ilsPerUnit(rates,f)/ilsPerUnit(rates,t);$('quickFxResult').textContent=`${a.toLocaleString()} ${f} = ${v.toLocaleString(undefined,{maximumFractionDigits:2})} ${t}`;$('quickFxInfo').textContent='השערים נשמרים במכשיר ומשותפים למשפחה. לעדכון שערים מלא עברו לתקציב.';quickFxLastResult={amount:a,from:f,to:t,converted:v};if(t==='ILS'){$('quickFxAddExpenseBtn').style.display='block'}else{$('quickFxAddExpenseHint').style.display='block'}}
 /* CHANGE 2026-09-17 FX-QUICK-ADD-01: jumps to the budget screen's add-expense form with the
    converted ILS amount and today's default day already filled in -- reuses the EXISTING
    expenseDefaultDayIndex/renderExpenseDayStrip/applyExpenseCurrencyUI (v2.4.0), not new
    logic. The user only has to pick a category and type a description. */
 $('quickFxAddExpenseBtn').onclick=()=>{
+ if(CUR_ON)return f10QuickAdd();/* CHANGE 2026-11-07 F10-P5-04: home instead of ILS */
  if(!requireUser()||!quickFxLastResult||quickFxLastResult.to!=='ILS')return;
  closeModal($('fxQuickModal'));
  switchPanel('budget');
@@ -6749,10 +7043,10 @@ async function renderPersonalBudget(){
  const target=await getPersonalBudgetTarget(activeUser);
  $('personalBudgetTarget').value=target||'';
  const items=await getExpenses();
- const mySpent=items.filter(e=>e.by===activeUser).reduce((s,e)=>s+Number(e.amount||0),0);
+ const mySpent=items.filter(e=>e.by===activeUser).reduce((s,e)=>s+f10Amt(e),0);/* CHANGE 2026-11-07 F10-P9-04: f10Amt + fmtHome (was Number(e.amount||0) and `… ₪`) */
  $('personalSpentSummary').textContent=target>0
-  ?`הוצאות אישיות שלך עד כה: ${mySpent.toLocaleString('he-IL')} ₪ מתוך ${target.toLocaleString('he-IL')} ₪`
-  :`הוצאות אישיות שלך עד כה: ${mySpent.toLocaleString('he-IL')} ₪ (לא הוגדר יעד אישי)`;
+  ?`הוצאות אישיות שלך עד כה: ${fmtHome(mySpent)} מתוך ${fmtHome(target)}`
+  :`הוצאות אישיות שלך עד כה: ${fmtHome(mySpent)} (לא הוגדר יעד אישי)`;
 }
 $('savePersonalBudgetTarget').onclick=async()=>{
  if(!requireUser())return;
@@ -6765,18 +7059,20 @@ $('savePersonalBudgetTarget').onclick=async()=>{
    tiles added/removed on every render). Cleared by the clear-filter pill's ✕ or by re-clicking the
    active tile. */
 let budgetCatFilter=null;
-async function renderBudget(){const target=await getBudgetTarget(),items=await getExpenses(),by=Object.fromEntries(Object.keys(CATEGORIES).map(k=>[k,0]));items.forEach(e=>{const c=normalizeCategory(e.category);by[c]=(by[c]||0)+Number(e.amount||0)});tripData.forEach(d=>{if(d.isBooked)by.lodging+=Number(d.actualCost||0)});const total=Object.values(by).reduce((a,b)=>a+b,0);$('budgetTarget').value=target;const pct=Math.min(100,total/target*100);$('budgetBar').style.width=pct+'%';
- $('budgetSpentAmt').textContent=`${total.toLocaleString('he-IL')} ₪`;
+/* CHANGE 2026-11-07 F10-P9-05: renderBudget reads the rates first (CUR_ON), sums f10Amt(e) and formats every amount with fmtHome; an old ILS
+   expense in a non-ILS trip gets the marker "(₪ מקורי)" in the list (D4). ILS trips: identical text (was: Number(e.amount||0), `… ₪`). */
+async function renderBudget(){if(CUR_ON)await f10Rates({noLive:true}).catch(()=>{});const target=await getBudgetTarget(),items=await getExpenses(),by=Object.fromEntries(Object.keys(CATEGORIES).map(k=>[k,0]));items.forEach(e=>{const c=normalizeCategory(e.category);by[c]=(by[c]||0)+f10Amt(e)});tripData.forEach(d=>{if(d.isBooked)by.lodging+=Number(d.actualCost||0)});const total=Object.values(by).reduce((a,b)=>a+b,0);$('budgetTarget').value=target;const pct=Math.min(100,total/target*100);$('budgetBar').style.width=pct+'%';
+ $('budgetSpentAmt').textContent=fmtHome(total);
  $('budgetSpentSub').textContent=`${Math.round(pct)}% מהיעד`;
- $('budgetAvailAmt').textContent=`${Math.max(0,target-total).toLocaleString('he-IL')} ₪`;
- $('budgetAvailSub').textContent=`מתוך יעד ${target.toLocaleString('he-IL')} ₪`;
+ $('budgetAvailAmt').textContent=fmtHome(Math.max(0,target-total));
+ $('budgetAvailSub').textContent=`מתוך יעד ${fmtHome(target)}`;
  const catBudgets=await getCatBudgets();
  $('catChips').innerHTML=Object.entries(CATEGORIES).map(([k,v])=>{
   const planned=Number(catBudgets[k]||0),actual=Number(by[k]||0);
   const over=planned>0&&actual>planned;
   return`<div class="tile ${budgetCatFilter===k?'active':''}" data-cat="${k}"><div class="ic">${CAT_ICONS[k]}</div><div class="name">${v}</div>
   <div class="trow">תכנון<input type="number" min="0" data-cat="${k}" value="${planned||''}" placeholder="0"></div>
-  <div class="trow actual ${planned>0?(over?'over':'under'):''}">בפועל<b>${actual.toLocaleString('he-IL')}₪${planned>0?(over?' ⚠️':' ✅'):''}</b></div></div>`}).join('');
+  <div class="trow actual ${planned>0?(over?'over':'under'):''}">בפועל<b>${fmtHome(actual,undefined,true)}${planned>0?(over?' ⚠️':' ✅'):''}</b></div></div>`}).join('');
  document.querySelectorAll('.tile input').forEach(inp=>{inp.onclick=e=>e.stopPropagation();inp.onchange=async()=>{await saveCatBudget(inp.dataset.cat,Number(inp.value)||0);renderBudget()}});
  $('budgetFilterPillRow').style.display=budgetCatFilter?'':'none';
  if(budgetCatFilter)$('budgetFilterPill').innerHTML=`מסונן: ${esc(CATEGORIES[budgetCatFilter]||budgetCatFilter)} ${esc(CAT_ICONS[budgetCatFilter]||'')} <button type="button" id="budgetClearFilterBtn">✕</button>`;
@@ -6784,13 +7080,13 @@ async function renderBudget(){const target=await getBudgetTarget(),items=await g
  if(!expenseFormDayInited){expenseFormDayIndex=expenseDefaultDayIndex();expenseFormDayInited=true}
  renderExpenseDaySlider();
  const lodgingRows=[];tripData.forEach((d,i)=>{if(d.isBooked)lodgingRows.push({dateStr:d.date,dateIso:iso(d.date)||'',category:'lodging',detail:d.bookedHotel||d.hotel||'',amount:Number(d.actualCost||0),source:'lodging',dayIndex:i})});
- const expenseRows=items.map((e,idx)=>{const di=e.dayIndex!=null&&tripData[e.dayIndex]?e.dayIndex:null;return{dateStr:di!=null?tripData[di].date:'',dateIso:di!=null?(iso(tripData[di].date)||''):'',category:normalizeCategory(e.category)||'other',detail:e.description||'',amount:Number(e.amount||0),source:'expense',expenseIdx:idx}});
+ const expenseRows=items.map((e,idx)=>{const di=e.dayIndex!=null&&tripData[e.dayIndex]?e.dayIndex:null;return{dateStr:di!=null?tripData[di].date:'',dateIso:di!=null?(iso(tripData[di].date)||''):'',category:normalizeCategory(e.category)||'other',detail:e.description||'',amount:f10Amt(e),legacy:f10Legacy(e)?f10AmtTxt(e):null,source:'expense',expenseIdx:idx}});
  const detailRowsAll=[...lodgingRows,...expenseRows].sort((a,b)=>(a.dateIso||'9999-99-99').localeCompare(b.dateIso||'9999-99-99'));
  const detailRows=budgetCatFilter?detailRowsAll.filter(r=>r.category===budgetCatFilter):detailRowsAll;
  const detailTotal=detailRows.reduce((s,r)=>s+r.amount,0);
  $('expenseList').innerHTML=`<table class="budget-detail-table"><thead><tr><th>תאריך</th><th>סעיף</th><th>פרוט</th><th>עלות</th><th></th></tr></thead><tbody>${
-  detailRows.map(r=>`<tr class="${r.source==='lodging'?'lodging-row':''}"><td class="bd-date">${esc(r.dateStr||'—')}</td><td class="bd-cat">${esc(CATEGORIES[r.category]||r.category)}</td><td class="bd-detail" title="${esc(r.detail)}">${esc(r.detail)}${r.source==='lodging'?' <span class="muted">🏨</span>':''}</td><td class="bd-amount">${r.amount.toLocaleString('he-IL')} ₪</td><td class="bd-actions">${r.source==='expense'?`<button class="btn outline" data-edit-expense="${r.expenseIdx}">✎</button><button class="btn outline" data-delete-expense="${r.expenseIdx}">🗑️</button>`:''}</td></tr>`).join('')||`<tr><td colspan="5" class="muted" style="text-align:center;padding:14px">${budgetCatFilter?'אין הוצאות בקטגוריה זו':'אין עדיין הוצאות רשומות'}</td></tr>`
- }</tbody>${detailRows.length?`<tfoot><tr><td colspan="3">סה״כ</td><td class="bd-amount">${detailTotal.toLocaleString('he-IL')} ₪</td><td></td></tr></tfoot>`:''}</table>`;
+  detailRows.map(r=>`<tr class="${r.source==='lodging'?'lodging-row':''}"><td class="bd-date">${esc(r.dateStr||'—')}</td><td class="bd-cat">${esc(CATEGORIES[r.category]||r.category)}</td><td class="bd-detail" title="${esc(r.detail)}">${esc(r.detail)}${r.source==='lodging'?' <span class="muted">🏨</span>':''}</td><td class="bd-amount">${r.legacy?esc(r.legacy):fmtHome(r.amount)}</td><td class="bd-actions">${r.source==='expense'?`<button class="btn outline" data-edit-expense="${r.expenseIdx}">✎</button><button class="btn outline" data-delete-expense="${r.expenseIdx}">🗑️</button>`:''}</td></tr>`).join('')||`<tr><td colspan="5" class="muted" style="text-align:center;padding:14px">${budgetCatFilter?'אין הוצאות בקטגוריה זו':'אין עדיין הוצאות רשומות'}</td></tr>`
+ }</tbody>${detailRows.length?`<tfoot><tr><td colspan="3">סה״כ</td><td class="bd-amount">${fmtHome(detailTotal)}</td><td></td></tr></tfoot>`:''}</table>`;
  renderPersonalBudget();
 }
 $('catChips').onclick=e=>{if(e.target.tagName==='INPUT')return;const tile=e.target.closest('.tile');if(!tile)return;const cat=tile.dataset.cat;budgetCatFilter=budgetCatFilter===cat?null:cat;renderBudget()};
@@ -6836,7 +7132,12 @@ $('expenseNoDayBtn').onclick=()=>{expenseFormDayIndex=expenseFormDayIndex===null
    per-device via localStorage, per Or's explicit decision; calculation is an explicit step
    ("חשב לשקלים") required before saving, also per Or's decision -- not live-as-you-type. */
 let expenseSelectedCur=localStorage.getItem('planner:lastExpenseCurrency')||'ILS',expenseCalculatedILS=null;
+/* CHANGE 2026-11-07 F10-P1-01: default = the last pick for this trip (planner:lastExpenseCurrency is per trip through the F02 namespace),
+   else TRIPCUR.local; a remembered code outside the list → local (was: last pick, else 'ILS'). The chip row is built from
+   TRIPCUR.list (F10_ROWS.exp, f10Row). 'off': no-op. */
+if(CUR_ON){expenseSelectedCur=f10Pick(localStorage.getItem('planner:lastExpenseCurrency'));F10_ROWS.exp={id:'expenseCurRow',style:'exp',sel:()=>[expenseSelectedCur],pick:c=>f10ExpensePick(c),paint:()=>document.querySelectorAll('#expenseCurRow .curchip').forEach(c=>c.classList.toggle('active',c.dataset.cur===expenseSelectedCur))}}
 function applyExpenseCurrencyUI(){
+ if(CUR_ON)return f10ApplyExpenseUI();/* CHANGE 2026-11-07 F10-P2-01: placeholder "סכום ב-<sym>", button "חשב ל<home word>", hidden when picked = home (was: ILS only) */
  document.querySelectorAll('#expenseCurRow .curchip').forEach(c=>c.classList.toggle('active',c.dataset.cur===expenseSelectedCur));
  const isILS=expenseSelectedCur==='ILS';
  $('expenseAmount').placeholder=isILS?'סכום בש״ח':'סכום ב-'+expenseSelectedCur;
@@ -6844,10 +7145,11 @@ function applyExpenseCurrencyUI(){
  $('expenseCalcBox').classList.remove('show');
  expenseCalculatedILS=null;
 }
-document.querySelectorAll('#expenseCurRow .curchip').forEach(chip=>{
+if(!CUR_ON)document.querySelectorAll('#expenseCurRow .curchip').forEach(chip=>{/* CHANGE 2026-11-07 F10-P1-02: alpha.8 chip binding only when 'off' (was: always) */
  chip.onclick=()=>{expenseSelectedCur=chip.dataset.cur;localStorage.setItem('planner:lastExpenseCurrency',expenseSelectedCur);applyExpenseCurrencyUI()};
 });
 $('expenseCalcBtn').onclick=async()=>{
+ if(CUR_ON)return f10ExpenseCalc();/* CHANGE 2026-11-07 F10-P2-02: converts to the home currency with homePerUnit (was: to ILS) */
  const amt=Number($('expenseAmount').value);
  $('expenseAmtErr').classList.remove('show');
  if(!Number.isFinite(amt)||amt<=0){$('expenseAmtErr').classList.add('show');return}
@@ -6860,6 +7162,7 @@ $('expenseCalcBtn').onclick=async()=>{
  $('expenseCalcBox').classList.add('show');
 };
 $('expenseAmount').addEventListener('input',()=>{expenseCalculatedILS=null;$('expenseCalcBox').classList.remove('show');$('expenseAmtErr').classList.remove('show')});
+if(CUR_ON)f10Row('exp');/* CHANGE 2026-11-07 F10-P1-03: builds the chip row (no alpha.8 equivalent) */
 applyExpenseCurrencyUI();
 
 /* CHANGE 2026-09-29 BUDGET-REDESIGN-01: the BUD-MIG-01 one-time 'אחר'→'נסיעות' migration tool
@@ -6867,8 +7170,8 @@ applyExpenseCurrencyUI();
    request -- the migration it offered has already been run, and its card is gone from the HTML
    above too, not just hidden. */
 
-$('expenseList').onclick=async e=>{const editBtn=e.target.closest('[data-edit-expense]');const delBtn=e.target.closest('[data-delete-expense]');if(delBtn){if(!requireUser())return;if(!confirm('למחוק הוצאה זו?'))return;const items=await getExpenses();items.splice(Number(delBtn.dataset.deleteExpense),1);await saveExpenses(items);renderBudget();renderDailyBurn();}else if(editBtn){if(!requireUser())return;const idx=Number(editBtn.dataset.editExpense);const items=await getExpenses();const exp=items[idx];$('expenseDescription').value=exp.description;expenseSelectedCur=exp.originalCurrency||'ILS';applyExpenseCurrencyUI();$('expenseAmount').value=exp.originalCurrency?exp.originalAmount:exp.amount;$('expenseCategory').value=exp.category||'other';expenseFormDayIndex=exp.dayIndex!=null?exp.dayIndex:null;expenseFormDayInited=true;renderExpenseDaySlider();$('saveExpense').dataset.editIdx=idx;$('saveExpense').textContent='עדכן הוצאה';$('cancelEditExpense').style.display='inline-block';$('expenseDescription').focus()}};
-$('saveExpense').onclick=async()=>{if(!requireUser())return;const d=$('expenseDescription').value.trim();const rawAmt=Number($('expenseAmount').value);$('expenseAmtErr').classList.remove('show');if(!d||!Number.isFinite(rawAmt)||rawAmt<=0){$('expenseAmtErr').classList.add('show');return}const isILS=expenseSelectedCur==='ILS';if(!isILS&&expenseCalculatedILS===null){alert('לחץ על "חשב לשקלים" לפני השמירה');return}const a=isILS?rawAmt:expenseCalculatedILS;const items=await getExpenses();const dayIndex=expenseFormDayIndex;const currencyExtra=isILS?{}:{originalAmount:rawAmt,originalCurrency:expenseSelectedCur};const editIdx=$('saveExpense').dataset.editIdx;if(editIdx!==undefined&&editIdx!==''){items[Number(editIdx)]={...items[Number(editIdx)],description:d,amount:a,category:$('expenseCategory').value,dayIndex,by:activeUser,editedAt:Date.now(),...currencyExtra};delete $('saveExpense').dataset.editIdx;$('saveExpense').textContent='שמור הוצאה';$('cancelEditExpense').style.display='none'}else{items.push({description:d,amount:a,category:$('expenseCategory').value,dayIndex,by:activeUser,createdAt:Date.now(),...currencyExtra})}await saveExpenses(items);$('expenseDescription').value='';$('expenseAmount').value='';expenseCalculatedILS=null;$('expenseCalcBox').classList.remove('show');renderBudget();renderDailyBurn();};
+$('expenseList').onclick=async e=>{if(CUR_ON)return f10ExpenseListClick(e);/* CHANGE 2026-11-07 F10-P1-04: edit picks the original / home currency of the expense (was: original, else ILS) */const editBtn=e.target.closest('[data-edit-expense]');const delBtn=e.target.closest('[data-delete-expense]');if(delBtn){if(!requireUser())return;if(!confirm('למחוק הוצאה זו?'))return;const items=await getExpenses();items.splice(Number(delBtn.dataset.deleteExpense),1);await saveExpenses(items);renderBudget();renderDailyBurn();}else if(editBtn){if(!requireUser())return;const idx=Number(editBtn.dataset.editExpense);const items=await getExpenses();const exp=items[idx];$('expenseDescription').value=exp.description;expenseSelectedCur=exp.originalCurrency||'ILS';applyExpenseCurrencyUI();$('expenseAmount').value=exp.originalCurrency?exp.originalAmount:exp.amount;$('expenseCategory').value=exp.category||'other';expenseFormDayIndex=exp.dayIndex!=null?exp.dayIndex:null;expenseFormDayInited=true;renderExpenseDaySlider();$('saveExpense').dataset.editIdx=idx;$('saveExpense').textContent='עדכן הוצאה';$('cancelEditExpense').style.display='inline-block';$('expenseDescription').focus()}};
+$('saveExpense').onclick=async()=>{if(CUR_ON)return f10SaveExpense();/* CHANGE 2026-11-07 F10-EXP-01: amount in home + homeCurrency (+ original fields when picked ≠ home) (was: ILS only, no homeCurrency) */if(!requireUser())return;const d=$('expenseDescription').value.trim();const rawAmt=Number($('expenseAmount').value);$('expenseAmtErr').classList.remove('show');if(!d||!Number.isFinite(rawAmt)||rawAmt<=0){$('expenseAmtErr').classList.add('show');return}const isILS=expenseSelectedCur==='ILS';if(!isILS&&expenseCalculatedILS===null){alert('לחץ על "חשב לשקלים" לפני השמירה');return}const a=isILS?rawAmt:expenseCalculatedILS;const items=await getExpenses();const dayIndex=expenseFormDayIndex;const currencyExtra=isILS?{}:{originalAmount:rawAmt,originalCurrency:expenseSelectedCur};const editIdx=$('saveExpense').dataset.editIdx;if(editIdx!==undefined&&editIdx!==''){items[Number(editIdx)]={...items[Number(editIdx)],description:d,amount:a,category:$('expenseCategory').value,dayIndex,by:activeUser,editedAt:Date.now(),...currencyExtra};delete $('saveExpense').dataset.editIdx;$('saveExpense').textContent='שמור הוצאה';$('cancelEditExpense').style.display='none'}else{items.push({description:d,amount:a,category:$('expenseCategory').value,dayIndex,by:activeUser,createdAt:Date.now(),...currencyExtra})}await saveExpenses(items);$('expenseDescription').value='';$('expenseAmount').value='';expenseCalculatedILS=null;$('expenseCalcBox').classList.remove('show');renderBudget();renderDailyBurn();};
 $('cancelEditExpense').onclick=()=>{delete $('saveExpense').dataset.editIdx;$('saveExpense').textContent='שמור הוצאה';$('cancelEditExpense').style.display='none';$('expenseDescription').value='';$('expenseAmount').value='';expenseCalculatedILS=null;$('expenseCalcBox').classList.remove('show')};
 function openUserModal(){renderUserChoices();openModal('userModal')}
 let pendingPhotoUser='';
@@ -6894,10 +7197,10 @@ function ilsPerUnit(rates,code){if(code==='ILS')return 1;if(code==='VND')return 
 async function getFxRates(){try{const raw=await SS.get(FX_KEY);if(raw){const v=JSON.parse(raw);if(Number.isFinite(v.USD)&&Number.isFinite(v.EUR)&&Number.isFinite(v.VND))return v}}catch{}
  return{...FX_DEFAULTS}}
 async function fetchLiveFxRates(){try{const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),6000);let r;try{r=await fetch('https://open.er-api.com/v6/latest/USD',{cache:'no-store',signal:ctrl.signal})}finally{clearTimeout(timer)}if(!r.ok)throw new Error('fx '+r.status);const x=await r.json();if(x.result!=='success')throw new Error('fx result');const usdIls=Number(x.rates?.ILS),usdEur=Number(x.rates?.EUR),usdVnd=Number(x.rates?.VND);if(![usdIls,usdEur,usdVnd].every(n=>Number.isFinite(n)&&n>0))throw new Error('fx data');return{USD:usdIls,EUR:usdIls/usdEur,VND:(1000/usdVnd)*usdIls,updatedAt:x.time_last_update_utc||null}}catch{return null}}
-async function refreshFxInputs(){const r=await getFxRates();$('rateUSD').value=r.USD;$('rateEUR').value=r.EUR;$('rateVND').value=r.VND;
+async function refreshFxInputs(){if(CUR_ON)return f10RefreshFxInputs();/* CHANGE 2026-11-07 F10-P3-01: one row per list currency except home, unit 1 / 1,000, header "שערים ב<home word>" (was: USD, EUR, 1000 VND in ₪) */const r=await getFxRates();$('rateUSD').value=r.USD;$('rateEUR').value=r.EUR;$('rateVND').value=r.VND;
  const raw=await SS.get(FX_KEY).catch(()=>null);$('fxRatesInfo').textContent=raw?'שערים שמורים (הוזנו ידנית)':'שערים ברירת מחדל משוערים — כדאי לעדכן לפני הנסיעה'}
-$('fxAutoUpdate').onclick=async()=>{if(!requireUser())return;$('fxRatesInfo').textContent='מעדכן שערים…';const live=await fetchLiveFxRates();if(!live){$('fxRatesInfo').textContent='⚠️ לא הצלחנו למשוך שערים חיים כרגע (בעיית רשת) — אפשר להזין ידנית או לנסות שוב';return}$('rateUSD').value=live.USD.toFixed(3);$('rateEUR').value=live.EUR.toFixed(3);$('rateVND').value=live.VND.toFixed(4);$('fxRatesInfo').textContent='שערים חיים נמשכו מהרשת — לחצו "שמור שערים" כדי לשתף עם המשפחה'+(live.updatedAt?` (מקור: ${live.updatedAt})`:'')};
-$('fxUpdate').onclick=async()=>{if(!requireUser())return;const USD=Number($('rateUSD').value),EUR=Number($('rateEUR').value),VND=Number($('rateVND').value);
+$('fxAutoUpdate').onclick=async()=>{if(CUR_ON)return f10AutoUpdate();/* CHANGE 2026-11-07 F10-P3-02: homePerUnit for every row from the same er-api call (was: ILS per USD/EUR/VND) */if(!requireUser())return;$('fxRatesInfo').textContent='מעדכן שערים…';const live=await fetchLiveFxRates();if(!live){$('fxRatesInfo').textContent='⚠️ לא הצלחנו למשוך שערים חיים כרגע (בעיית רשת) — אפשר להזין ידנית או לנסות שוב';return}$('rateUSD').value=live.USD.toFixed(3);$('rateEUR').value=live.EUR.toFixed(3);$('rateVND').value=live.VND.toFixed(4);$('fxRatesInfo').textContent='שערים חיים נמשכו מהרשת — לחצו "שמור שערים" כדי לשתף עם המשפחה'+(live.updatedAt?` (מקור: ${live.updatedAt})`:'')};
+$('fxUpdate').onclick=async()=>{if(CUR_ON)return f10SaveRates();/* CHANGE 2026-11-07 F10-P3-03: saves v2 (+ legacy USD/EUR/VND when home is ILS), §2 (was: {USD,EUR,VND}) */if(!requireUser())return;const USD=Number($('rateUSD').value),EUR=Number($('rateEUR').value),VND=Number($('rateVND').value);
  if(![USD,EUR,VND].every(n=>Number.isFinite(n)&&n>0))return alert('נא להזין שערים תקינים וחיוביים');
  await SS.set(FX_KEY,JSON.stringify({USD,EUR,VND}));fxState={result:null};$('fxRatesInfo').textContent='✅ השערים נשמרו ומשותפים לכל בני המשפחה'};
 /* CHANGE 2026-09-17 FX-BUDGET-01: same sequential 2-click chip selection as the quick
@@ -6905,13 +7208,15 @@ $('fxUpdate').onclick=async()=>{if(!requireUser())return;const USD=Number($('rat
    Kept as separate state (budgetFxFromCur/budgetFxToCur) from the quick converter's
    quickFxFromCur/quickFxToCur -- two independent tools, not shared state. */
 let budgetFxFromCur='VND',budgetFxToCur='ILS';
+/* CHANGE 2026-11-07 F10-P4-01: default from TRIPCUR.local to home; chips from TRIPCUR.list (F10_ROWS.bfx) (was: VND → ILS, ₪ $ € ₫). 'off': no-op. */
+if(CUR_ON){[budgetFxFromCur,budgetFxToCur]=f10FxDefault();F10_ROWS.bfx={id:'budgetFxRow',style:'fx',sel:()=>[budgetFxFromCur,budgetFxToCur],pick:c=>f10BudgetPick(c),paint:()=>applyBudgetFxUI()}}
 function applyBudgetFxUI(){
  document.querySelectorAll('#budgetFxRow .curchip').forEach(c=>{
   c.classList.toggle('src',c.dataset.cur===budgetFxFromCur);
   c.classList.toggle('dst',c.dataset.cur===budgetFxToCur&&c.dataset.cur!==budgetFxFromCur);
  });
 }
-document.querySelectorAll('#budgetFxRow .curchip').forEach(chip=>{
+if(!CUR_ON)document.querySelectorAll('#budgetFxRow .curchip').forEach(chip=>{/* CHANGE 2026-11-07 F10-P4-02: alpha.8 binding only when 'off' */
  chip.onclick=()=>{
   const picked=chip.dataset.cur;
   if(picked===budgetFxFromCur){budgetFxFromCur=null;budgetFxToCur=null}
@@ -6923,12 +7228,13 @@ document.querySelectorAll('#budgetFxRow .curchip').forEach(chip=>{
   $('fxResult').textContent='';
  };
 });
+if(CUR_ON)f10Row('bfx');/* CHANGE 2026-11-07 F10-P4-03: builds the chip row */
 applyBudgetFxUI();
 
-$('fxCalculate').onclick=async()=>{if(!requireUser())return;if(!budgetFxFromCur||!budgetFxToCur)return $('fxResult').textContent='⚠️ בחרו מטבע מקור ומטבע יעד';const a=Number($('fxAmount').value),f=budgetFxFromCur,t=budgetFxToCur;if(!Number.isFinite(a)||a<0)return $('fxResult').textContent='⚠️ סכום לא תקין';
+$('fxCalculate').onclick=async()=>{if(CUR_ON)return f10BudgetCalc();/* CHANGE 2026-11-07 F10-P4-04: homePerUnit; "אין שער" disables (was: ilsPerUnit) */if(!requireUser())return;if(!budgetFxFromCur||!budgetFxToCur)return $('fxResult').textContent='⚠️ בחרו מטבע מקור ומטבע יעד';const a=Number($('fxAmount').value),f=budgetFxFromCur,t=budgetFxToCur;if(!Number.isFinite(a)||a<0)return $('fxResult').textContent='⚠️ סכום לא תקין';
  const rates=await getFxRates();const v=f===t?a:a*ilsPerUnit(rates,f)/ilsPerUnit(rates,t);
  fxState.result={amount:a,from:f,to:t,converted:v};$('fxResult').textContent=`${a.toLocaleString()} ${f} = ${v.toLocaleString(undefined,{maximumFractionDigits:2})} ${t}`};
-$('fxSave').onclick=async()=>{if(!requireUser()||!fxState.result)return alert('בצע המרה תחילה');if(fxState.result.to!=='ILS')return alert('בחר ILS כמטבע יעד');const items=await getExpenses();items.push({description:`המרה ${fxState.result.amount.toLocaleString('he-IL')} ${fxState.result.from}`,amount:fxState.result.converted,category:'other',by:activeUser,createdAt:Date.now()});await saveExpenses(items);renderBudget()};
+$('fxSave').onclick=async()=>{if(CUR_ON)return f10FxSave();/* CHANGE 2026-11-07 F10-P4-05: target must be home; saves homeCurrency (was: ILS) */if(!requireUser()||!fxState.result)return alert('בצע המרה תחילה');if(fxState.result.to!=='ILS')return alert('בחר ILS כמטבע יעד');const items=await getExpenses();items.push({description:`המרה ${fxState.result.amount.toLocaleString('he-IL')} ${fxState.result.from}`,amount:fxState.result.converted,category:'other',by:activeUser,createdAt:Date.now()});await saveExpenses(items);renderBudget()};
 function parseMaps(v){const m=String(v).match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)|!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)|^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);if(!m)return null;const lat=Number(m[1]??m[3]??m[5]),lng=Number(m[2]??m[4]??m[6]);return valid(lat,lng)?{lat,lng}:null}
 /* CHANGE 2026-08-29 BUG-01: parseMaps longitude was truncated at the decimal point -- the lng
    capture groups were missing the "(?:\.\d+)?" fraction part that lat already had, so a URL like
@@ -6993,6 +7299,7 @@ function closeModal(m){if(!m)return;if(m.id==='userModal'&&!activeUser)return;m.
 const TAB_FOR_PANEL={home:'home',route:'route',journal:'journal',budget:'budget',more:'more',album:'more',management:'more',backup:'more'};
 function switchPanel(id){const activeId=(id==='home'&&HOME_LAYOUT==='v2')?'homeV2':id;document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===activeId));const activeTabId=TAB_FOR_PANEL[id]||id;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.panel===activeTabId));if(id==='budget'){renderBudget();refreshFxInputs();renderDailyBurn()}if(id==='album')renderAlbum();if(id==='route'){setTimeout(()=>{if(map)google.maps.event.trigger(map,'resize');drawMap()},100);updateRouteDayStrip();renderRouteDayWeather()}if(id==='management')renderManagement();if(id==='backup')renderBackupScreen();if(id==='more'){updateDocumentsSummary();updateReservationsSummary();updateGooglePhotosSummary()}window.scrollTo(0,0)}
 function ensureModalXControls(){document.querySelectorAll('.modal').forEach(m=>{if(m.querySelector('[data-modal-x]'))return;const b=document.createElement('button');b.type='button';b.className='modal-x';b.dataset.modalX='';b.setAttribute('aria-label','סגירה');b.textContent='×';b.style.position='absolute';b.style.top='10px';b.style.right='10px';m.querySelector('.modal-box')?.appendChild(b)})}ensureModalXControls();document.querySelectorAll('[data-modal-x]').forEach(b=>b.onclick=()=>closeModal(b.closest('.modal')));
+if(CUR_ON){f10Row('qfx');applyQuickFxUI();f10RefreshTexts()}/* CHANGE 2026-11-07 F10-P5-05 + F10-P6-01 + F10-P8-01: quick-FX row, "<home sym> ⇄ <local sym>", "עלות (<home sym> / <local sym>)" (was: fixed ₪ $ € ₫ / "₪ ⇄ $" / "עלות (₪ / ₫)") */
 $('globalFxBtn').onclick=()=>{openModal('fxQuickModal');$('quickFxAmount').value='';$('quickFxResult').textContent='';$('quickFxAddExpenseBtn').style.display='none';$('quickFxAddExpenseHint').style.display='none';quickFxLastResult=null};$('quickFxCalculate').onclick=quickFxCalculate;$('homeWeather').onclick=showWeatherDetails;$('documentsBtn').onclick=async()=>{currentDocFolder=null;currentDocMember='all';$('docFolderView').style.display='none';$('docFolderGrid').style.display='';if($('docBy'))$('docBy').value=activeUser;openModal('documentsModal');await renderDocMemberRow();await renderDocFolderGrid()};$('googlePhotosBtn').onclick=()=>openGooglePhotosModal();$('mgmtPhotoCleanup').onclick=()=>{$('photoCleanupResult').innerHTML='';photoCleanupScan=null;openModal('photoCleanupModal')};$('googlePhotosSaveBtn').onclick=async()=>{if(!requireUser())return;const v=$('googlePhotosUrl').value.trim();await SS.set(SHARED.googlePhotosLink,v);$('googlePhotosFeedback').textContent=v?'✅ הקישור נשמר ומשותף לכל המשפחה':'הקישור נמחק';if(v){$('googlePhotosOpenBtn').href=v;$('googlePhotosOpenBtn').style.display=''}else{$('googlePhotosOpenBtn').style.display='none'}await updateGooglePhotosSummary()};$('docAddBtn').onclick=()=>$('docInput').click();$('docInput').onchange=async e=>{if(!requireUser())return;const files=[...e.target.files];if(!files.length)return;const cat=$('docCategory').value,labels={flights:'טיסות',passport:'דרכונים / ויזות',hotels:'מלונות',insurance:'ביטוח',transport:'תחבורה',other:'אחר'};let docs=await getDocuments();let skippedTooBig=0;for(const f of files){const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);let src,extra={};if(isPdf){if(f.size>3*1024*1024){skippedTooBig++;continue}src=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>res(null);r.readAsDataURL(f)});extra={isPdf:true}}else{src=await compressImage(f)}if(!src)continue;const id='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);docs.push({id,name:($('docName').value.trim()||f.name).slice(0,50),category:cat,categoryLabel:labels[cat],src,createdAt:Date.now(),by:($('docBy').value||activeUser),...extra})}const ok=await saveDocuments(docs);$('docName').value='';e.target.value='';if(currentDocFolder)await renderDocuments();await updateDocumentsSummary();if(skippedTooBig)alert(`${skippedTooBig} קובץ/י PDF לא הועלו — חורגים מהמגבלה של 3MB`);if(!ok)alert('שמירת המסמך נכשלה — כנראה שהאחסון המקומי במכשיר מלא. נסו למחוק מסמכים ישנים.')};$('documentsGrid').onclick=e=>{const menuBtn=e.target.closest('[data-doc-menu]');if(!menuBtn)return;docActionTargetId=menuBtn.dataset.docMenu;openModal('docActionModal')};
 /* CHANGE 2026-08-30 RES-01: Reservations Center event wiring — additive, inserted between two pre-existing handlers without altering either. See CHANGELOG_v1.8.0.txt. */
 $('reservationsBtn').onclick=async()=>{openModal('reservationsModal');currentResFilter='all';document.querySelectorAll('[data-res-filter]').forEach(c=>c.classList.toggle('active',c.dataset.resFilter==='all'));await renderReservationsList()};
@@ -7296,7 +7603,7 @@ async function sendChatMessage(text){
      image:img?{mime:img.mime,data:img.data}:null,
      currentDay:d?{day:d.day,date:d.date,region:d.region,title:d.title,activities:d.activities,hotel:d.bookedHotel||d.hotel,notes:d.notes,cost:d.cost,waypoints:(d.waypoints||[]).map(w=>w.name),isBooked:!!d.isBooked,bookingRef:d.bookingRef||null,actualCost:d.isBooked?(d.actualCost??null):null}:null,
      trip:tripData.map(x=>({day:x.day,date:x.date,region:x.region,title:x.title})),
-     fx:fx?{USD:fx.USD,EUR:fx.EUR,VND:fx.VND}:null,
+     fx:CUR_ON?await f10ChatFx():fx?{USD:fx.USD,EUR:fx.EUR,VND:fx.VND}:null,/* CHANGE 2026-11-07 F10-P10-01: {base, rates, home, local} (was {USD,EUR,VND}) */
      weather:weather?{region:weather.region,max:weather.max,min:weather.min,rain:weather.rain,date:weather.date}:null,
      budget:extras?extras.budget:null,
      expenses:extras?extras.expenses:null,
@@ -7349,7 +7656,7 @@ async function applyChatAction(idx){
    const category=Object.prototype.hasOwnProperty.call(CATEGORIES,params.category)?params.category:'other';
    if(!desc||!Number.isFinite(amount)||amount<0)throw new Error('invalid expense');
    const items=await getExpenses();
-   items.push({description:desc,amount,category,by:activeUser,createdAt:Date.now()});
+   items.push({description:desc,amount,category,by:activeUser,createdAt:Date.now(),...(CUR_ON?{homeCurrency:f10Home()}:{})});/* CHANGE 2026-11-07 F10-EXP-02: + homeCurrency (D4) (was: none) */
    await saveExpenses(items);
    renderBudget();if(typeof renderDailyBurn==='function')renderDailyBurn();
   }else if(type==='swap_days'){
@@ -8696,7 +9003,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.8';/* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.9';/* CHANGE 2026-11-07 F10-VER-01: was '3.0.0-alpha.8' (F10) *//* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;
@@ -8882,8 +9189,11 @@ const QUICK_EXPENSE='on';
 const QE_CATS=[['food','🍜','אוכל'],['lodging','🛏️','לינה'],['transport','🚕','נסיעות'],['shopping','🛍️','קניות'],['attractions','🎟️','אטרקציות'],['other','📦','אחר']];
 const QE_CUR=[['VND','VND'],['ILS','₪'],['USD','$']];
 let qeCur=(()=>{try{return localStorage.getItem('planner:qe:cur')||'VND'}catch{return'VND'}})(),qeCat='food';
+/* CHANGE 2026-11-07 F10-P7-01: default = last pick for this trip (planner:qe:cur, per trip) else TRIPCUR.local; chips from TRIPCUR.list (F10_ROWS.qe,
+   pill style, 5 + "עוד") (was: VND ₪ $, default VND). 'off': no-op. */
+if(CUR_ON){qeCur=f10Pick((()=>{try{return localStorage.getItem('planner:qe:cur')}catch{return null}})());F10_ROWS.qe={id:'qeCurRow',style:'qe',sel:()=>[qeCur],pick:()=>{},paint:()=>document.querySelectorAll('#qeCurRow [data-qe-cur]').forEach(b=>{const on=b.dataset.qeCur===qeCur;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}}
 function qeParse(v){const n=Number(String(v||'').replace(/[,\s]/g,''));return Number.isFinite(n)&&n>0?n:null}
-function qeFmt(n,cur){if(cur==='ILS')return`${Math.round(n).toLocaleString('he-IL')} ₪`;if(cur==='USD')return`$${n.toLocaleString('en-US',{maximumFractionDigits:2})}`;return`${Math.round(n).toLocaleString('en-US')} ₫`}
+function qeFmt(n,cur){if(CUR_ON&&f10QeFmt(n,cur)!==null)return f10QeFmt(n,cur);/* CHANGE 2026-11-07 F10-P7-02: other currencies "<n> <sym>" (was: everything else as ₫) */if(cur==='ILS')return`${Math.round(n).toLocaleString('he-IL')} ₪`;if(cur==='USD')return`$${n.toLocaleString('en-US',{maximumFractionDigits:2})}`;return`${Math.round(n).toLocaleString('en-US')} ₫`}
 async function qeToILS(amount,cur){const rates=await getFxRates();return Math.round(amount*ilsPerUnit(rates,cur)*100)/100}
 function qeCatMeta(c){return QE_CATS.find(x=>x[0]===normalizeCategory(c))||QE_CATS[5]}
 (function qeBuild(){
@@ -8901,10 +9211,11 @@ function qeCatMeta(c){return QE_CATS.find(x=>x[0]===normalizeCategory(c))||QE_CA
  const bar=$('budget').querySelector('.pbar2');
  (bar||$('budget').querySelector('.topbar')).insertAdjacentElement('afterend',card);
  const paint=()=>{card.querySelectorAll('[data-qe-cur]').forEach(b=>{const on=b.dataset.qeCur===qeCur;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});card.querySelectorAll('[data-qe-cat]').forEach(b=>{const on=b.dataset.qeCat===qeCat;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})};
- const conv=async()=>{const a=qeParse($('qeAmount').value);if(!a){$('qeConv').textContent=qeCur==='ILS'?'':'≈ 0 ₪';return}$('qeConv').textContent=qeCur==='ILS'?'':`≈ ${Math.round(await qeToILS(a,qeCur)).toLocaleString('he-IL')} ₪`};
+ const conv=async()=>{if(CUR_ON)return f10QeConv();/* CHANGE 2026-11-07 F10-P7-03: "≈ <home amount>" (was ≈ … ₪) */const a=qeParse($('qeAmount').value);if(!a){$('qeConv').textContent=qeCur==='ILS'?'':'≈ 0 ₪';return}$('qeConv').textContent=qeCur==='ILS'?'':`≈ ${Math.round(await qeToILS(a,qeCur)).toLocaleString('he-IL')} ₪`};
  card.addEventListener('click',e=>{const c=e.target.closest('[data-qe-cur]'),k=e.target.closest('[data-qe-cat]');if(c){qeCur=c.dataset.qeCur;try{localStorage.setItem('planner:qe:cur',qeCur)}catch{}paint();conv()}if(k){qeCat=k.dataset.qeCat;paint()}});
  $('qeAmount').addEventListener('input',()=>{$('qeErr').classList.remove('show');conv()});
  $('qeSave').onclick=async()=>{
+  if(CUR_ON)return f10QeSave();/* CHANGE 2026-11-07 F10-P7-04: amount in home + homeCurrency (was ILS) */
   if(!requireUser())return;
   const a=qeParse($('qeAmount').value);if(!a){$('qeErr').classList.add('show');$('qeAmount').focus();return}
   const ils=qeCur==='ILS'?Math.round(a*100)/100:await qeToILS(a,qeCur);
@@ -8917,6 +9228,7 @@ function qeCatMeta(c){return QE_CATS.find(x=>x[0]===normalizeCategory(c))||QE_CA
   ciToast(`✅ נשמרה הוצאה · ${qeFmt(a,qeCur)}${qeCur==='ILS'?'':' ≈ '+Math.round(ils).toLocaleString('he-IL')+' ₪'}`);
   renderBudget();renderDailyBurn();qeRenderRecent();
  };
+ if(CUR_ON)f10Row('qe');/* CHANGE 2026-11-07 F10-P7-05: builds the chip row */
  paint();conv();
 })();
 async function qeRenderRecent(){
@@ -8924,7 +9236,7 @@ async function qeRenderRecent(){
  const items=(await getExpenses()).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,3);
  const today=new Date();today.setHours(0,0,0,0);
  const when=t=>{if(!t)return'';const d=new Date(t);d.setHours(0,0,0,0);const diff=Math.round((today-d)/864e5);return diff===0?'היום':diff===1?'אתמול':new Date(t).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})};
- el.innerHTML=items.length?items.map(e=>{const m=qeCatMeta(e.category);const amt=e.originalCurrency&&e.originalAmount?qeFmt(Number(e.originalAmount),e.originalCurrency):qeFmt(Number(e.amount||0),'ILS');return`<div class="qe-item"><span>${m[1]} ${esc(e.description||m[2])} · ${when(e.createdAt)}</span><b>${esc(amt)}</b></div>`}).join(''):'<div class="qe-item muted">עוד אין הוצאות</div>';
+ el.innerHTML=items.length?items.map(e=>{const m=qeCatMeta(e.category);const amt=e.originalCurrency&&e.originalAmount?qeFmt(Number(e.originalAmount),e.originalCurrency):CUR_ON?(f10Legacy(e)?f10AmtTxt(e):qeFmt(Number(e.amount||0),f10Home())||fmtHome(Math.round(Number(e.amount||0)))):qeFmt(Number(e.amount||0),'ILS');/* CHANGE 2026-11-07 F10-P9-07: home amount via fmtHome (was qeFmt(…,'ILS')) */return`<div class="qe-item"><span>${m[1]} ${esc(e.description||m[2])} · ${when(e.createdAt)}</span><b>${esc(amt)}</b></div>`}).join(''):'<div class="qe-item muted">עוד אין הוצאות</div>';
 }
 if(QUICK_EXPENSE==='on'){const _qeOrigRenderBudget=renderBudget;renderBudget=async function(){const r=await _qeOrigRenderBudget.apply(this,arguments);qeRenderRecent();return r};qeRenderRecent()}
 function qeOpen(){switchPanel('budget');const c=$('quickExpenseCard');if(!c)return;c.scrollIntoView({block:'start',behavior:'smooth'});setTimeout(()=>{try{$('qeAmount').focus({preventScroll:true})}catch{}},250)}
@@ -9445,7 +9757,7 @@ if(EDIT_MENU==='on'){
   // expenses
   let b=t.closest('[data-ui-exp-more]');
   if(b){e.preventDefault();e.stopPropagation();const idx=Number(b.dataset.uiExpMore);const ex=(await getExpenses())[idx];if(!ex)return;
-   const amt=`${Number(ex.amount||0).toLocaleString('he-IL')} ₪`,orig=ex.originalCurrency&&ex.originalAmount?` (${qeFmt(Number(ex.originalAmount),ex.originalCurrency)})`:'';
+   const amt=f10Legacy(ex)?f10AmtTxt(ex):fmtHome(Number(ex.amount||0)),orig=ex.originalCurrency&&ex.originalAmount?` (${qeFmt(Number(ex.originalAmount),ex.originalCurrency)})`:'';/* CHANGE 2026-11-07 F10-P9-06: fmtHome + D4 marker (was `${…} ₪`) */
    uiSheetOpen({title:`${ex.description||CATEGORIES[normalizeCategory(ex.category)]||'הוצאה'} · ${amt}`,sub:[CATEGORIES[normalizeCategory(ex.category)],ex.by?`נרשם ע"י ${ex.by}`:'',uiWhen(ex.editedAt||ex.createdAt)].filter(Boolean).join(' · ')+orig,actions:[
     {icon:'✏️',label:'עריכה',run:()=>expEdit(idx)},
     {icon:'🗑️',label:'מחיקה',danger:true,confirm:{title:`למחוק את "${ex.description||'ההוצאה'}" (${amt})?`,text:'ההוצאה תימחק אצל כל בני המשפחה.'},run:()=>expDelete(idx)}]});return}
@@ -9549,6 +9861,234 @@ if(DAY_TODAY==='on'){
   }
   return _dtOrigFillSelects.apply(this,arguments);
  };
+}
+/* CHANGE 2026-11-07 F10-PLACES-01: new functions (no alpha.8 equivalent), additive. The F10 versions of the currency places
+   (docs/F10_spec.md §3). Each alpha.8 function / handler they replace starts with one new line `if(CUR_ON)return f10…()`
+   (tagged F10-<AREA>-NN where it is), so with CURRENCY_FEATURE='off' none of these runs.
+   P1/P2 add-expense: f10ApplyExpenseUI, f10ExpensePick, f10ExpenseCalc, f10SaveExpense, f10ExpenseListClick.
+   P3 rate rows: f10RefreshFxInputs, f10AutoUpdate, f10SaveRates (v2 + legacy USD/EUR/VND for ILS homes, §2).
+   P4 budget converter: f10BudgetPick, f10BudgetCalc, f10FxSave.  P5 quick FX: f10QuickPick, f10QuickCalc, f10QuickAdd.
+   P7 quick expense: f10QeConv, f10QeSave, f10QeFmt.  P10 chat: f10ChatFx.  homePerUnit(code) = §2's name for f10Hpu. */
+function homePerUnit(code){return f10Hpu(code)}
+/* missing rate (§2): message + the calculate button disabled while a picked currency has no rate */
+function f10FxNote(resId,btnId,f,t){
+ const miss=f10Missing(f,t);
+ const b=$(btnId);if(b)b.disabled=!!miss;
+ if(miss&&$(resId))$(resId).textContent='⚠️ '+f10NoRateMsg(miss);
+ if(miss&&!f10LiveTried)f10Rates().then(()=>{const m2=f10Missing(f,t);if(b)b.disabled=!!m2;if(!m2&&$(resId)&&$(resId).textContent.indexOf('⚠️ אין שער')===0)$(resId).textContent=''}).catch(()=>{});
+ return miss;
+}
+function f10RateVal(x){return Number(Number(x).toPrecision(12))}
+/* ---- P1 / P2 ---- */
+function f10ApplyExpenseUI(){
+ document.querySelectorAll('#expenseCurRow .curchip').forEach(c=>c.classList.toggle('active',c.dataset.cur===expenseSelectedCur));
+ const home=f10Home(),isHome=expenseSelectedCur===home;
+ $('expenseAmount').placeholder=isHome?(home==='ILS'?'סכום בש״ח':'סכום ב-'+f10Sym(home)):'סכום ב-'+f10Sym(expenseSelectedCur);
+ $('expenseCalcRow').style.display=isHome?'none':'flex';
+ $('expenseCalcBtn').textContent='🔄 חשב '+f10ToWord(home);
+ $('expenseCalcBox').classList.remove('show');
+ expenseCalculatedILS=null;
+ const miss=!isHome&&!!f10Missing(expenseSelectedCur);
+ $('expenseCalcBtn').disabled=miss;
+ if(miss){$('expenseCalcBox').textContent='⚠️ '+f10NoRateMsg(expenseSelectedCur);$('expenseCalcBox').classList.add('show')}
+}
+function f10ExpensePick(c){expenseSelectedCur=c;try{localStorage.setItem('planner:lastExpenseCurrency',c)}catch{}applyExpenseCurrencyUI()}
+async function f10ExpenseCalc(){
+ const amt=Number($('expenseAmount').value);
+ $('expenseAmtErr').classList.remove('show');
+ if(!Number.isFinite(amt)||amt<=0){$('expenseAmtErr').classList.add('show');return}
+ const cur=expenseSelectedCur,home=f10Home();
+ await f10Rates();
+ const rate=f10Hpu(cur);
+ if(!rate){expenseCalculatedILS=null;$('expenseCalcBox').textContent='⚠️ '+f10NoRateMsg(cur);$('expenseCalcBox').classList.add('show');return}
+ const v=amt*rate;expenseCalculatedILS=v;
+ const u=f10Unit(cur),rateTxt=`${u===1000?'1,000':'1'} ${cur} = ${(rate*u).toLocaleString('he-IL',{maximumFractionDigits:2})} ${f10Sym(home)}`;
+ $('expenseCalcBox').innerHTML=`${amt.toLocaleString('he-IL')} ${esc(cur)} = <b>${esc(fmtHome(v,{maximumFractionDigits:2}))}</b><br>שער: ${esc(rateTxt)}`;
+ $('expenseCalcBox').classList.add('show');
+}
+async function f10SaveExpense(){
+ if(!requireUser())return;
+ const d=$('expenseDescription').value.trim();const rawAmt=Number($('expenseAmount').value);
+ $('expenseAmtErr').classList.remove('show');
+ if(!d||!Number.isFinite(rawAmt)||rawAmt<=0){$('expenseAmtErr').classList.add('show');return}
+ const home=f10Home(),isHome=expenseSelectedCur===home;
+ if(!isHome&&expenseCalculatedILS===null){alert(`לחץ על "חשב ${f10ToWord(home)}" לפני השמירה`);return}
+ const a=isHome?rawAmt:expenseCalculatedILS;
+ const items=await getExpenses();const dayIndex=expenseFormDayIndex;
+ const extra=isHome?{homeCurrency:home}:{originalAmount:rawAmt,originalCurrency:expenseSelectedCur,homeCurrency:home};
+ const editIdx=$('saveExpense').dataset.editIdx;
+ if(editIdx!==undefined&&editIdx!==''){
+  const old={...items[Number(editIdx)]};if(isHome){delete old.originalAmount;delete old.originalCurrency}
+  items[Number(editIdx)]={...old,description:d,amount:a,category:$('expenseCategory').value,dayIndex,by:activeUser,editedAt:Date.now(),...extra};
+  delete $('saveExpense').dataset.editIdx;$('saveExpense').textContent='שמור הוצאה';$('cancelEditExpense').style.display='none';
+ }else items.push({description:d,amount:a,category:$('expenseCategory').value,dayIndex,by:activeUser,createdAt:Date.now(),...extra});
+ await saveExpenses(items);
+ $('expenseDescription').value='';$('expenseAmount').value='';expenseCalculatedILS=null;$('expenseCalcBox').classList.remove('show');
+ renderBudget();renderDailyBurn();
+}
+/* the alpha.8 #expenseList handler with one difference in "edit": the chip = the original currency, else the expense's home
+   currency (old expenses: ILS); a currency that is not in this trip's list → home, with the amount converted */
+async function f10ExpenseListClick(e){
+ const editBtn=e.target.closest('[data-edit-expense]');const delBtn=e.target.closest('[data-delete-expense]');
+ if(delBtn){if(!requireUser())return;if(!confirm('למחוק הוצאה זו?'))return;const items=await getExpenses();items.splice(Number(delBtn.dataset.deleteExpense),1);await saveExpenses(items);renderBudget();renderDailyBurn();return}
+ if(!editBtn)return;
+ if(!requireUser())return;
+ const idx=Number(editBtn.dataset.editExpense);const items=await getExpenses();const exp=items[idx];
+ const home=f10Home();let cur=exp.originalCurrency||exp.homeCurrency||'ILS',amt=exp.originalCurrency?exp.originalAmount:exp.amount;
+ if(f10TC.list.indexOf(cur)<0){cur=home;amt=Math.round(f10Amt(exp)*100)/100}
+ $('expenseDescription').value=exp.description;expenseSelectedCur=cur;applyExpenseCurrencyUI();$('expenseAmount').value=amt;
+ $('expenseCategory').value=exp.category||'other';expenseFormDayIndex=exp.dayIndex!=null?exp.dayIndex:null;expenseFormDayInited=true;renderExpenseDaySlider();
+ $('saveExpense').dataset.editIdx=idx;$('saveExpense').textContent='עדכן הוצאה';$('cancelEditExpense').style.display='inline-block';$('expenseDescription').focus();
+}
+/* ---- P3 ---- */
+let f10Filled=false;
+function f10RateGrid(){
+ let g=$('f10RateGrid');if(g)return g;
+ const a=$('rateUSD');g=a&&a.closest('.grid');if(!g)return null;
+ g.id='f10RateGrid';
+ const h=document.createElement('div');h.id='f10RatesHead';h.className='muted';h.style.cssText='font-weight:700;font-size:.78rem;margin-bottom:6px';
+ g.insertAdjacentElement('beforebegin',h);
+ g.addEventListener('input',e=>{if(e.target.closest('[data-f10-rate]'))f10Filled=false});
+ return g;
+}
+async function f10RefreshFxInputs(){
+ const g=f10RateGrid();if(!g)return;
+ const R=await f10Rates(),home=f10Home(),hs=esc(f10Sym(home));
+ $('f10RatesHead').textContent='שערים '+f10InWord(home);
+ const codes=f10TC.list.filter(c=>c!==home);
+ g.innerHTML=codes.map(c=>{const u=f10Unit(c),k=esc(c);return`<div class="info-item"><span class="info-label">${u===1000?'1,000':'1'} ${k}</span><div class="row"><input id="rate${k}" data-f10-rate="${k}" type="number" min="0" step="any"><span class="muted">${hs}</span></div></div>`}).join('');
+ const miss=[];
+ codes.forEach(c=>{const inp=$('rate'+c),r=f10Hpu(c,R);if(r){inp.value=f10RateVal(r*f10Unit(c))}else{inp.value='';inp.placeholder='אין שער';miss.push(c)}});
+ f10Filled=false;
+ const base=R.source==='saved'?'שערים שמורים (הוזנו ידנית)':R.source==='live'?'שערים חיים · לא נשמרו':R.source==='defaults'?'שערים ברירת מחדל משוערים — כדאי לעדכן לפני הנסיעה':'אין שערים שמורים — לחצו "🔄 עדכן שערים אוטומטית" או הזינו ידנית';
+ $('fxRatesInfo').textContent=base+(miss.length&&R.source!=='none'?' · אין שער ל-'+miss.join(', '):'');
+ f10RowsAll();
+}
+async function f10AutoUpdate(){
+ if(!requireUser())return;
+ $('fxRatesInfo').textContent='מעדכן שערים…';
+ const live=await f10Live();
+ if(!live){$('fxRatesInfo').textContent='⚠️ לא הצלחנו למשוך שערים חיים כרגע (בעיית רשת) — אפשר להזין ידנית או לנסות שוב';return}
+ f10Mem=live;const home=f10Home();
+ document.querySelectorAll('[data-f10-rate]').forEach(inp=>{const c=inp.dataset.f10Rate,r=live.rates[c];if(!(r>0))return;const v=r*f10Unit(c);
+  inp.value=home==='ILS'&&(c==='USD'||c==='EUR')?v.toFixed(3):home==='ILS'&&c==='VND'?v.toFixed(4):String(Number(v.toPrecision(4)))});
+ f10Filled=true;
+ $('fxRatesInfo').textContent='שערים חיים נמשכו מהרשת — לחצו "שמור שערים" כדי לשתף עם המשפחה'+(live.updatedAt?` (מקור: ${live.updatedAt})`:'');
+}
+async function f10SaveRates(){
+ if(!requireUser())return;
+ const home=f10Home(),rates={},typed={};let bad=false;
+ document.querySelectorAll('[data-f10-rate]').forEach(inp=>{const c=inp.dataset.f10Rate,s=String(inp.value).trim();if(s==='')return;const n=Number(s);if(!(Number.isFinite(n)&&n>0)){bad=true;return}typed[c]=n;rates[c]=f10RateVal(n/f10Unit(c))});
+ if(bad||!Object.keys(rates).length)return alert('נא להזין שערים תקינים וחיוביים');
+ const obj={v:2,base:home,rates,updatedAt:Date.now(),source:f10Filled?'live':'manual'};
+ /* §2 dual-write: an ILS home also keeps the alpha.8 fields (ILS per 1 USD / 1 EUR / 1,000 VND) in the same object */
+ if(home==='ILS'){if(rates.USD)obj.USD=rates.USD;if(rates.EUR)obj.EUR=rates.EUR;if(rates.VND)obj.VND=f10RateVal(rates.VND*1000)}
+ await SS.set(FX_KEY,JSON.stringify(obj));fxState={result:null};
+ $('fxRatesInfo').textContent='✅ השערים נשמרו ומשותפים לכל בני המשפחה';
+ await f10Rates({noLive:true});f10RowsAll();
+}
+/* ---- P4 ---- */
+function f10BudgetPick(c){[budgetFxFromCur,budgetFxToCur]=f10TwoClick(budgetFxFromCur,budgetFxToCur,c);applyBudgetFxUI();$('fxResult').textContent='';f10FxNote('fxResult','fxCalculate',budgetFxFromCur,budgetFxToCur)}
+async function f10BudgetCalc(){
+ if(!requireUser())return;
+ if(!budgetFxFromCur||!budgetFxToCur)return $('fxResult').textContent='⚠️ בחרו מטבע מקור ומטבע יעד';
+ const a=Number($('fxAmount').value),f=budgetFxFromCur,t=budgetFxToCur;
+ if(!Number.isFinite(a)||a<0)return $('fxResult').textContent='⚠️ סכום לא תקין';
+ await f10Rates();if(f10FxNote('fxResult','fxCalculate',f,t))return;
+ const v=f10Conv(a,f,t);
+ fxState.result={amount:a,from:f,to:t,converted:v};$('fxResult').textContent=`${a.toLocaleString()} ${f} = ${v.toLocaleString(undefined,{maximumFractionDigits:2})} ${t}`;
+}
+async function f10FxSave(){
+ const home=f10Home();
+ if(!requireUser()||!fxState.result)return alert('בצע המרה תחילה');
+ if(fxState.result.to!==home)return alert(`בחר ${home} כמטבע יעד`);
+ const items=await getExpenses();
+ items.push({description:`המרה ${fxState.result.amount.toLocaleString('he-IL')} ${fxState.result.from}`,amount:fxState.result.converted,category:'other',by:activeUser,createdAt:Date.now(),homeCurrency:home});
+ await saveExpenses(items);renderBudget();
+}
+/* ---- P5 ---- */
+function f10QuickPick(c){
+ [quickFxFromCur,quickFxToCur]=f10TwoClick(quickFxFromCur,quickFxToCur,c);applyQuickFxUI();
+ $('quickFxResult').textContent='';$('quickFxAddExpenseBtn').style.display='none';$('quickFxAddExpenseHint').style.display='none';quickFxLastResult=null;
+ f10FxNote('quickFxResult','quickFxCalculate',quickFxFromCur,quickFxToCur);
+}
+async function f10QuickCalc(){
+ $('quickFxAddExpenseBtn').style.display='none';$('quickFxAddExpenseHint').style.display='none';quickFxLastResult=null;
+ if(!quickFxFromCur||!quickFxToCur){$('quickFxResult').textContent='⚠️ בחרו מטבע מקור ומטבע יעד';return}
+ const a=Number($('quickFxAmount').value),f=quickFxFromCur,t=quickFxToCur;
+ if(!Number.isFinite(a)||a<0){$('quickFxResult').textContent='⚠️ סכום לא תקין';return}
+ await f10Rates();if(f10FxNote('quickFxResult','quickFxCalculate',f,t))return;
+ const v=f10Conv(a,f,t);
+ $('quickFxResult').textContent=`${a.toLocaleString()} ${f10Sym(f)} = ${v.toLocaleString(undefined,{maximumFractionDigits:2})} ${f10Sym(t)}`;
+ $('quickFxInfo').textContent='השערים נשמרים במכשיר ומשותפים למשפחה. לעדכון שערים מלא עברו לתקציב.';
+ quickFxLastResult={amount:a,from:f,to:t,converted:v};
+ if(t===f10Home()){$('quickFxAddExpenseBtn').style.display='block'}else{$('quickFxAddExpenseHint').style.display='block'}
+}
+function f10QuickAdd(){
+ const home=f10Home();
+ if(!requireUser()||!quickFxLastResult||quickFxLastResult.to!==home)return;
+ closeModal($('fxQuickModal'));switchPanel('budget');$('addExpenseDetails').open=true;
+ expenseFormDayIndex=expenseDefaultDayIndex();expenseFormDayInited=true;renderExpenseDaySlider();
+ expenseSelectedCur=home;applyExpenseCurrencyUI();
+ $('expenseAmount').value=Number(quickFxLastResult.converted.toFixed(2));$('expenseDescription').value='';
+ $('addExpenseDetails').scrollIntoView({behavior:'smooth',block:'start'});
+ setTimeout(()=>$('expenseDescription').focus(),300);
+}
+/* ---- P7 ---- */
+function f10QeFmt(n,cur){
+ if(cur==='ILS'||cur==='USD'||cur==='VND')return null;   /* the alpha.8 formats */
+ return`${Number(n).toLocaleString('en-US',{maximumFractionDigits:2})} ${f10Sym(cur)}`;
+}
+async function f10QeHome(a,cur){await f10Rates();const v=f10Conv(a,cur,f10Home());return v==null?null:Math.round(v*100)/100}
+async function f10QeConv(){
+ const a=qeParse($('qeAmount').value),home=f10Home();
+ if(qeCur!==home&&!f10Hpu(qeCur)){await f10Rates();if(!f10Hpu(qeCur)){$('qeConv').textContent='⚠️ '+f10NoRateMsg(qeCur);return}}
+ if(!a){$('qeConv').textContent=qeCur===home?'':'≈ '+fmtHome(0);return}
+ if(qeCur===home){$('qeConv').textContent='';return}
+ const v=await f10QeHome(a,qeCur);
+ $('qeConv').textContent=v==null?'⚠️ '+f10NoRateMsg(qeCur):'≈ '+fmtHome(Math.round(v));
+}
+async function f10QeSave(){
+ if(!requireUser())return;
+ const a=qeParse($('qeAmount').value);if(!a){$('qeErr').classList.add('show');$('qeAmount').focus();return}
+ const home=f10Home(),cur=qeCur;
+ const v=cur===home?Math.round(a*100)/100:await f10QeHome(a,cur);
+ if(v==null){$('qeConv').textContent='⚠️ '+f10NoRateMsg(cur);return}
+ const m=qeCatMeta(qeCat);
+ const item={description:$('qeDesc').value.trim()||m[2],amount:v,category:qeCat,dayIndex:expenseDefaultDayIndex(),by:activeUser,createdAt:Date.now()};
+ if(cur!==home){item.originalAmount=a;item.originalCurrency=cur}
+ item.homeCurrency=home;
+ $('qeSave').disabled=true;
+ try{const items=await getExpenses();items.push(item);await saveExpenses(items)}finally{$('qeSave').disabled=false}
+ $('qeAmount').value='';$('qeDesc').value='';$('qeConv').textContent='';
+ ciToast(`✅ נשמרה הוצאה · ${qeFmt(a,cur)}${cur===home?'':' ≈ '+fmtHome(Math.round(v))}`);
+ renderBudget();renderDailyBurn();qeRenderRecent();
+}
+/* ---- P10 ---- */
+async function f10ChatFx(){try{const R=await f10Rates({noLive:true});return{base:R.home,rates:R.rates,home:f10Home(),local:f10TC.local}}catch{return null}}
+/* boot: rows, texts and the first (saved / cached) rates; a DB refresh of TRIPCUR rebuilds everything (F20 switch reloads) */
+if(CUR_ON){
+ window.__ptF10.onChange(m=>{f10TC=m;
+  try{expenseSelectedCur=f10Pick(localStorage.getItem('planner:lastExpenseCurrency'));qeCur=f10Pick(localStorage.getItem('planner:qe:cur'));[budgetFxFromCur,budgetFxToCur]=f10FxDefault();[quickFxFromCur,quickFxToCur]=f10FxDefault()}catch{}
+  f10Rates({noLive:true}).then(()=>{f10RowsAll();f10RefreshTexts();try{applyExpenseCurrencyUI()}catch{}if(currentPanel()==='budget'){renderBudget();refreshFxInputs();renderDailyBurn()}}).catch(()=>{});
+ });
+}
+if(CUR_ON){
+ const st=document.createElement('style');st.id='f10Css';st.textContent=`
+.currow.f10-n3{grid-template-columns:repeat(3,minmax(0,1fr))}.currow.f10-n5{grid-template-columns:repeat(5,minmax(0,1fr))}.currow.f10-n6{grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
+#expenseCurRow .curchip,#budgetFxRow .curchip,#quickFxRow .curchip,#f10MoreList .curchip{min-height:44px;min-width:0;padding-inline:2px}
+#qeCurRow .qe-chip,#f10MoreList .qe-chip{min-height:44px;min-width:44px}
+/* CHANGE 2026-11-07 F10-BUG-01: the dashed border also under html.ui-kit (was: only the unprefixed rule, which the UI-kit solid border overrode). */.curchip.f10-more,.qe-chip.f10-more,html.ui-kit .curchip.f10-more,html.ui-kit .qe-chip.f10-more{border-style:dashed}.curchip.f10-more .code{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qe-row.f10-wrap{flex-wrap:wrap}.qe-row.f10-wrap #qeCurRow{flex-basis:100%;flex-wrap:wrap}
+#f10MoreSheet{position:fixed;inset:0;z-index:1150;display:flex;align-items:flex-end;justify-content:center}#f10MoreSheet[hidden]{display:none}
+#f10MoreSheet .f10-scrim{position:absolute;inset:0;background:#0f172a66}
+#f10MoreSheet .f10-sheet{position:relative;width:100%;max-width:520px;background:var(--card,#fff);border-radius:18px 18px 0 0;padding:14px 16px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box}
+#f10MoreSheet .f10-sheet-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+#f10MoreSheet .f10-x{min-width:44px;min-height:44px;border:0;background:transparent;font-size:1.4rem;cursor:pointer}
+#f10MoreList.currow{grid-template-columns:repeat(4,minmax(0,1fr))}
+`;document.head.appendChild(st);
+ f10RefreshTexts();
+ f10Rates().then(()=>{f10RowsAll();try{applyExpenseCurrencyUI()}catch{}f10QeConv().catch(()=>{});if(currentPanel()==='budget'){renderBudget();refreshFxInputs();renderDailyBurn()}else renderDailyBurn()}).catch(()=>{});
 }
 </script>
 </body>

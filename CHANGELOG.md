@@ -1,5 +1,22 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.9 — F10 (2026-11-07)
+
+### F10 · Every trip converts in its own currencies
+<!-- CHANGE 2026-11-07 F10-DOCS-03: new entry. Base: main 4ca777b (3.0.0-alpha.8). -->
+- QA (independent, tests/f10, 33 tests): 33/33 after F10-BUG-01 fix (the "עוד" chip's dashed border lost to the UI-kit solid border). Report: docs/qa/F10_QA.md.
+- App only (flag `CURRENCY_FEATURE`, 'off' = alpha.8). The trip's currency model TRIPCUR is built from `trips.home_currency`,
+  `trip_countries`, `trip_currencies` + countries.json / currencies.json, cached per trip (`pt:<trip>:tripcur`), exposed
+  read-only as `window.__PT.tripcur`. Fallback = the Vietnam converter (VND ILS USD EUR).
+- Chip rows (add expense, budget converter, quick FX sheet, quick expense) follow the trip's list (local first, D6), at most 5
+  chips + "עוד" sheet (D7); default = last pick on this device for this trip, else the local currency (D2).
+- Rates `fxrates` v2 `{v:2, base, rates, updatedAt, source}`; ILS trips also keep the alpha.8 `USD/EUR/VND` fields (dual
+  write). Rate rows per list currency, weak currencies per 1,000 (C2); "אין שער" disables a conversion.
+- Home currency everywhere an amount was "₪" (`fmtHome`, D3); new expenses store `homeCurrency` (D4); old expenses in a
+  non-ILS trip are shown converted with "(₪ מקורי)". Floating button "<home> ⇄ <local>", reservation cost placeholder,
+  chat context `fx` = `{base, rates, home, local}`.
+- No migration, no Edge Function change. Dev notes: docs/F10_dev_notes.md.
+
 ## 3.0.0-alpha.8 — F21 (2026-10-30)
 
 ### F21 · Anyone can request to open a trip; the super-admin approves
