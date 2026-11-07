@@ -79,6 +79,14 @@ const HOME_INSTALL_FEATURE='on';
    from a request. The /request/ page has its own REQUEST_FEATURE. 'off' = exactly the 3.0.0-alpha.7.2 behaviour: every F21
    line is a no-op (no tab, no badge, no admin_trip_requests call, wizard unchanged). Needs ADMIN_FEATURE and SWITCH_FEATURE. */
 const REQUEST_FEATURE='on';
+/* CHANGE 2026-11-07 F10-FLAG-01: new flag (no alpha.8 equivalent). 'on' = F10 (docs/F10_spec.md): every trip converts in its
+   own currencies — the trip's currency model TRIPCUR (trips.home_currency + trip_countries + trip_currencies, cached per trip)
+   drives the add-expense chips, the budget converter + rate rows, the quick FX sheet, the floating FX button, the quick
+   expense chips, the reservation cost placeholder and every display of a stored amount (fmtHome, the trip's home currency);
+   rates are shared in the v2 format (legacy USD/EUR/VND fields kept for ILS trips). 'off' = exactly the 3.0.0-alpha.8
+   behaviour: the F10 block returns on its first line and every F10 line in the main script is a no-op (Vietnam converter,
+   amounts in ₪). No server part. */
+const CURRENCY_FEATURE='on';
 </script>
 <!-- CHANGE 2026-10-05 F03-UI-01: NEW block (no 3.0.0-alpha.2 equivalent) — F03 "super-admin invites a manager"
      (docs/F03_spec.md). Style + one classic script, placed after the flags script and BEFORE the F02 gate block so it
@@ -2311,7 +2319,12 @@ try{
 function attach(a){if(!api&&a&&typeof a==='object')api=a}
 /* CHANGE 2026-10-26 F04H-CORE-02: what changed from alpha.7: two more read-only members, gateTop (F04H-GATE-02) and resumeBoot
    (F04H-RES-10); both are no-ops with HOME_INSTALL_FEATURE='off'. */
-try{Object.defineProperty(window,'__ptF04',{value:Object.freeze({version:F04_VERSION,attach,fromInvite,gateCard,emptyTrip,gateTop,resumeBoot}),writable:false,configurable:false})}catch{}
+/* CHANGE 2026-11-07 F10-F04-01: new function (no alpha.8 equivalent): hands the F10 block (TRIPCUR) the wizard's own lazy
+   countries.json / currencies.json loader (loadData, unchanged) — resolves {byCode, curByCode} or null on failure. */
+function curData(){return loadData().then(ok=>ok?{byCode:data.byCode,curByCode:data.curByCode}:null,()=>null)}
+/* CHANGE 2026-11-07 F10-F04-02: one more read-only member, curData (F10-F04-01) (was: {version, attach, fromInvite, gateCard,
+   emptyTrip, gateTop, resumeBoot}). The wizard itself is unchanged. */
+try{Object.defineProperty(window,'__ptF04',{value:Object.freeze({version:F04_VERSION,attach,fromInvite,gateCard,emptyTrip,gateTop,resumeBoot,curData}),writable:false,configurable:false})}catch{}
 })();
 </script>
 <!-- CHANGE 2026-10-13 F20-UI-01: NEW block (no 3.0.0-alpha.4.2 equivalent) — F20 "the super-admin entry is separate from the
@@ -4005,6 +4018,122 @@ function attach(a){
 try{Object.defineProperty(window,'__ptF06',{value:Object.freeze({version:F06_VERSION,attach}),writable:false,configurable:false})}catch{}
 })();
 </script>
+<script>
+/* CHANGE 2026-11-07 F10-CUR-01 (3.0.0-alpha.9): new script (no alpha.8 equivalent). One IIFE; exposes only the frozen,
+   read-only object window.__ptF10 {version, attach, get, snapshot, onChange, setUnit, refresh, source} used by the gate bridge
+   (F10-GATE-01, which also adds the read-only window.__PT.tripcur) and by the F10 lines of the main script. It builds the
+   trip's currency model TRIPCUR (docs/F10_spec.md §1) from trips.home_currency + trip_countries + trip_currencies (read-only,
+   existing RLS) and countries.json / currencies.json (the F04 wizard's lazy loader, window.__ptF04.curData; same-origin, not
+   precached). The built model is kept device-only per trip (localStorage key 'tripcur' = pt:<trip>:tripcur through the F02
+   namespacing) and used at once on the next open, then refreshed from the database when online.
+   With CURRENCY_FEATURE='off' the script returns on its first line: nothing at all (alpha.8). */
+(function(){
+'use strict';
+if(typeof CURRENCY_FEATURE==='undefined'||CURRENCY_FEATURE!=='on')return;      /* off: nothing at all (alpha.8) */
+const F10_VERSION='3.0.0-alpha.9';
+const CACHE_KEY='tripcur',DATA_TIMEOUT_MS=15000;
+/* spec §1 fallback (no cache and no network, or the migrated Vietnam trip without rows) = today's behaviour */
+const FALLBACK={home:'ILS',local:'VND',list:['VND','ILS','USD','EUR']};
+/* symbols / Hebrew names known without currencies.json (the alpha.8 converter's four) */
+const KNOWN_SYM={ILS:'₪',USD:'$',EUR:'€',VND:'₫'},KNOWN_HE={ILS:'שקל',USD:'דולר',EUR:'יורו',VND:'דונג'};
+let api=null,model=null,src='none',refreshing=null,lastKey='',listeners=[],onlineHooked=false;
+const CODE3=/^[A-Z]{3}$/;
+function online(){try{return navigator.onLine!==false}catch{return true}}
+function readCache(){
+ try{const v=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');if(v&&CODE3.test(v.home)&&Array.isArray(v.list)&&v.list.length)return v}catch{}
+ return null;
+}
+function writeCache(m){try{localStorage.setItem(CACHE_KEY,JSON.stringify(m))}catch{}}
+function keyOf(m){return JSON.stringify([m.home,m.local,m.list,m.sym,m.he])}
+/* sym / he / unit for every listed code: currencies.json, else `prev` (the cached or current model), else built-in, else the
+   code. unit (C2) defaults to 1 (VND: 1000, as alpha.8) until the main script decides it from the rates (setUnit). */
+function fill(m,cur,prev){
+ prev=prev||model||{};
+ const sym={},he={},unit={};
+ m.list.forEach(c=>{
+  const k=cur&&cur[c];
+  sym[c]=(k&&k.symbol)||(prev.sym&&prev.sym[c])||KNOWN_SYM[c]||c;
+  he[c]=(k&&k.he)||(prev.he&&prev.he[c])||KNOWN_HE[c]||c;
+  const u=prev.unit&&prev.unit[c];
+  unit[c]=u===1000||u===1?u:(c==='VND'?1000:1);
+ });
+ return{home:m.home,local:m.local,list:m.list.slice(),sym,he,unit};
+}
+function fallback(){return fill({home:FALLBACK.home,local:FALLBACK.local,list:FALLBACK.list},null,{})}
+/* spec §1: local = currency of the first trip country that has one (and is listed); list (D6) = destination currencies in
+   trip-country order, then home, then the other base currencies, then the added ones (trip_currencies.sort); no duplicates;
+   a destination currency that trip_currencies lacks (cap reached) is skipped. */
+function build(home,countries,currencies,byCode,curByCode){
+ home=CODE3.test(String(home||''))?String(home):'ILS';
+ const cs=(countries||[]).filter(x=>x&&/^[A-Z]{2}$/.test(String(x.country_code||''))).slice().sort((a,b)=>(Number(a.sort)||0)-(Number(b.sort)||0));
+ const tc=(currencies||[]).filter(x=>x&&CODE3.test(String(x.currency_code||''))).slice().sort((a,b)=>(Number(a.sort)||0)-(Number(b.sort)||0));
+ if(!cs.length&&!tc.length&&home==='ILS')return null;   /* the migrated Vietnam trip without rows → fallback */
+ const inTc=new Set(tc.map(x=>x.currency_code));
+ const allowed=c=>c===home||!tc.length||inTc.has(c);
+ let dest=[];
+ if(byCode)cs.forEach(x=>{const k=byCode[x.country_code];const c=k&&CODE3.test(String(k.currency||''))?k.currency:null;if(c&&allowed(c)&&dest.indexOf(c)<0)dest.push(c)});
+ else tc.filter(x=>x.kind==='destination').forEach(x=>{if(dest.indexOf(x.currency_code)<0)dest.push(x.currency_code)});   /* countries.json unavailable */
+ const list=dest.slice();
+ const add=c=>{if(list.indexOf(c)<0)list.push(c)};
+ add(home);
+ tc.filter(x=>x.kind==='base').forEach(x=>add(x.currency_code));
+ tc.filter(x=>x.kind==='added').forEach(x=>add(x.currency_code));
+ const local=dest.length?dest[0]:home;
+ return fill({home,local,list},curByCode);
+}
+function loadCurData(){
+ if(window.__ptF04&&typeof window.__ptF04.curData==='function')return window.__ptF04.curData();
+ /* WIZARD_FEATURE='off' (no F04 block): the same two same-origin files, fetched the same way */
+ const get=u=>fetch(u,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error('http '+r.status);return r.json()});
+ return Promise.all([get('countries.json'),get('currencies.json')]).then(([c,k])=>{
+  const byCode={},curByCode={};
+  (Array.isArray(c)?c:[]).forEach(x=>{if(x&&/^[A-Z]{2}$/.test(x.code))byCode[x.code]=x});
+  (Array.isArray(k)?k:[]).forEach(x=>{if(x&&CODE3.test(x.code))curByCode[x.code]=x});
+  return{byCode,curByCode};
+ }).catch(()=>null);
+}
+function set(m,how){
+ const k=keyOf(m),changed=!!model&&k!==lastKey;
+ model=m;src=how;lastKey=k;
+ if(how==='db')writeCache(m);
+ if(changed)listeners.slice().forEach(fn=>{try{fn(snapshot())}catch(e){console.warn('[pt] F10 listener',e)}});
+}
+function get(){
+ if(!model&&!(api&&api.tripId&&api.tripId()))return fallback();   /* trip not known yet: nothing is cached or remembered */
+ if(!model){const c=readCache();if(c){model=fill(c,null,c);src='cache'}else{model=fallback();src='fallback'}lastKey=keyOf(model);refresh()}
+ return model;
+}
+function snapshot(){const m=get();return JSON.parse(JSON.stringify({home:m.home,local:m.local,list:m.list,sym:m.sym,he:m.he,unit:m.unit}))}
+function refresh(){
+ if(refreshing)return refreshing;
+ const c=api&&api.client&&api.client(),t=api&&api.tripId&&api.tripId();
+ if(!c||!t||t==='local'||!online()){hookOnline();return Promise.resolve(false)}
+ const T=p=>api.withTimeout(p,api.timeoutMs);
+ refreshing=(async()=>{
+  const[tr,cc,tc,cd]=await Promise.all([
+   T(c.from('trips').select('home_currency').eq('id',t).maybeSingle()),
+   T(c.from('trip_countries').select('country_code,sort').eq('trip_id',t)),
+   T(c.from('trip_currencies').select('currency_code,kind,sort').eq('trip_id',t)),
+   Promise.race([loadCurData(),new Promise(r=>setTimeout(()=>r(null),DATA_TIMEOUT_MS))])]);
+  if(!tr||tr.error||!tr.data||!cc||cc.error||!tc||tc.error)throw new Error('tripcur');
+  const m=build(tr.data.home_currency,cc.data,tc.data,cd&&cd.byCode,cd&&cd.curByCode);
+  if(api.tripId&&api.tripId()!==t)return false;          /* the trip changed meanwhile */
+  set(m||fallback(),'db');return true;
+ })().catch(()=>{hookOnline();return false}).finally(()=>{refreshing=null});
+ return refreshing;
+}
+function hookOnline(){if(onlineHooked)return;onlineHooked=true;window.addEventListener('online',()=>{setTimeout(refresh,1500)})}
+function onChange(fn){if(typeof fn==='function')listeners.push(fn)}
+/* units (C2) are decided by the main script from the rates; kept in the model + cache so an offline open shows the same rows */
+function setUnit(u){
+ const m=get();let ch=false;
+ Object.keys(u||{}).forEach(c=>{const v=u[c]===1000?1000:1;if(m.list.indexOf(c)>-1&&m.unit[c]!==v){m.unit[c]=v;ch=true}});
+ if(ch&&src!=='fallback')writeCache(m);
+}
+function attach(a){if(!api&&a&&typeof a==='object')api=a}
+try{Object.defineProperty(window,'__ptF10',{value:Object.freeze({version:F10_VERSION,attach,get:snapshot,snapshot,onChange,setUnit,refresh,source:()=>src}),writable:false,configurable:false})}catch{}
+})();
+</script>
 <!-- CHANGE 2026-10-04 F02-GATE-01: the v2.15.2 GM-08 block (static supabase-js <script> tag + the inline IIFE that
      created a client for the old live project and defined window.storage on its key-value table) is REMOVED and
      replaced by this block. This replacement is unavoidable: that IIFE held the old project's URL/key, which must
@@ -4041,7 +4170,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.8'; /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.9'; /* CHANGE 2026-11-07 F10-VER-02: was '3.0.0-alpha.8' (F10: every trip converts in its own currencies) */ /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -4391,6 +4520,16 @@ if(window.__ptF06&&STORAGE_BACKEND==='cloud'){
   enterTrip:(tripId,role)=>{writeCached({trip_id:String(tripId),role:role||null});if(state.started){location.reload();return}setTrip(tripId,role);installStorage();start()},
   started:()=>state.started,phase:()=>state.phase
  });
+}
+
+/* CHANGE 2026-11-07 F10-GATE-01: new lines (no alpha.8 equivalent), additive — no existing statement changed. Placed before
+   the F03 bridge (which may leave this IIFE for the #invite= landing). Hands the F10 block (head, window.__ptF10; absent when
+   CURRENCY_FEATURE='off') read-only access to this gate's client, the timeout helper and the current trip, and adds
+   window.__PT.tripcur = a read-only copy of the trip's currency model (spec §1; a getter, so every read is a fresh copy).
+   'off': no-op, window.__PT has no tripcur (alpha.8). */
+if(window.__ptF10){
+ window.__ptF10.attach({withTimeout,timeoutMs:PT_TIMEOUT_MS,client:()=>sb,tripId:()=>state.tripId});
+ try{Object.defineProperty(state,'tripcur',{enumerable:true,configurable:false,get(){try{return state.tripId?window.__ptF10.snapshot():null}catch{return null}}})}catch{}
 }
 
 /* CHANGE 2026-10-05 F03-GATE-01: new lines (no alpha.2 equivalent), additive — no existing statement changed.
@@ -8696,7 +8835,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.8';/* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.9';/* CHANGE 2026-11-07 F10-VER-01: was '3.0.0-alpha.8' (F10) *//* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;
