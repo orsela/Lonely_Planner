@@ -1,5 +1,24 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.11 — F22a (2026-11-07)
+
+### F22a · Sign in with Google (account backup for every member)
+<!-- CHANGE 2026-11-07 F22A-DOCS-02: new entry. Base: main b32ef62 (3.0.0-alpha.10 + spike page). -->
+- App + `/invite/` (flag `ACCOUNT_FEATURE` = 'off' | 'on' | 'beta'; shipped **'beta'**: only on a device opened once with
+  `#f22beta`, `#f22beta-off` turns it off). 'off' = alpha.10 exactly.
+- Gate: "כבר בטיול? כניסה עם החשבון" (המשך עם Google + קוד למייל) on top, "בלי חשבון" (join link, Safari transfer code)
+  below (C5). After Google: welcome header + "מסמכים ושינויים…" line, 1 trip → straight in, 2+ → list, open invite → the F04
+  wizard, super-admin → F20 chooser, none → "החשבון הזה עוד לא בטיול" (C6).
+- "עוד → אני · <שם>" for every member: sync card + "חשבון כניסה" (link Google with `linkIdentity` on the same uid, C1/C2;
+  masked address, owner only; the F03 email row moves into the card, C7). Conflict sheet on `identity_already_exists` (C4).
+  "הסרה" of Google with the D12 warning; when Supabase refuses to remove the last identity the refusal and its code are shown
+  (R1, no server change) (C8). iPhone home-screen app: no Google, "באייפון: כניסה עם קוד למייל" (C9). Offline: Google /
+  unlink disabled with the offline line.
+- "המשך עם Google" on the F04 email step and on `/invite/` (C10). New static pages `/privacy/` and `/terms/` (Hebrew + short
+  English, draft for Or's approval) linked from the gate and "אני" (C12).
+- No migration, no Edge Function, no dashboard change. `/join/` unchanged. Tests: tests/f22a (run.sh). Spec:
+  docs/F22a_spec.md; dev notes: docs/F22a_dev_notes.md.
+
 ## 3.0.0-alpha.10 — F10b (2026-11-07)
 
 ### F10b · Trip currencies screen: add, swap, remove (cap 10)
