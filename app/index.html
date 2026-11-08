@@ -92,6 +92,660 @@ const CURRENCY_FEATURE='on';
    trigger) — editors and viewers read only. Needs CURRENCY_FEATURE='on' and cloud. 'off' = exactly the 3.0.0-alpha.9
    behaviour: the F10b head block returns on its first line, the gate hook F10B-GATE-01 and the main-script block are no-ops. */
 const CURMGR_FEATURE='on';
+/* CHANGE 2026-11-07 F22A-FLAG-01: new flag (no alpha.10 equivalent). F22a (docs/F22a_spec.md): sign in with Google. Three values
+   (spec C13, extended by the architect): 'on' = for everyone: the gate card "כבר בטיול? כניסה עם החשבון" (Google + קוד למייל),
+   "עוד → אני · <שם>" with the "חשבון כניסה" card (Google link / unlink, the F03 email row moves into it), the F22_Welcome /
+   F22_NoTrips screens after a Google sign-in, "המשך עם Google" on the F04 email step and on /invite/. 'beta' = the same, but
+   only on a device where localStorage['pt-f22-beta']==='1' (opening the app with #f22beta sets it, #f22beta-off clears it).
+   'off' = exactly the 3.0.0-alpha.10 behaviour: the F22 head block returns on its first line and the gate hooks F22A-GATE-0x
+   are no-ops (no Google anywhere, no new DOM). /invite/ has its own copy of this flag. Needs STORAGE_BACKEND='cloud'. */
+const ACCOUNT_FEATURE='beta';
+</script>
+<!-- CHANGE 2026-11-07 F22A-UI-01: NEW block (no 3.0.0-alpha.10 equivalent) — F22a "sign in with Google" (docs/F22a_spec.md,
+     rulings C1–C13, mockup row 15 F22_Me / F22_Linked / F22_Gate / F22_Welcome / F22_NoTrips / F22_Conflict). Style + one classic
+     script, placed right after the flags script and BEFORE the F03 block, because the OAuth return (token hash / ?code= /
+     error_code) must be read and removed from the address bar before the F03 hash reader (which would take an
+     #access_token=… hash for an email-link confirmation) and before trip boot (C3). Runs only when ACCOUNT_FEATURE is 'on', or
+     'beta' on a device with localStorage['pt-f22-beta']==='1' (set by opening the app with #f22beta, cleared by #f22beta-off).
+     Otherwise the script returns on its first lines and every style below matches nothing: alpha.10 behaviour.
+     - F22A-RET-01: OAuth return reader + pending-intent marker in sessionStorage (`link` | `signin`) (C3)
+     - F22A-GATE-01: gate card "כבר בטיול? כניסה עם החשבון" (Google + the existing F04-HOME code button) + "בלי חשבון" (C5)
+     - F22A-WEL-01: after a Google sign-in: F22_Welcome / F22_NoTrips, routing as F04-HOME C3 / F20 (C6)
+     - F22A-ME-01: "עוד → אני · <name>" screen with the sync card and the "חשבון כניסה" card (C7); the F03 email row moves here
+     - F22A-CONF-01: F22_Conflict sheet on identity_already_exists (C4) · F22A-UNLINK-01: remove Google (C8, D12, R1)
+     - F22A-WZ-01: "המשך עם Google" under the F04 email step (C10) · iPhone standalone hides Google (C9) · offline (spec §5.12)
+     All network calls go through the gate's client (bridge F22A-GATE-02 in the gate block below). -->
+<style>
+/* CHANGE 2026-11-07 F22A-UI-01: F22a styles, new lines (no alpha.10 equivalent). Only new pt22-* classes / #ptF22* ids, and rules
+   under html.pt-f22 (set only while the feature is on for this device). Reuses the UI-kit variables. */
+html.pt-f22 #ptEmailRow,html.pt-f22 #ptLinkEmailRow{display:none!important}
+html.pt-f22 #ptAcctCard:not(:has(#ptAdminRow:not([hidden]))){display:none!important}
+html.pt-f22-screen body>*:not(#ptF22Screen):not(#ptF22Toast):not(#ptF22Layer){display:none!important}
+#ptF22Screen{position:fixed;inset:0;z-index:1000;overflow-y:auto;overflow-x:hidden;background:var(--bg,#f7f6f1);color:var(--text,#17211b);-webkit-overflow-scrolling:touch}
+.pt22-in{max-width:440px;margin:0 auto;padding:26px 16px calc(28px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;box-sizing:border-box}
+.pt22-brand{font-size:14px;font-weight:900}
+.pt22-ring{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#e3f3ea;margin-top:18px}
+.pt22-ring.grey{background:#eef0ea}
+.pt22-h1{margin:4px 0 0;font-size:22px;line-height:1.3}
+.pt22-lead{margin:0;font-size:13.5px;color:#5f6861;line-height:1.55;overflow-wrap:anywhere}
+.pt22-sec{font-size:12px;font-weight:700;color:#5f6861;padding:6px 4px 0}
+.pt22-card{background:var(--card,#fff);border:1px solid #e4e6df;border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;box-sizing:border-box;width:100%}
+.pt22-card.hi{border-color:#0f6b4f;box-shadow:0 0 0 3px #0f6b4f14}
+.pt22-head{display:flex;align-items:center;gap:8px}
+.pt22-head b{font-size:15px}
+.pt22-head .pt22-end{margin-inline-start:auto}
+.pt22-txt{margin:0;font-size:13px;color:#3a443d;line-height:1.5}
+.pt22-gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:48px;border:1px solid #747775;border-radius:14px;background:#fff;color:#1f1f1f;font:inherit;font-family:Roboto,Arial,system-ui,sans-serif;font-size:15px;font-weight:600;cursor:pointer;touch-action:manipulation;padding:0 12px;box-sizing:border-box}
+.pt22-gbtn[disabled]{opacity:.45;cursor:default}
+.pt22-gbtn svg{flex-shrink:0}
+.pt22-ebtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:48px;border:0;border-radius:14px;background:var(--primary,#0f6b4f);color:#fff;font:inherit;font-size:14.5px;font-weight:800;cursor:pointer;touch-action:manipulation;box-sizing:border-box}
+.pt22-ebtn.out{background:#fff;color:#0f6b4f;border:1px solid #cfe1d7}
+.pt22-ebtn[disabled]{background:#c9ccc3;color:#fff;border:0;cursor:default}
+.pt22-soon{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:#5f6861}
+.pt22-chip{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;background:#f1f1ec;color:#5f6861;font-size:11px;font-weight:700}
+.pt22-new{display:inline-flex;font-size:10.5px;font-weight:800;border-radius:999px;padding:2px 8px;background:#e8f0ff;color:#1d4ed8}
+.pt22-okb{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;background:#e3f3ea;color:#146c43;font-size:11px;font-weight:800}
+.pt22-opt{font-size:11.5px;color:#5f6861}
+.pt22-alt{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 14px;border:1px solid #e4e6df;border-radius:14px;background:#fff;color:#17211b;font:inherit;font-size:13.5px;font-weight:700;text-align:right;cursor:pointer;text-decoration:none;box-sizing:border-box}
+.pt22-alt>span{flex:1;min-width:0}
+.pt22-alt small{display:block;font-size:11.5px;font-weight:600;color:#5f6861;line-height:1.45}
+.pt22-alt svg{flex-shrink:0}
+.pt22-note{display:flex;gap:8px;align-items:flex-start;background:#fffaf1;border:1px solid #f5d6a8;color:#6b3a02;border-radius:14px;padding:10px 12px;font-size:12.5px;line-height:1.5}
+.pt22-note.info{background:#eef4fb;color:#1d3f63;border-color:#cfe0f2}
+.pt22-note[hidden]{display:none}
+.pt22-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:48px;border:0;border-radius:14px;background:var(--primary,#0f6b4f);color:#fff;font:inherit;font-size:15px;font-weight:800;cursor:pointer;text-decoration:none;box-sizing:border-box}
+.pt22-btn.out{background:#fff;color:var(--text,#17211b);border:1px solid #e4e6df}
+.pt22-btn.red{background:#b42318}
+.pt22-btn[disabled]{background:#c9ccc3;color:#fff;border:0;cursor:default}
+.pt22-lnk{display:flex;align-items:center;justify-content:center;min-height:44px;color:#0f6b4f;font:inherit;font-size:14px;font-weight:700;text-decoration:underline;text-underline-offset:3px;background:none;border:0;cursor:pointer;width:100%}
+.pt22-trip{display:flex;align-items:center;gap:10px;width:100%;min-height:60px;padding:10px 14px;border:1px solid #e4e6df;border-radius:14px;background:#fff;color:#17211b;font:inherit;text-align:right;cursor:pointer;box-sizing:border-box}
+.pt22-trip>span.pt22-m{flex:1;min-width:0}
+.pt22-trip b{display:block;font-size:14.5px;overflow-wrap:anywhere}
+.pt22-trip small{font-size:11.5px;color:#5f6861}
+.pt22-role{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;background:#edf8f3;color:#0b5841;white-space:nowrap}
+.pt22-rows{display:flex;flex-direction:column}
+.pt22-row{display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 0;border-top:1px solid #efeee8}
+.pt22-row:first-child{border-top:0}
+.pt22-row>div{flex:1;min-width:0}
+.pt22-row b{display:block;font-size:13.5px}
+.pt22-ghost{min-height:44px;min-width:44px;border-radius:10px;border:1px solid #e4e6df;background:#fff;color:#3a443d;font:inherit;font-size:12.5px;font-weight:700;padding:0 12px;cursor:pointer}
+.pt22-ghost[disabled]{opacity:.45;cursor:default}
+.pt22-dash{display:flex;align-items:center;gap:8px;width:100%;min-height:46px;border:1px dashed #b9c9bf;border-radius:12px;background:#fff;color:#0f6b4f;font:inherit;font-size:13.5px;font-weight:800;padding:0 12px;cursor:pointer;box-sizing:border-box}
+.pt22-small{font-size:11.5px;color:#5f6861;line-height:1.5}
+.pt22-ltr{direction:ltr;unicode-bidi:isolate}
+.pt22-mail{display:block;font-size:12px;color:#5f6861;text-align:right;overflow-wrap:anywhere}
+#ptF22Me .pt22-top{display:flex;align-items:center;gap:8px;padding:4px 0 8px}
+#ptF22Me .pt22-top h1{margin:0;font-size:18px;overflow-wrap:anywhere}
+#ptF22Back{width:44px;height:44px;border:0;background:none;font-size:24px;cursor:pointer;color:inherit;flex-shrink:0}
+.pt22-body{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:10px;padding-bottom:24px}
+.pt22-sync{flex-direction:row;align-items:center;padding:10px 14px;cursor:pointer}
+.pt22-dot{width:9px;height:9px;border-radius:50%;background:#16a34a;flex-shrink:0}
+.pt22-dot.wait{background:#d97706}
+.pt22-legal{display:flex;justify-content:center;flex-wrap:wrap;gap:2px;font-size:12px;color:#5f6861}
+.pt22-legal a{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;color:#0f6b4f}
+#ptF22Layer{position:fixed;inset:0;z-index:1250;display:flex;align-items:flex-end;justify-content:center}
+#ptF22Layer[hidden]{display:none}
+#ptF22Layer .pt22-scrim{position:absolute;inset:0;background:#0f172a66}
+#ptF22Layer .pt22-sheet{position:relative;width:100%;max-width:560px;max-height:min(90vh,760px);overflow-y:auto;overflow-x:hidden;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -8px 28px #00000020;padding:10px 16px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;color:#17211b;box-sizing:border-box}
+#ptF22Layer .pt22-handle{width:40px;height:4px;border-radius:2px;background:#d6d8d1;align-self:center}
+#ptF22Layer h2{margin:0;font-size:18px;line-height:1.35}
+#ptF22Layer p{margin:0;font-size:13.5px;color:#3a443d;line-height:1.55}
+#ptF22Layer ul{margin:0;padding:0 18px 0 0;font-size:12.5px;color:#5f6861;line-height:1.7}
+.pt22-warnic{width:48px;height:48px;border-radius:50%;background:#fff4e5;display:flex;align-items:center;justify-content:center}
+#ptF22Toast{position:fixed;left:14px;right:14px;top:14px;z-index:1300;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:#17211b;color:#fff;font-size:13px;font-weight:700;box-shadow:0 8px 24px #00000030;max-width:520px;margin:0 auto;transform:translateY(-160%);transition:transform .25s;pointer-events:none}
+#ptF22Toast.on{transform:none}
+@media (prefers-reduced-motion:reduce){#ptF22Toast{transition:none}}
+.pt22-spin{width:28px;height:28px;border-radius:50%;border:3px solid #e4e6df;border-top-color:#0f6b4f;animation:pt22spin 1s linear infinite;margin:40px auto 0}
+@keyframes pt22spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.pt22-spin{animation:none}}
+/* the gate (C5): account card on top, then "בלי חשבון"; overrides the F04-HOME / F05 auto margins (higher specificity) */
+#ptGate#ptGate#ptGate.pt-gate-f22{justify-content:flex-start;gap:12px}
+#ptGate#ptGate#ptGate.pt-gate-f22>*{margin:0!important}
+#ptGate#ptGate#ptGate.pt-gate-f22>#ptGateInvite{text-align:right;border-color:#0f6b4f;box-shadow:0 0 0 3px #0f6b4f14;gap:10px}
+#ptGate .pt22-hero{width:100%;max-width:380px;padding:6px 2px 0;text-align:right}
+#ptGate .pt22-hero h1{margin:18px 0 4px;font-size:24px}
+#ptGate #ptF05Others.pt22-noacct{font-size:12px;font-weight:700;color:#5f6861;padding:6px 4px 0;text-align:right}
+#ptWizard .pt22-or{display:flex;align-items:center;gap:8px;font-size:12px;color:#5f6861;margin:2px 0}
+#ptWizard .pt22-or::before,#ptWizard .pt22-or::after{content:"";flex:1;height:1px;background:#e4e6df}
+</style>
+<script>
+/* CHANGE 2026-11-07 F22A-UI-01 (3.0.0-alpha.11): new script (no alpha.10 equivalent). One IIFE; exposes only the frozen,
+   read-only object window.__ptF22 {version, attach, takeOverBoot, gateCard, diag} used by the gate (F22A-GATE-02..04). OAuth
+   tokens from the return hash live only in this closure until they are handed to supabase-js (setSession); the Google
+   provider_token is dropped, never stored. The email / Google address is shown masked and only from the device's own auth
+   user (getUser) — nothing is written to any table (C1: no server change). */
+(function(){
+'use strict';
+const MODE=typeof ACCOUNT_FEATURE==='undefined'?'off':String(ACCOUNT_FEATURE);
+if(MODE!=='on'&&MODE!=='beta')return;                                         /* off: nothing at all (alpha.10) */
+if(typeof STORAGE_BACKEND!=='undefined'&&STORAGE_BACKEND!=='cloud')return;     /* local-only: no accounts */
+/* CHANGE 2026-11-07 F22A-FLAG-02: new lines (no alpha.10 equivalent). 'beta' (architect, extends C13): only on a device with
+   localStorage['pt-f22-beta']==='1'. #f22beta sets it, #f22beta-off clears it; the hash is removed at once. Raw localStorage:
+   this runs before the F02 gate namespaces Storage.prototype. */
+const BETA_KEY='pt-f22-beta';
+function lsGet(k){try{return window.localStorage.getItem(k)}catch{return null}}
+function lsSet(k,v){try{window.localStorage.setItem(k,v)}catch{}}
+function lsDel(k){try{window.localStorage.removeItem(k)}catch{}}
+if(MODE==='beta'){
+ let h='';try{h=String(location.hash||'')}catch{}
+ if(h==='#f22beta'||h==='#f22beta-off'){
+  if(h==='#f22beta')lsSet(BETA_KEY,'1');else lsDel(BETA_KEY);
+  try{history.replaceState(history.state,'',location.pathname+location.search)}catch{}
+ }
+ if(lsGet(BETA_KEY)!=='1')return;
+}
+const F22_VERSION='3.0.0-alpha.11';
+const AUTH_KEY='sb-zwufpxnioqaweobnvffs-auth-token';
+const INTENT_KEY='pt22:intent',FROM_KEY='pt22:from';
+const CALL_TIMEOUT_MS=20000;
+try{document.documentElement.classList.add('pt-f22')}catch{}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F22A-RET-01 (C3): read the OAuth return before anything else and clean the address bar.
+   - pending intent: sessionStorage pt22:intent = 'link' | 'signin' (+ pt22:from = the screen that started it); read once and
+     removed on every load (a cancelled round trip that comes back through "back" leaves nothing behind).
+   - return shapes: ?code= (PKCE → exchangeCodeForSession), #access_token=…&refresh_token=… (implicit, the client's default
+     flow → setSession), error / error_code / error_description in the query or the hash.
+   - without a marker (the return landed in another tab, R3) only an implicit hash that carries provider_token is taken (F03's
+     email-link hash never does); intent 'auto' = link when the returned uid equals this device's stored uid, else signin.
+   --------------------------------------------------------------------------------------------------------- */
+function ssGet(k){try{return sessionStorage.getItem(k)}catch{return null}}
+function ssSet(k,v){try{sessionStorage.setItem(k,v);return true}catch{return false}}
+function ssDel(k){try{sessionStorage.removeItem(k)}catch{}}
+let ret=null,googleAsked=false,prevUid=null;
+try{const raw=lsGet(AUTH_KEY);const s=raw?JSON.parse(raw):null;prevUid=s&&s.user&&s.user.id?String(s.user.id):null}catch{}
+try{
+ const intent0=ssGet(INTENT_KEY),from0=ssGet(FROM_KEY)||'';
+ ssDel(INTENT_KEY);ssDel(FROM_KEY);
+ const q=new URLSearchParams(location.search);
+ const hs=String(location.hash||'');
+ const hp=/^#(.*&)?(access_token|error|error_code|error_description)=/.test(hs)?new URLSearchParams(hs.slice(1)):null;
+ const code=q.get('code')||'';
+ const errC=q.get('error_code')||q.get('error')||(hp&&(hp.get('error_code')||hp.get('error')))||'';
+ const errD=q.get('error_description')||(hp&&hp.get('error_description'))||'';
+ const at=hp&&hp.get('access_token')||'',rt=hp&&hp.get('refresh_token')||'';
+ let intent=(intent0==='link'||intent0==='signin')?intent0:'';
+ let take=false;
+ if(intent&&(code||errC||at))take=true;
+ else if(!intent&&at&&rt&&hp&&hp.get('provider_token')){take=true;intent='auto'}
+ if(take){
+  ret={intent,from:from0,code:at?'':code,at,rt,err:errC&&!at?{code:String(errC),desc:String(errD).slice(0,240)}:null};
+  ['code','error','error_code','error_description','state','sb'].forEach(k=>q.delete(k));
+ }
+ if(q.get('f22')==='google'){googleAsked=true;q.delete('f22')}   /* /invite/ → "המשך עם Google" (C10) */
+ if(take||googleAsked){const qs=q.toString();history.replaceState(history.state,'',location.pathname+(qs?'?'+qs:''))}
+}catch{}
+
+/* ---------------------------------------------------------------------------------------------------------
+   small helpers
+   --------------------------------------------------------------------------------------------------------- */
+let api=null;   /* set by the gate: {endpoint,key,withTimeout,timeoutMs,client(),uid(),ensureClient(),ensureSession(),activeTrips(),
+                   enterTrip(),boot(),showCard(),clearCached(),started(),tripId(),role()} */
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
+function onReady(fn){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fn,{once:true});else fn()}
+function online(){return navigator.onLine!==false}
+function isIOS(){const ua=String(navigator.userAgent||'');return/iPhone|iPad|iPod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)}
+function isStandalone(){let m=false;try{m=!!(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)}catch{}return m||navigator.standalone===true}
+/* C9: in the iPhone home-screen app the OAuth return would land in Safari, not in the app */
+function googleHidden(){return isIOS()&&isStandalone()}
+function mask(e){e=String(e||'').trim();const at=e.lastIndexOf('@');if(at<1)return e?'•••':'';const l=e.slice(0,at);return l.slice(0,Math.min(3,Math.max(1,l.length-1)))+'•••'+e.slice(at)}
+function appUrl(){return location.origin+location.pathname}
+function dayCount(a,b){const p=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?Date.UTC(+m[1],+m[2]-1,+m[3]):NaN};const n=Math.round((p(b)-p(a))/86400000)+1;return n>0?n:null}
+const ROLE_HE={manager:'מנהל/ת',editor:'עורך/ת',viewer:'צופה'};
+const TX={
+ offline:'אין חיבור. נסו שוב כשהרשת תחזור.',
+ offAcct:'אין חיבור. צריך חיבור כדי לחבר או להסיר חשבון – הפרטים מוצגים כפי שנשמרו.',
+ cancel:'הכניסה בוטלה',
+ fail:'הכניסה נכשלה. נסו שוב.',
+ linked:'החשבון חובר. מעכשיו אפשר להיכנס איתו מכל טלפון.',
+ manual:'חיבור חשבון עוד לא פתוח בשרת. נסו שוב מאוחר יותר.',
+ iphone:'באייפון: כניסה עם קוד למייל',
+ hasTrips:'הטלפון הזה כבר בטיול. אפשר לחבר את Google במסך "עוד → אני".',
+ removed:'חשבון ה-Google הוסר'
+};
+const G_SVG='<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+const IC={
+ mail:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+ user:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+ check:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#146c43" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
+ tick:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7ee2a8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0"><path d="M5 12l5 5 9-10"/></svg>',
+ pin:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+ nopin:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5f6861" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></svg>',
+ info:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a16207" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>',
+ warn:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.5"/></svg>',
+ retry:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>',
+ link:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+ plus:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
+};
+function gBtn(id,label){return'<button type="button" class="pt22-gbtn" id="'+id+'" data-pt22-net>'+G_SVG+'<span>'+esc(label||'המשך עם Google')+'</span></button>'}
+const SOON='<div class="pt22-soon"><span>בקרוב:</span><span class="pt22-chip">Facebook</span><span class="pt22-chip">X</span><span class="pt22-chip">ווטסאפ</span></div>';
+const LEGAL='<div class="pt22-legal" id="ptF22Legal"><a href="../privacy/" target="_blank" rel="noopener">מדיניות פרטיות</a><span aria-hidden="true">·</span><a href="../terms/" target="_blank" rel="noopener">תנאי שימוש</a></div>';
+let toastT=null;
+function toast(msg,ok){
+ onReady(()=>{let el=$('ptF22Toast');if(!el){el=document.createElement('div');el.id='ptF22Toast';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.appendChild(el)}
+  el.innerHTML=(ok?IC.tick:'')+'<span>'+esc(msg)+'</span>';el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),3600)});
+}
+/* offline (spec §5.12): Google / unlink buttons carry data-pt22-net and are disabled while offline */
+function netPaint(){
+ const off=!online();
+ document.querySelectorAll('[data-pt22-net]').forEach(b=>{b.disabled=off||b.hasAttribute('data-pt22-hold')});
+ document.querySelectorAll('[data-pt22-offnote]').forEach(n=>{n.hidden=!off});
+}
+window.addEventListener('online',()=>{netPaint();if(mePanelOpen())loadMe().then(paintMe)});
+window.addEventListener('offline',netPaint);
+const diagState={lastError:null,lastUnlinkError:null};
+function errRec(e){if(!e)return null;return{code:String(e.code||e.error_code||''),status:Number(e.status)||0,message:String(e.message||'').slice(0,240)}}
+
+/* ---------------------------------------------------------------------------------------------------------
+   starting the round trip (C2: linkIdentity inside a trip only, signInWithOAuth on the gate / landing only)
+   --------------------------------------------------------------------------------------------------------- */
+async function startOAuth(intent,from,extra){
+ if(!online()){toast(TX.offline);return false}
+ if(!api)return false;
+ let c=null;try{c=await api.ensureClient()}catch{c=null}
+ if(!c){toast(TX.offline);return false}
+ if(intent==='signin'){
+  /* C2 guard: a device that owns trips never starts signInWithOAuth (it would drop that identity) */
+  let rows=null;try{if(api.uid())rows=await api.activeTrips()}catch{rows=null}
+  if(rows&&rows.length){toast(TX.hasTrips);return false}
+ }
+ if(!ssSet(INTENT_KEY,intent)){toast(TX.fail);return false}
+ ssSet(FROM_KEY,String(from||''));
+ const options={redirectTo:appUrl()};
+ if(extra&&extra.selectAccount)options.queryParams={prompt:'select_account'};
+ let r=null;
+ try{r=intent==='link'?await c.auth.linkIdentity({provider:'google',options}):await c.auth.signInWithOAuth({provider:'google',options})}catch(x){r={error:x}}
+ if(r&&r.error){
+  ssDel(INTENT_KEY);ssDel(FROM_KEY);
+  diagState.lastError=errRec(r.error);
+  const m=String(r.error.message||'').toLowerCase();
+  toast(/manual linking/.test(m)||r.error.code==='manual_linking_disabled'?TX.manual:(online()?TX.fail:TX.offline));
+  return false;
+ }
+ return true;   /* supabase-js now navigates to Google */
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F22A-RET-02: the gate hands over before trip boot (F22A-GATE-03). Returns true when this block took over.
+   --------------------------------------------------------------------------------------------------------- */
+let pending=null;   /* what to show once the trip (or the gate) is up: {kind:'linked'|'conflict'|'cancel'|'fail'|'hasTrips'} */
+let gateNote=null;  /* a toast for the gate (sign-in cancelled / failed) */
+function takeOverBoot(){
+ if(!api)return false;
+ if(ret){const r=ret;ret=null;handleReturn(r).catch(e=>{console.warn('[pt22] return failed',e);api.boot()});return true}
+ if(googleAsked){googleAsked=false;inviteGoogle().catch(()=>api.boot());return true}
+ return false;
+}
+function errKind(code){return/access_denied|cancel/i.test(String(code||''))?'cancel':'fail'}
+async function handleReturn(r){
+ if(r.err){
+  diagState.lastError={code:r.err.code,status:0,message:r.err.desc};
+  if(r.intent==='link'){pending={kind:r.err.code==='identity_already_exists'?'conflict':errKind(r.err.code)}}
+  else gateNote=errKind(r.err.code)==='cancel'?TX.cancel:TX.fail;
+  api.boot();return;
+ }
+ let c=null;try{c=await api.ensureClient()}catch{c=null}
+ if(!c){gateNote=TX.fail;api.boot();return}
+ let res=null;
+ try{res=r.at?await api.withTimeout(c.auth.setSession({access_token:r.at,refresh_token:r.rt}),api.timeoutMs):await api.withTimeout(c.auth.exchangeCodeForSession(r.code),api.timeoutMs)}catch(x){res={error:x}}
+ const s=res&&!res.error&&res.data&&(res.data.session||null);
+ const nu=s&&s.user?String(s.user.id):(res&&!res.error&&res.data&&res.data.user?String(res.data.user.id):null);
+ if(!nu){
+  diagState.lastError=errRec(res&&res.error);
+  if(r.intent==='link')pending={kind:'fail'};else gateNote=TX.fail;
+  api.boot();return;
+ }
+ let intent=r.intent;
+ if(intent==='auto')intent=prevUid&&prevUid===nu?'link':'signin';
+ try{await api.ensureSession()}catch{}
+ if(intent==='link'){pending={kind:'linked'};api.boot();return}
+ welcomeFlow(r.from).catch(e=>{console.warn('[pt22] welcome failed',e);api.boot()});
+}
+/* /invite/ → ../app/?f22=google: a device without trips starts the Google sign-in; one with trips boots as usual (C2) */
+async function inviteGoogle(){
+ try{await api.ensureSession()}catch{api.boot();return}
+ let rows=null;try{rows=await api.activeTrips()}catch{rows=null}
+ if(rows&&rows.length){pending={kind:'hasTrips'};api.boot();return}
+ if(!(await startOAuth('signin','invite')))api.boot();
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F22A-WEL-01 (C6): after a Google sign-in on the gate. Routing reuses F04-HOME C3 / F20: open invite → the F04 wizard (it
+   finds the confirmed Google email and goes straight to the invite); super-admin → the normal boot (F20 "לאן נכנסים?");
+   1 trip → F22_Welcome and straight into the trip; 2+ trips → F22_Welcome with the list (F20's chooser is super-admin only);
+   no trips and no invite → F22_NoTrips.
+   --------------------------------------------------------------------------------------------------------- */
+function screenRoot(){
+ let el=$('ptF22Screen');
+ if(!el){el=document.createElement('main');el.id='ptF22Screen';el.setAttribute('dir','rtl');el.setAttribute('aria-labelledby','ptF22Title');document.body.appendChild(el)}
+ return el;
+}
+function showScreen(html){
+ onReady(()=>{
+  const de=document.documentElement;de.classList.remove('pt-booting','pt-gate');de.classList.add('pt-f22-screen');
+  const el=screenRoot();el.innerHTML='<div class="pt22-in">'+html+'</div>';el.scrollTop=0;netPaint();
+ });
+}
+function hideScreen(){const el=$('ptF22Screen');if(el)el.remove();document.documentElement.classList.remove('pt-f22-screen')}
+const BRAND='<span class="pt22-brand">Lonely Planner</span>';
+function googleEmail(u){
+ const ids=(u&&Array.isArray(u.identities))?u.identities:[];
+ const g=ids.find(i=>i&&i.provider==='google');
+ return String(g&&g.identity_data&&g.identity_data.email||u&&u.email||'');
+}
+function confirmedEmail(u){return u&&u.email&&(u.email_confirmed_at||u.confirmed_at)?String(u.email).trim().toLowerCase():''}
+async function getUser(){
+ const c=api&&api.client();if(!c)return null;
+ if(online()){try{const g=await api.withTimeout(c.auth.getUser(),api.timeoutMs);if(g&&!g.error&&g.data&&g.data.user)return g.data.user}catch{}}
+ try{const s=await api.withTimeout(c.auth.getSession(),api.timeoutMs);return s&&s.data&&s.data.session&&s.data.session.user||null}catch{return null}
+}
+async function lookupInvite(){
+ const c=api.client();if(!c||!online())return null;
+ let tok=null;try{const s=await api.withTimeout(c.auth.getSession(),api.timeoutMs);tok=s&&s.data&&s.data.session&&s.data.session.access_token}catch{}
+ if(!tok)return null;
+ const ac=typeof AbortController!=='undefined'?new AbortController():null;const t=setTimeout(()=>{try{ac&&ac.abort()}catch{}},CALL_TIMEOUT_MS);
+ try{
+  const r=await fetch(api.endpoint,{method:'POST',headers:{'Content-Type':'application/json','apikey':api.key,'Authorization':'Bearer '+tok},body:JSON.stringify({action:'lookup'}),signal:ac?ac.signal:undefined});
+  const j=await r.json().catch(()=>null);return r.ok&&j?j:null;
+ }catch{return null}finally{clearTimeout(t)}
+}
+async function welcomeFlow(from){
+ showScreen(BRAND+'<div class="pt22-spin" aria-hidden="true"></div><h1 class="pt22-h1" id="ptF22Title" style="text-align:center;font-size:18px">נכנסים…</h1>');
+ const u=await getUser();
+ const mail=googleEmail(u);
+ let rows=[];try{rows=await api.activeTrips()}catch{rows=[]}
+ if(window.__ptF20&&typeof window.__ptF20.check==='function'){let adm=false;try{adm=await window.__ptF20.check()}catch{adm=false}if(adm){hideScreen();api.boot();return}}
+ if(confirmedEmail(u)&&window.__ptF04&&typeof window.__ptF04.openEntry==='function'){
+  const inv=await lookupInvite();
+  if(inv&&inv.found===true){hideScreen();window.__ptF04.openEntry('gate');return}
+ }
+ if(!rows.length){if(from==='invite'){otherEmail(mail);return}noTrips(mail);return}
+ welcome(rows,mail);
+}
+async function tripDetails(rows){
+ const c=api.client(),ids=rows.map(r=>r.trip_id),det={};
+ if(!c||!online())return det;
+ try{
+  const T=p=>api.withTimeout(p,api.timeoutMs);
+  const[t,m]=await Promise.all([T(c.from('trips').select('id,name,start_date,end_date').in('id',ids)),T(c.from('trip_members').select('trip_id').in('trip_id',ids).eq('status','active'))]);
+  (t&&!t.error&&Array.isArray(t.data)?t.data:[]).forEach(x=>{det[x.id]={name:x.name||'',days:dayCount(x.start_date,x.end_date),members:0}});
+  (m&&!m.error&&Array.isArray(m.data)?m.data:[]).forEach(x=>{if(det[x.trip_id])det[x.trip_id].members++});
+ }catch{}
+ return det;
+}
+let autoT=null;
+async function welcome(rows,mail){
+ const nm=String(rows[0]&&rows[0].display_name||'').trim();
+ const det=await tripDetails(rows);
+ const card=r=>{const d=det[r.trip_id]||{};const sub=[d.days?d.days+' ימים':'',d.members?d.members+(d.members===1?' חבר':' חברים'):''].filter(Boolean).join(' · ');
+  return'<button type="button" class="pt22-trip" data-pt22-trip="'+esc(r.trip_id)+'">'+IC.pin+'<span class="pt22-m"><b>'+esc(d.name||'טיול')+'</b>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</span><span class="pt22-role">'+esc(ROLE_HE[r.role]||r.role||'')+'</span></button>'};
+ showScreen(BRAND+'<div class="pt22-ring">'+IC.check+'</div><h1 class="pt22-h1" id="ptF22Title">שלום'+(nm?' '+esc(nm):'')+', ברוך/ה השב/ה</h1>'+
+  '<p class="pt22-lead">נכנסת עם Google'+(mail?' · <bdi class="pt22-ltr" id="ptF22WelMail">'+esc(mask(mail))+'</bdi>':'')+'</p>'+
+  '<div class="pt22-sec">'+(rows.length>1?'הטיולים שלך · בוחרים טיול':'הטיולים שלך')+'</div><div id="ptF22Trips" style="display:flex;flex-direction:column;gap:8px">'+rows.map(card).join('')+'</div>'+
+  (rows.length===1?'<button type="button" class="pt22-btn" id="ptF22Enter">כניסה לטיול</button>':'')+
+  '<div class="pt22-note" id="ptF22OnceNote">'+IC.info+'<span>מסמכים ושינויים שנשמרו רק בטלפון הקודם לא עוברים לכאן. כל מה שסונכרן – כבר כאן.</span></div>');
+ onReady(()=>{
+  const go=tid=>{clearTimeout(autoT);const r=rows.find(x=>x.trip_id===tid)||rows[0];hideScreen();api.enterTrip(r.trip_id,r.role)};
+  document.querySelectorAll('#ptF22Screen [data-pt22-trip]').forEach(b=>b.onclick=()=>go(b.dataset.pt22Trip));
+  const e=$('ptF22Enter');if(e)e.onclick=()=>go(rows[0].trip_id);
+  if(rows.length===1){clearTimeout(autoT);autoT=setTimeout(()=>{if($('ptF22Screen'))go(rows[0].trip_id)},1800)}
+ });
+}
+async function signOutClean(){
+ const c=api&&api.client();
+ try{if(c)await api.withTimeout(c.auth.signOut({scope:'local'}),api.timeoutMs)}catch{}
+ try{api.clearCached()}catch{}
+ try{location.replace(location.pathname)}catch{location.reload()}
+}
+/* C10: opened from /invite/ with a Google account whose email is not the invite's → the F04 "no active invite" texts; nothing created */
+function otherEmail(mail){
+ showScreen(BRAND+'<div class="pt22-ring grey">'+IC.nopin+'</div><h1 class="pt22-h1" id="ptF22Title">לא מצאנו הזמנה פעילה למייל הזה</h1>'+
+  '<p class="pt22-lead">נכנסת עם Google'+(mail?' · <bdi class="pt22-ltr" id="ptF22NoMail">'+esc(mask(mail))+'</bdi>':'')+'. ההזמנה נשלחה כנראה למייל אחר.</p>'+
+  '<p class="pt22-txt">פותחים את ההזמנה מהמייל ובוחרים "קוד למייל" עם הכתובת שאליה נשלחה, או מבקשים ממי שהזמין אותך לשלוח הזמנה חדשה.</p>'+
+  '<button type="button" class="pt22-btn out" id="ptF22SignOut">יציאה מהחשבון</button>');
+ onReady(()=>{$('ptF22SignOut').onclick=signOutClean});
+}
+function noTrips(mail){
+ showScreen(BRAND+'<div class="pt22-ring grey">'+IC.nopin+'</div><h1 class="pt22-h1" id="ptF22Title">החשבון הזה עוד לא בטיול</h1>'+
+  '<p class="pt22-lead">נכנסת עם Google'+(mail?' · <bdi class="pt22-ltr" id="ptF22NoMail">'+esc(mask(mail))+'</bdi>':'')+'. אף טיול לא מחובר לחשבון הזה.</p>'+
+  '<div class="pt22-sec">מה אפשר לעשות</div>'+
+  '<button type="button" class="pt22-alt" id="ptF22Other">'+IC.retry+'<span>לנסות חשבון אחר<small>אולי חיברת בטלפון הקודם חשבון אחר או קוד מייל</small></span></button>'+
+  '<button type="button" class="pt22-alt" id="ptF22JoinLink">'+IC.link+'<span>פתיחת קישור ההצטרפות<small>בקשו מהמנהל בווטסאפ. החשבון יחובר לטיול אחרי האישור</small></span></button>'+
+  '<a class="pt22-alt" id="ptF22Request" href="../request/">'+IC.plus+'<span>בקשה לפתיחת טיול חדש<small>שולחים בקשה, ומנהל המערכת פותח את הטיול</small></span></a>'+
+  '<button type="button" class="pt22-lnk" id="ptF22SignOut">יציאה מהחשבון</button>');
+ onReady(()=>{
+  $('ptF22Other').onclick=signOutClean;
+  $('ptF22SignOut').onclick=signOutClean;
+  $('ptF22JoinLink').onclick=()=>{hideScreen();api.showCard();setTimeout(()=>{const b=$('ptF05LinkBtn'),box=$('ptF05LinkBox');if(b&&box&&box.hidden)b.click()},60)};
+ });
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F22A-GATE-01 (C5, artboard F22_Gate): called by the gate after the F04 / F05 / F04-HOME cards were built. The F04-HOME card
+   (#ptGateInvite) becomes "כבר בטיול? כניסה עם החשבון": Google + its own button (same id, same action) renamed "קוד למייל".
+   "בלי חשבון" (the F05 label) then the join link, the Safari transfer code and the device code, unchanged.
+   --------------------------------------------------------------------------------------------------------- */
+function gateCard(g){
+ if(!api||!g)return;
+ if(!$('ptF22GateHero')){
+  g.classList.add('pt-gate-f22');
+  const hero=document.createElement('div');hero.className='pt22-hero';hero.id='ptF22GateHero';
+  hero.innerHTML=BRAND+'<h1 id="ptF22GateTitle">ברוכים הבאים</h1><p class="pt22-lead">הטלפון הזה עוד לא מחובר לטיול.</p>';
+  g.insertBefore(hero,g.firstChild);g.setAttribute('aria-labelledby','ptF22GateTitle');
+  let c=$('ptGateInvite');
+  const btn=c&&$('ptGateInviteBtn');
+  if(!c){c=document.createElement('section');c.className='card';c.id='ptGateInvite'}
+  c.classList.add('pt22-acct');c.style.display='flex';c.style.flexDirection='column';
+  c.innerHTML='<div class="pt22-head"><b>כבר בטיול? כניסה עם החשבון</b><span class="pt22-new">חדש</span></div>'+
+   '<p class="pt22-txt" style="font-size:12.5px;color:#5f6861">מנהלים וחברים. נכנסים עם החשבון שחיברת בטלפון הקודם, והטיול נפתח בלי לחכות לאישור.</p>'+
+   (googleHidden()?'<p class="pt22-note info" id="ptF22IosHint">'+esc(TX.iphone)+'</p>':gBtn('ptF22GateGoogle'))+
+   '<p class="pt22-note" data-pt22-offnote hidden>'+esc(TX.offline)+'</p>';
+  if(btn){btn.className='pt22-ebtn';btn.innerHTML=IC.mail+'<span>קוד למייל</span>';c.appendChild(btn)}
+  c.insertAdjacentHTML('beforeend',SOON);
+  g.insertBefore(c,hero.nextSibling);
+  let lab=$('ptF05Others');
+  if(lab){lab.textContent='בלי חשבון';lab.classList.add('pt22-noacct');g.insertBefore(lab,c.nextSibling);
+   const alt=$('ptF05Alt'),tr=$('ptF05Transfer');if(alt)g.insertBefore(alt,lab.nextSibling);if(tr)g.insertBefore(tr,(alt||lab).nextSibling)}
+  const dev=g.querySelector('.pt-gate-card');if(dev)g.appendChild(dev);
+  const foot=document.createElement('div');foot.id='ptF22GateFoot';foot.style.cssText='width:100%;max-width:380px';foot.innerHTML=LEGAL.replace('id="ptF22Legal"','');g.appendChild(foot);
+  const gb=$('ptF22GateGoogle');if(gb)gb.onclick=()=>startOAuth('signin','gate');
+  netPaint();
+ }
+ if(gateNote){const m=gateNote;gateNote=null;toast(m)}
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F22A-WZ-01 (C10): "המשך עם Google" under "שליחת קוד" on the F04 email step. Inside a trip (the step opened from "אני") it
+   links (C2); on the gate / landing it signs in.
+   --------------------------------------------------------------------------------------------------------- */
+function wizardHook(){
+ const w=$('ptWizard');if(!w||w.getAttribute('data-screen')!=='email'||$('ptF22WzGoogle')||googleHidden())return;
+ const send=$('ptWzSend');if(!send||!send.parentNode)return;
+ send.insertAdjacentHTML('afterend','<div class="pt22-or" aria-hidden="true">או</div>'+gBtn('ptF22WzGoogle'));
+ $('ptF22WzGoogle').onclick=()=>startOAuth(api&&api.started()?'link':'signin','wizard');
+ netPaint();
+}
+/* only the wizard's data-screen attribute is watched (paint() sets it right before it fills the screen) */
+try{new MutationObserver(()=>wizardHook()).observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['data-screen']})}catch{}
+
+/* ---------------------------------------------------------------------------------------------------------
+   F22A-ME-01 (C7, artboards F22_Me / F22_Linked): "עוד" row "אני · <name>" for every member (in the F03 "החשבון שלי" section,
+   in place of the F03 email row, which moves into the card) and the screen #ptF22Me (a .panel next to #more).
+   --------------------------------------------------------------------------------------------------------- */
+const me={user:null,name:'',trip:'',loaded:false};
+function meWays(u){
+ const ids=(u&&Array.isArray(u.identities))?u.identities:[];
+ const google=ids.find(i=>i&&i.provider==='google')||null;
+ const onlyGoogle=!!google&&ids.filter(i=>i&&i.provider!=='anonymous').length===1;
+ const emailId=ids.find(i=>i&&i.provider==='email')||null;
+ const email=emailId?String(emailId.identity_data&&emailId.identity_data.email||u.email||''):(confirmedEmail(u)&&!onlyGoogle?confirmedEmail(u):'');
+ return{google,email,pending:u&&u.new_email?String(u.new_email):'',any:!!google||!!email};
+}
+async function loadMe(){
+ const u=await getUser();if(u)me.user=u;
+ const c=api&&api.client(),t=api&&api.tripId(),uid=api&&api.uid();
+ if(c&&t&&uid&&online()){
+  try{const r=await api.withTimeout(c.from('trip_members').select('display_name').eq('trip_id',t).eq('user_id',uid).maybeSingle(),api.timeoutMs);if(r&&!r.error&&r.data&&r.data.display_name)me.name=String(r.data.display_name)}catch{}
+ }
+ if(!me.name){try{if(typeof activeUser!=='undefined'&&activeUser)me.name=String(activeUser)}catch{}}
+ try{if(typeof getTripName==='function'){const n=await getTripName();if(n)me.trip=String(n)}}catch{}
+ me.loaded=true;
+}
+function moreHost(){const more=$('more');return more&&more.querySelector('.topbar')&&more.querySelector('.topbar').nextElementSibling}
+function paintMoreRow(){
+ const host=moreHost();if(!host)return;
+ let row=$('ptF22MeRow');
+ if(!row){
+  row=document.createElement('button');row.type='button';row.className='listitem';row.id='ptF22MeRow';
+  row.style.cssText='width:100%;text-align:right;font:inherit;color:inherit;min-height:58px';
+  row.onclick=openMe;
+ }
+ const acc=$('ptAccount'),card=$('ptAcctCard');
+ if(acc&&card&&card.parentNode===acc){if(row.nextSibling!==card||row.parentNode!==acc)acc.insertBefore(row,card)}
+ else if(row.parentNode!==host)host.insertBefore(row,host.firstChild);
+ const w=me.user?meWays(me.user):null;
+ const sub=w?(w.any?'חשבון כניסה · מוגן':'חשבון כניסה · לא חובה'):'חשבון כניסה';
+ row.innerHTML='<div class="ic" style="background:#edf8f3" aria-hidden="true">👤</div><div class="lbl">אני'+(me.name?' · '+esc(me.name):'')+'<span class="val" id="ptF22MeRowSub" style="display:block;font-weight:400;font-size:.72rem">'+sub+'</span></div><div class="chev">‹</div>';
+}
+function ensureMe(){
+ let p=$('ptF22Me');if(p)return p;
+ const more=$('more');if(!more)return null;
+ p=document.createElement('section');p.id='ptF22Me';p.className='panel';p.setAttribute('aria-labelledby','ptF22MeTitle');p.setAttribute('dir','rtl');
+ p.innerHTML='<div class="pt22-top"><button type="button" id="ptF22Back" aria-label="חזרה">›</button><h1 id="ptF22MeTitle">אני</h1></div><div class="pt22-body" id="ptF22MeBody"></div>';
+ more.parentNode.insertBefore(p,more.nextSibling);
+ $('ptF22Back').onclick=()=>{try{switchPanel('more')}catch{}};
+ return p;
+}
+function mePanelOpen(){const p=$('ptF22Me');return!!p&&p.classList.contains('active')}
+async function openMe(){
+ const p=ensureMe();if(!p)return;
+ document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x===p));
+ document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.panel==='more'));
+ try{window.scrollTo(0,0)}catch{}
+ paintMe();
+ await loadMe();paintMe();paintMoreRow();
+}
+function paintMe(){
+ const p=$('ptF22Me');if(!p)return;
+ $('ptF22MeTitle').textContent='אני'+(me.name?' · '+me.name:'');
+ const u=me.user,w=u?meWays(u):{google:null,email:'',pending:'',any:false};
+ const sc=$('moreSyncCard'),ok=!sc||sc.classList.contains('ok');
+ const st=($('moreSyncTitle')&&$('moreSyncTitle').textContent)||'סנכרון בענן פעיל',ss=($('moreSyncSub')&&$('moreSyncSub').textContent)||'';
+ let h='<div class="pt22-card pt22-sync" id="ptF22Sync" role="button" tabindex="0"><span class="pt22-dot'+(ok?'':' wait')+'"></span><span style="font-size:12.5px;font-weight:700">'+esc(ok?'מסונכרן':st)+'</span><span class="pt22-small">'+esc(ss)+'</span></div>';
+ h+='<section class="pt22-card" id="ptF22Acct" aria-label="חשבון כניסה"><div class="pt22-head">'+IC.user+'<b>חשבון כניסה</b>'+(w.any?'<span class="pt22-okb pt22-end" id="ptF22Badge">מוגן</span>':'<span class="pt22-opt pt22-end" id="ptF22Badge">לא חובה</span>')+'</div>';
+ h+='<p class="pt22-note" data-pt22-offnote id="ptF22Off"'+(online()?' hidden':'')+'>'+esc(TX.offAcct)+'</p>';
+ if(!w.any){
+  h+='<p class="pt22-txt">חברו חשבון לטלפון הזה. אם תחליפו טלפון, תיכנסו איתו לטיול מיד, בלי לחכות לאישור של המנהל. החשבון לא מוצג לשאר החברים.</p>';
+  h+=googleHidden()?'<p class="pt22-note info" id="ptF22IosHint">'+esc(TX.iphone)+'</p>':gBtn('ptF22Google');
+  h+='<button type="button" class="pt22-ebtn out" id="ptF22Email">'+IC.mail+'<span>קוד למייל</span></button>'+SOON;
+  if(w.pending)h+='<p class="pt22-small" id="ptF22Pending">ממתין לאישור: <bdi class="pt22-ltr">'+esc(mask(w.pending))+'</bdi></p>';
+ }else{
+  h+='<div class="pt22-rows">';
+  if(w.google)h+='<div class="pt22-row" id="ptF22GoogleRow"><div><b>Google</b><span class="pt22-mail pt22-ltr" dir="ltr" id="ptF22GoogleMail">'+esc(mask(googleEmail(u)))+'</span></div><button type="button" class="pt22-ghost" id="ptF22Unlink" data-pt22-net>הסרה</button></div>';
+  if(w.email)h+='<div class="pt22-row" id="ptF22EmailRow"><div><b>קוד למייל</b><span class="pt22-mail pt22-ltr" dir="ltr" id="ptF22EmailMail">'+esc(mask(w.email))+'</span></div><span class="pt22-okb">מקושר</span></div>';
+  h+='</div><p class="pt22-small" id="ptF22Private">רק את/ה רואה את המייל הזה. שאר החברים רואים רק את השם'+(me.name?' "'+esc(me.name)+'"':'')+'.</p>';
+  if(!w.google)h+=googleHidden()?'<p class="pt22-note info" id="ptF22IosHint">'+esc(TX.iphone)+'</p>':gBtn('ptF22Google','הוספת Google');
+  if(!w.email)h+='<button type="button" class="pt22-dash" id="ptF22Email">'+IC.plus+'<span>דרך נוספת · קוד למייל</span></button>';
+ }
+ h+='</section>'+LEGAL;
+ $('ptF22MeBody').innerHTML=h;
+ const g=$('ptF22Google');if(g)g.onclick=()=>startOAuth('link','me');
+ const e=$('ptF22Email');if(e)e.onclick=()=>emailWay(u,w);
+ const x=$('ptF22Unlink');if(x)x.onclick=()=>unlinkSheet(u,w);
+ const s=$('ptF22Sync');if(s){const go=()=>{try{switchPanel('backup')}catch{}};s.onclick=go;s.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();go()}}}
+ netPaint();
+}
+/* "קוד למייל": the F04 code screen (updateUser({email}) + verifyOtp email_change, F04-HOME resume) via window.__ptF04.openEntry */
+function emailWay(u,w){
+ const ce=confirmedEmail(u);
+ if(ce){   /* the Google address is already the account's confirmed email: the wizard would not send a code to it */
+  sheet('<h2 id="ptF22SheetT">קוד למייל</h2><p>המייל <bdi class="pt22-ltr">'+esc(mask(ce))+'</bdi> כבר שייך לחשבון הזה דרך Google. בטלפון חדש בוחרים "קוד למייל" ומקלידים את הכתובת הזו.</p><button type="button" class="pt22-btn out" data-pt22-close>סגירה</button>','קוד למייל','ptF22EmailInfo');
+  return;
+ }
+ if(window.__ptF04&&typeof window.__ptF04.openEntry==='function')window.__ptF04.openEntry('me');
+ else toast(TX.fail);
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   sheets (conflict C4, unlink C8)
+   --------------------------------------------------------------------------------------------------------- */
+function sheet(html,label,id){
+ let l=$('ptF22Layer');
+ if(!l){l=document.createElement('div');l.id='ptF22Layer';l.hidden=true;l.setAttribute('dir','rtl');document.body.appendChild(l);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('ptF22Layer').hidden)closeSheet()})}
+ l.innerHTML='<div class="pt22-scrim" data-pt22-close></div><section class="pt22-sheet" role="dialog" aria-modal="true" aria-labelledby="ptF22SheetT" aria-label="'+esc(label)+'"'+(id?' id="'+id+'"':'')+'><div class="pt22-handle" aria-hidden="true"></div>'+html+'</section>';
+ l.hidden=false;l.querySelectorAll('[data-pt22-close]').forEach(x=>x.onclick=closeSheet);
+ const f=l.querySelector('button:not([disabled])');try{f&&f.focus({preventScroll:true})}catch{}
+ netPaint();return l;
+}
+function closeSheet(){const l=$('ptF22Layer');if(l){l.hidden=true;l.innerHTML=''}}
+function conflictSheet(){
+ const nm=me.name?'"'+esc(me.name)+'"':'כמו שהוא';
+ sheet('<div class="pt22-warnic">'+IC.warn+'</div><h2 id="ptF22SheetT">החשבון הזה כבר שייך למישהו אחר באפליקציה</h2>'+
+  '<p>חשבון ה-Google שבחרת כבר מחובר למשתמש אחר. לא שינינו כלום – הטלפון הזה נשאר '+nm+(me.trip?' בטיול '+esc(me.trip):' בטיול')+'.</p>'+
+  '<ul><li>אם זה החשבון שלך מטלפון אחר – נכנסים איתו מטלפון ריק (בלי טיולים).</li><li>אם זו טעות – בחר/י חשבון Google אחר.</li></ul>'+
+  '<p class="pt22-note" data-pt22-offnote hidden>'+esc(TX.offline)+'</p>'+
+  '<button type="button" class="pt22-btn" id="ptF22ConfOther" data-pt22-net>בחירת חשבון אחר</button><button type="button" class="pt22-btn out" data-pt22-close>סגירה</button>','החשבון כבר שייך למישהו אחר','ptF22Conflict');
+ $('ptF22ConfOther').onclick=()=>{closeSheet();startOAuth('link','conflict',{selectAccount:true})};
+}
+function unlinkSheet(u,w){
+ const only=!w.email;
+ sheet('<h2 id="ptF22SheetT">להסיר את חשבון ה-Google?</h2>'+
+  '<p>אחרי ההסרה לא אפשר יהיה להיכנס עם <bdi class="pt22-ltr">'+esc(mask(googleEmail(u)))+'</bdi> בטלפון אחר. הטלפון הזה נשאר בטיול כמו עכשיו.</p>'+
+  (only?'<div class="pt22-note" id="ptF22UnlinkWarn">'+IC.info+'<span>זו דרך הכניסה היחידה שלך. בלי חשבון, טלפון חדש יצטרך אישור מנהל כדי להיכנס לטיול.</span></div>':'')+
+  '<p class="pt22-note" data-pt22-offnote hidden>'+esc(TX.offline)+'</p>'+
+  '<button type="button" class="pt22-btn red" id="ptF22UnlinkGo" data-pt22-net>הסרה</button><button type="button" class="pt22-btn out" data-pt22-close>ביטול</button>','הסרת חשבון Google','ptF22UnlinkSheet');
+ $('ptF22UnlinkGo').onclick=async()=>{
+  const b=$('ptF22UnlinkGo');if(!online()){toast(TX.offline);return}
+  const c=api&&api.client();if(!c){toast(TX.offline);return}
+  b.setAttribute('data-pt22-hold','');b.disabled=true;b.textContent='מסירים…';
+  let r=null;try{r=await api.withTimeout(c.auth.unlinkIdentity(w.google),api.timeoutMs)}catch(x){r={error:x}}
+  if(r&&r.error){
+   /* R1: Supabase refuses to remove the last identity — record the exact error (dev notes, phone check) and explain */
+   diagState.lastUnlinkError=errRec(r.error);
+   const e=diagState.lastUnlinkError;
+   if(!online()){b.removeAttribute('data-pt22-hold');b.textContent='הסרה';netPaint();toast(TX.offline);return}
+   sheet('<div class="pt22-warnic">'+IC.warn+'</div><h2 id="ptF22SheetT">עוד אי אפשר להסיר את החשבון</h2>'+
+    '<p>'+(only?'זו דרך הכניסה היחידה, ובינתיים השרת לא מאפשר להסיר אותה. ':'השרת לא הסיר את החשבון. ')+'לא השתנה כלום – הטלפון הזה נשאר בטיול.</p>'+
+    (only?'<p>אפשר להוסיף קודם "קוד למייל", ואז להסיר את Google.</p>':'')+
+    '<p class="pt22-small" id="ptF22UnlinkCode">קוד: <bdi class="pt22-ltr">'+esc(e.code||String(e.status||'')||'—')+'</bdi></p>'+
+    '<button type="button" class="pt22-btn out" data-pt22-close>הבנתי</button>','לא אפשר להסיר','ptF22UnlinkRefused');
+   return;
+  }
+  closeSheet();toast(TX.removed,true);
+  await loadMe();paintMe();paintMoreRow();
+ };
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+   start hook: runs once the gate has started the main script (same pattern as F03 / F04)
+   --------------------------------------------------------------------------------------------------------- */
+let started=false;
+function onStarted(){
+ if(started||!api||!window.__PT||!window.__PT.started)return;
+ started=true;
+ paintMoreRow();
+ [400,1500,4000].forEach(ms=>setTimeout(paintMoreRow,ms));   /* the F03 "החשבון שלי" section is injected by its own start hook */
+ loadMe().then(()=>{paintMoreRow();if(mePanelOpen())paintMe()});
+ const p=pending;pending=null;
+ if(p)setTimeout(async()=>{
+  if(p.kind==='hasTrips'){toast(TX.hasTrips);return}
+  await openMe();
+  if(p.kind==='linked')toast(TX.linked,true);
+  else if(p.kind==='conflict')conflictSheet();
+  else toast(p.kind==='cancel'?TX.cancel:TX.fail);
+ },300);
+}
+try{
+ new MutationObserver(()=>{if(!started&&window.__PT&&window.__PT.started)setTimeout(onStarted,30)})   /* after the F03 start hook (it injects #ptAccount) */
+  .observe(document.documentElement,{attributes:true,attributeFilter:['class']});
+}catch{}
+
+function attach(a){if(!api&&a&&typeof a==='object')api=a}
+function diag(){return JSON.parse(JSON.stringify(diagState))}
+try{Object.defineProperty(window,'__ptF22',{value:Object.freeze({version:F22_VERSION,attach,takeOverBoot,gateCard,diag}),writable:false,configurable:false})}catch{}
+})();
 </script>
 <!-- CHANGE 2026-10-05 F03-UI-01: NEW block (no 3.0.0-alpha.2 equivalent) — F03 "super-admin invites a manager"
      (docs/F03_spec.md). Style + one classic script, placed after the flags script and BEFORE the F02 gate block so it
@@ -2329,7 +2983,13 @@ function attach(a){if(!api&&a&&typeof a==='object')api=a}
 function curData(){return loadData().then(ok=>ok?{byCode:data.byCode,curByCode:data.curByCode}:null,()=>null)}
 /* CHANGE 2026-11-07 F10-F04-02: one more read-only member, curData (F10-F04-01) (was: {version, attach, fromInvite, gateCard,
    emptyTrip, gateTop, resumeBoot}). The wizard itself is unchanged. */
-try{Object.defineProperty(window,'__ptF04',{value:Object.freeze({version:F04_VERSION,attach,fromInvite,gateCard,emptyTrip,gateTop,resumeBoot,curData}),writable:false,configurable:false})}catch{}
+/* CHANGE 2026-11-07 F22A-F04-01: new function (no alpha.10 equivalent): the F22 block opens the email step of this wizard — from
+   the "אני" screen ("קוד למייל": updateUser({email}) + the code screen, C7; origin 'me', "חזרה" reloads into the trip) and after
+   a Google sign-in that has an open invite (origin 'gate', C6/C10: the confirmed Google email goes straight to the lookup). */
+function openEntry(origin){if(!api)return false;onReady(()=>openWizard(origin==='me'?'me':'gate','entry',''));return true}
+/* CHANGE 2026-11-07 F22A-F04-02: one more read-only member, openEntry (F22A-F04-01) (was: {version, attach, fromInvite, gateCard,
+   emptyTrip, gateTop, resumeBoot, curData}). The wizard itself is unchanged. */
+try{Object.defineProperty(window,'__ptF04',{value:Object.freeze({version:F04_VERSION,attach,fromInvite,gateCard,emptyTrip,gateTop,resumeBoot,curData,openEntry}),writable:false,configurable:false})}catch{}
 })();
 </script>
 <!-- CHANGE 2026-10-13 F20-UI-01: NEW block (no 3.0.0-alpha.4.2 equivalent) — F20 "the super-admin entry is separate from the
@@ -4188,7 +4848,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.10'; /* CHANGE 2026-11-07 F10B-VER-02: was '3.0.0-alpha.9' (F10b: trip currencies screen) */ /* CHANGE 2026-11-07 F10-VER-02: was '3.0.0-alpha.8' (F10: every trip converts in its own currencies) */ /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.11'; /* CHANGE 2026-11-07 F22A-VER-02: was '3.0.0-alpha.10' (F22a: sign in with Google) */ /* CHANGE 2026-11-07 F10B-VER-02: was '3.0.0-alpha.9' (F10b: trip currencies screen) */ /* CHANGE 2026-11-07 F10-VER-02: was '3.0.0-alpha.8' (F10: every trip converts in its own currencies) */ /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -4407,6 +5067,10 @@ function showCard(){
       "מנהל/ת טיול" moves to the top, above the F05 cards (spec §1.3). 'off' (or no F04 block): no-op. */
    if(window.__ptF04&&window.__ptF04.gateTop)window.__ptF04.gateTop(g);
   }
+  /* CHANGE 2026-11-07 F22A-GATE-04: new line (no alpha.10 equivalent) in this existing function: with ACCOUNT_FEATURE on for
+     this device the F22 block turns the F04-HOME card into "כבר בטיול? כניסה עם החשבון" (Google + קוד למייל) on top and the
+     F05 cards into "בלי חשבון" (C5, artboard F22_Gate). 'off' (no window.__ptF22): no-op, the alpha.10 gate. */
+  if(window.__ptF22)window.__ptF22.gateCard(g);
   const code=state.uid?String(state.uid).replace(/-/g,'').slice(0,8):'--------';
   document.getElementById('ptDeviceCode').textContent=code;
   document.getElementById('ptCopyBtn').disabled=!state.uid;
@@ -4557,6 +5221,24 @@ if(window.__ptF10b&&STORAGE_BACKEND==='cloud'){
  window.__ptF10b.attach({withTimeout,timeoutMs:PT_TIMEOUT_MS,client:()=>sb,tripId:()=>state.tripId,role:()=>state.role});
 }
 
+/* CHANGE 2026-11-07 F22A-GATE-02: new lines (no alpha.10 equivalent), additive — no existing statement changed. Hands the F22
+   block (head, window.__ptF22; absent when ACCOUNT_FEATURE='off', 'beta' on a non-beta device, or local-only) the client, uid,
+   timeout helper, a way to create the client / the session on demand, the active memberships, the create-trip endpoint (lookup
+   for the welcome routing, C6), the gate's own boot() / showCard() / cached-trip clear, and enterTrip() = the normal path. */
+if(window.__ptF22&&STORAGE_BACKEND==='cloud'){
+ window.__ptF22.attach({
+  endpoint:PT_TRIP_ENDPOINT,key:PT_SUPABASE_KEY,withTimeout,timeoutMs:PT_TIMEOUT_MS,
+  client:()=>sb,uid:()=>state.uid,
+  ensureClient:async()=>{if(!sb){if(!(await loadLib()))return null;if(!sb)sb=makeClient()}return sb},
+  ensureSession:async()=>{if(!sb){if(!(await loadLib()))throw new Error('[pt] Supabase library not available');if(!sb)sb=makeClient()}const u=await ensureUser();if(!u)throw new Error('[pt] no session');state.uid=u.id;return u},
+  activeTrips:async()=>(sb&&state.uid)?fetchTrips(state.uid):[],
+  enterTrip:(tripId,role)=>{writeCached({trip_id:String(tripId),role:role||null});if(state.started){location.reload();return}setTrip(tripId,role);installStorage();start()},
+  boot:()=>{boot().catch(e=>{console.warn('[pt] boot failed',e);const c=readCached();if(c)startCached(c);else showCard()})},
+  showCard:()=>showCard(),clearCached:()=>rDel(PT_ACTIVE_TRIP),
+  started:()=>state.started,tripId:()=>state.tripId,role:()=>state.role
+ });
+}
+
 /* CHANGE 2026-10-05 F03-GATE-01: new lines (no alpha.2 equivalent), additive — no existing statement changed.
    Hands the F03 block (head, window.__ptF03; absent when ADMIN_FEATURE='off' or local-only) read-only access to this gate's
    client, uid and timeout helper, plus the invite-manager endpoint (spec §4: PT_SUPABASE_URL + '/functions/v1/invite-manager').
@@ -4568,6 +5250,10 @@ if(window.__ptF03&&STORAGE_BACKEND==='cloud'){
  if(window.__ptF03.takeOverBoot()){state.phase='invite-landing';return}
 }
 
+/* CHANGE 2026-11-07 F22A-GATE-03: new line (no alpha.10 equivalent): with ACCOUNT_FEATURE on for this device a return from Google
+   (token hash / ?code= / error_code, read and removed by the F22 head block, C3) or /invite/'s ?f22=google is handled by the F22
+   block, which then calls this gate's boot() itself (or shows F22_Welcome / F22_NoTrips). 'off' / nothing to handle: no-op. */
+if(window.__ptF22&&STORAGE_BACKEND==='cloud'&&window.__ptF22.takeOverBoot()){state.phase='account';return}
 /* CHANGE 2026-10-26 F04H-RES-11: new line (no alpha.7 equivalent): with HOME_INSTALL_FEATURE='on' a reload of the wizard opened
    from the invite link (?invite=1 + a valid resume entry, spec §3.3) goes back to the code screen instead of the trip boot.
    'off' (or nothing to resume): no-op, boot() below as before. */
@@ -9028,7 +9714,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.10';/* CHANGE 2026-11-07 F10B-VER-01: was '3.0.0-alpha.9' (F10b) *//* CHANGE 2026-11-07 F10-VER-01: was '3.0.0-alpha.8' (F10) *//* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.11';/* CHANGE 2026-11-07 F22A-VER-01: was '3.0.0-alpha.10' (F22a) *//* CHANGE 2026-11-07 F10B-VER-01: was '3.0.0-alpha.9' (F10b) *//* CHANGE 2026-11-07 F10-VER-01: was '3.0.0-alpha.8' (F10) *//* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;
