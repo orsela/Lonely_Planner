@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--
+  Lonely Planner teaser page · version 1.0.0 (2026-11-08)
+  CHANGE 2026-11-08 TEASER-01: new file (no previous version).
+  Public share page for the 25 s teaser (teaser.mp4 = teaser v10). The compass is the only call to action:
+  a small one rides on the video the whole time; from the "בוא תנסה:" card (20.8 s) a large one sits exactly
+  on the video's compass and stays after the video ends. Both open the trip-request page (/request/).
+  Open Graph tags make WhatsApp / Telegram / Facebook show the compass card (og.jpg) when the link is shared.
+  "שיתוף" shares the video file itself with a 🧭 line + this page's link (Web Share, Android Chrome);
+  where files can't be shared, it shares the link (the preview shows the compass).
+  Static page: no app code, no Supabase, no tracking.
+-->
+<title>Lonely Planner · בוא תנסה</title>
+<meta name="description" content="אל תפחדו מהחלומות שלכם. כל אחד יכול לתכנן את הטיול המושלם – Lonely Planner עוזר לכם להגשים חלומות, בפשטות.">
+<meta property="og:type" content="video.other">
+<meta property="og:site_name" content="Lonely Planner">
+<meta property="og:title" content="Lonely Planner · בוא תנסה 🧭">
+<meta property="og:description" content="אל תפחדו מהחלומות שלכם. כל אחד יכול לתכנן את הטיול המושלם.">
+<meta property="og:url" content="https://orsela.github.io/Lonely_Planner/teaser/">
+<meta property="og:image" content="https://orsela.github.io/Lonely_Planner/teaser/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:video" content="https://orsela.github.io/Lonely_Planner/teaser/teaser.mp4">
+<meta property="og:video:type" content="video/mp4">
+<meta property="og:video:width" content="1280">
+<meta property="og:video:height" content="720">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://orsela.github.io/Lonely_Planner/teaser/og.jpg">
+<meta name="theme-color" content="#0b120e">
+<link rel="icon" href="compass-192.png">
+<style>
+:root{--bg:#0b120e;--fg:#f1f6f2;--muted:#a9b8ae;--accent:#1f9d6a;--ring:#ffffff77;--glass:#0b120eb0}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:'Segoe UI',system-ui,sans-serif}
+body{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.stage{position:relative;width:min(100%,1100px);aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000}
+video{display:block;width:100%;height:100%;object-fit:contain;background:#000}
+a.cmp{position:absolute;display:flex;align-items:center;justify-content:center;border-radius:50%;z-index:3;-webkit-tap-highlight-color:transparent}
+a.cmp img{width:100%;height:100%;display:block}
+a.cmp:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+.mini{top:4%;left:2.5%;width:clamp(44px,7.5%,72px);aspect-ratio:1;border:2px solid var(--ring);background:#000;overflow:hidden}
+.big{left:50%;top:58.3%;height:31%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;z-index:4}
+.big:active{transform:translate(-50%,-50%) scale(.96)}
+.fs{position:absolute;top:4%;right:2.5%;z-index:3;width:44px;height:44px;border-radius:50%;border:2px solid var(--ring);background:var(--glass);color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.stage:fullscreen{width:100vw;height:100vh;border-radius:0;aspect-ratio:auto}
+.row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 20px;border-radius:14px;border:0;font:inherit;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none}
+.btn.pri{background:var(--accent);color:#fff}
+.btn.sec{background:#ffffff14;color:var(--fg);border:1px solid #ffffff33}
+.msg{min-height:20px;font-size:14px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <video id="v" src="teaser.mp4" poster="poster.jpg" controls controlslist="nofullscreen nodownload" disablepictureinpicture playsinline preload="metadata"></video>
+  <!-- small compass: visible while the video plays -->
+  <a class="cmp mini" id="mini" href="../request/" aria-label="להקמת טיול ב-Lonely Planner"><img src="compass-192.png" alt=""></a>
+  <!-- large compass: transparent hit area exactly over the video's own compass (20.8 s → end, stays after the end) -->
+  <a class="cmp big" id="big" href="../request/" aria-label="להקמת טיול ב-Lonely Planner" hidden></a>
+  <button class="fs" type="button" id="fs" aria-label="מסך מלא"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+</div>
+<div class="row">
+  <button class="btn pri" type="button" id="share">🧭 שיתוף הסרטון</button>
+  <button class="btn sec" type="button" id="replay">לצפייה חוזרת</button>
+</div>
+<div class="msg" id="msg" role="status"></div>
+<script>
+const v=document.getElementById('v'),big=document.getElementById('big'),mini=document.getElementById('mini'),msg=document.getElementById('msg');
+const PAGE='https://orsela.github.io/Lonely_Planner/teaser/';
+const TEXT='🧭 בוא תנסה – Lonely Planner\nכל אחד יכול לתכנן את הטיול המושלם';
+function sync(){const end=v.currentTime>=21.2||v.ended;big.hidden=!end;mini.hidden=end;}
+['timeupdate','ended','seeked','loadedmetadata'].forEach(e=>v.addEventListener(e,sync));
+// keep the last frame (compass) on screen after the end instead of the poster
+v.addEventListener('ended',()=>{try{v.currentTime=Math.max(0,v.duration-0.05)}catch(e){};sync();});
+document.getElementById('replay').addEventListener('click',()=>{v.currentTime=0;v.play().catch(()=>{});sync();});
+document.getElementById('fs').addEventListener('click',()=>{const st=document.getElementById('stage');try{document.fullscreenElement?document.exitFullscreen():st.requestFullscreen&&st.requestFullscreen().catch(()=>{})}catch(e){}});
+// share: the video file + a compass line + this page's link; fall back to the link (its preview shows the compass)
+document.getElementById('share').addEventListener('click',async()=>{
+  msg.textContent='';
+  try{
+    if(navigator.canShare){
+      msg.textContent='מכין את הסרטון לשיתוף…';
+      const blob=await (await fetch('teaser.mp4')).blob();
+      const file=new File([blob],'Lonely_Planner.mp4',{type:'video/mp4'});
+      if(navigator.canShare({files:[file]})){msg.textContent='';await navigator.share({files:[file],text:TEXT+'\n'+PAGE});return;}
+    }
+    if(navigator.share){msg.textContent='';await navigator.share({title:'Lonely Planner',text:TEXT,url:PAGE});return;}
+    await navigator.clipboard.writeText(TEXT+'\n'+PAGE);msg.textContent='הקישור הועתק – אפשר להדביק בווטסאפ';
+  }catch(e){ if(e&&e.name==='AbortError'){msg.textContent='';return;} msg.textContent='השיתוף לא הצליח. אפשר להעתיק את הקישור משורת הכתובת.'; }
+});
+sync();
+</script>
+</body>
+</html>
