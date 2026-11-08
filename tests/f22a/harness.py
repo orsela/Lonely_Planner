@@ -381,7 +381,9 @@ def toasts(page):
 
 
 def in_trip(dev, timeout=25.0):
-    return f20.wait_state(dev.page, "app", timeout) == "app"
+    """The trip runs (main script started) — any panel may be open (after a link return the app opens "אני")."""
+    js = "()=>!!(window.__PT&&window.__PT.started&&window.__PT.phase==='running'&&window.__PT.tripId)"
+    return wait(lambda: dev.page.evaluate(js), timeout, dev.page)
 
 
 def boot_member(env, key="V", role="editor", name="A", me="נועה", **kw):

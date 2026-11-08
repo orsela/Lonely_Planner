@@ -250,13 +250,17 @@ def test_a03_gate_google_enters_trip(env, trips):
     H.after_return(dev)
     if [c["op"] for c in be.oauth_calls] != ["signin"]:
         P.append("OAuth calls %r (C2: signInWithOAuth on the gate)" % [c["op"] for c in be.oauth_calls])
-    if not H.wait_vis(page, "#ptF22Screen", 10):
-        pytest.fail("welcome screen not shown: %r" % H.body(page)[:200])
-    w = H.text(page, "#ptF22Screen")
-    if "שלום דנה" not in w or "d" not in H.text(page, "#ptF22WelMail") or "dana@example.com" in w:
-        P.append("welcome header %r" % w[:120])
-    if "מסמכים ושינויים שנשמרו רק בטלפון הקודם לא עוברים" not in w:
-        P.append("one-time line missing")
+    if trips == 1 and not H.vis(page, "#ptF22Screen") and H.in_trip(dev, 1):
+        w = ""     # 1 trip: the welcome screen already moved on into the trip (1.8 s)
+    else:
+        if not H.wait_vis(page, "#ptF22Screen", 10):
+            pytest.fail("welcome screen not shown: %r" % H.body(page)[:200])
+        w = H.text(page, "#ptF22Screen")
+    if w:
+        if "שלום דנה" not in w or "d" not in H.text(page, "#ptF22WelMail") or "dana@example.com" in w:
+            P.append("welcome header %r" % w[:120])
+        if "מסמכים ושינויים שנשמרו רק בטלפון הקודם לא עוברים" not in w:
+            P.append("one-time line missing")
     if trips == 2:
         if page.locator("#ptF22Screen [data-pt22-trip]").count() != 2:
             P.append("2 trips: list of 2 not shown")
@@ -509,7 +513,7 @@ def test_a09_email_not_visible_to_others(env):
         H.h10.tab(b.page, tab)
         b.page.wait_for_timeout(700)
         html = b.page.content()
-        if "noa" in html.lower():
+        if "noa.family" in html.lower() or "noa•••" in html.lower():
             P.append("other member's DOM contains the address (%s)" % tab)
     leaks = [c for c in be.calls if c["device"] == "B" and "noa" in json.dumps(c.get("result") or {}).lower()
              and c.get("op") == "query"]

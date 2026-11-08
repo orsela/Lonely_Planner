@@ -178,7 +178,7 @@ html.pt-f22-screen body>*:not(#ptF22Screen):not(#ptF22Toast):not(#ptF22Layer){di
 #ptF22Me .pt22-top h1{margin:0;font-size:18px;overflow-wrap:anywhere}
 #ptF22Back{width:44px;height:44px;border:0;background:none;font-size:24px;cursor:pointer;color:inherit;flex-shrink:0}
 .pt22-body{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:10px;padding-bottom:24px}
-.pt22-sync{flex-direction:row;align-items:center;padding:10px 14px;cursor:pointer}
+.pt22-sync{flex-direction:row;align-items:center;padding:10px 14px;cursor:pointer;min-height:48px}
 .pt22-dot{width:9px;height:9px;border-radius:50%;background:#16a34a;flex-shrink:0}
 .pt22-dot.wait{background:#d97706}
 .pt22-legal{display:flex;justify-content:center;flex-wrap:wrap;gap:2px;font-size:12px;color:#5f6861}
@@ -205,6 +205,7 @@ html.pt-f22-screen body>*:not(#ptF22Screen):not(#ptF22Toast):not(#ptF22Layer){di
 #ptGate .pt22-hero{width:100%;max-width:380px;padding:6px 2px 0;text-align:right}
 #ptGate .pt22-hero h1{margin:18px 0 4px;font-size:24px}
 #ptGate #ptF05Others.pt22-noacct{font-size:12px;font-weight:700;color:#5f6861;padding:6px 4px 0;text-align:right}
+#ptWizard .pt-wz-foot-in.pt22-col{flex-direction:column}
 #ptWizard .pt22-or{display:flex;align-items:center;gap:8px;font-size:12px;color:#5f6861;margin:2px 0}
 #ptWizard .pt22-or::before,#ptWizard .pt22-or::after{content:"";flex:1;height:1px;background:#e4e6df}
 </style>
@@ -568,6 +569,7 @@ function gateCard(g){
 function wizardHook(){
  const w=$('ptWizard');if(!w||w.getAttribute('data-screen')!=='email'||$('ptF22WzGoogle')||googleHidden())return;
  const send=$('ptWzSend');if(!send||!send.parentNode)return;
+ send.parentNode.classList.add('pt22-col');   /* the footer row becomes a column: Google under "שליחת קוד" */
  send.insertAdjacentHTML('afterend','<div class="pt22-or" aria-hidden="true">או</div>'+gBtn('ptF22WzGoogle'));
  $('ptF22WzGoogle').onclick=()=>startOAuth(api&&api.started()?'link':'signin','wizard');
  netPaint();
