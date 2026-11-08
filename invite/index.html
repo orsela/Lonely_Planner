@@ -7,7 +7,13 @@
 <meta name="theme-color" content="#0f6b4f">
 <title>הזמנה · Lonely Planner</title>
 <!-- CHANGE 2026-10-12 F04-NAME-01: display name Plan_Travel → Lonely Planner (title + brand). -->
-<!-- Plan_Travel invite page · version 3.0.0-alpha.7.2 (CHANGE 2026-10-26 FIX-VER-04: no change in this page; version aligned with the app hotfix 3.0.0-alpha.7.2. Before: 3.0.0-alpha.7.1) · F04 + F04-HOME
+<!-- Plan_Travel invite page · version 3.0.0-alpha.11 · F22a
+     CHANGE 2026-11-07 F22A-INV-01: what changed from 3.0.0-alpha.10 (this page last changed in alpha.7.2): new flag ACCOUNT_FEATURE
+     (same name and values as the app's; shipped 'beta'). With it on (or 'beta' on a device with localStorage['pt-f22-beta']==='1',
+     same origin as the app) a VALID invite also shows "המשך עם Google" under the code button (spec C10). It opens
+     ../app/?f22=google (no token: the wizard finds the invite by the confirmed Google email, find_invite_for_email). Not shown
+     in the iPhone home-screen app (C9). 'off' = exactly the alpha.10 page.
+     Previous: Plan_Travel invite page · version 3.0.0-alpha.7.2 (CHANGE 2026-10-26 FIX-VER-04: no change in this page; version aligned with the app hotfix 3.0.0-alpha.7.2. Before: 3.0.0-alpha.7.1) · F04 + F04-HOME
      CHANGE 2026-10-26 F04H-INV-VER: version comment 3.0.0-alpha.4 → 3.0.0-alpha.7.1 (F04-HOME, docs/F04-HOME_spec.md).
      CHANGE 2026-10-26 F04H-INV-01: what changed from 3.0.0-alpha.7 (this page last changed in alpha.4): new flag
      HOME_INSTALL_FEATURE ('on'). With it on and a VALID token: (1) inside a mail app's in-app browser (§3.1) the page shows
@@ -81,6 +87,8 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
 .h-sheet h2{margin:0;font-size:17px}
 .spin{width:28px;height:28px;border:3px solid #e4e6df;border-top-color:#0f6b4f;border-radius:50%;animation:s 1s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
+/* CHANGE 2026-11-07 F22A-INV-03: new rule (no alpha.10 equivalent): the Google button (Google sign-in branding: white, grey border, "G" mark) */
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:48px;border:1px solid #747775;border-radius:14px;background:#fff;color:#1f1f1f;font-family:Roboto,Arial,sans-serif;font-size:15px;font-weight:600;text-decoration:none}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 </style>
 </head>
@@ -90,6 +98,8 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
 /* CHANGE 2026-10-26 F04H-INV-FLAG: new flag (no alpha.7 equivalent), same name as the app's. 'on' = F04-HOME variants
    (F04H-INV-01); 'off' = exactly the alpha.7 page. */
 const HOME_INSTALL_FEATURE='on';
+/* CHANGE 2026-11-07 F22A-INV-FLAG: new flag (no alpha.10 equivalent), same name and values as the app's ('off' | 'on' | 'beta'). */
+const ACCOUNT_FEATURE='beta';
 (function(){
   'use strict';
   var ENDPOINT='https://zwufpxnioqaweobnvffs.supabase.co/functions/v1/invite-manager';
@@ -195,7 +205,22 @@ const HOME_INSTALL_FEATURE='on';
     render(IS_ANDROID?androidPage(j):valid(j));
   }
   var m=document.getElementById('m');
-  function render(html){m.innerHTML=html;var r=document.getElementById('retry');if(r)r.onclick=check}
+  function render(html){m.innerHTML=html;var r=document.getElementById('retry');if(r)r.onclick=check;googleBtn()}
+  /* CHANGE 2026-11-07 F22A-INV-02: new lines (no alpha.10 equivalent): "המשך עם Google" under the code button of a valid invite
+     (#open on the desktop / Android card, #hSkip on the iPhone card), spec C10. Off / beta device without the key: nothing. */
+  function f22On(){
+    if(ACCOUNT_FEATURE==='on')return true;
+    if(ACCOUNT_FEATURE!=='beta')return false;
+    try{return window.localStorage.getItem('pt-f22-beta')==='1'}catch(e){return false}
+  }
+  var G_SVG='<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+  function googleBtn(){
+    if(!f22On()||document.getElementById('ptF22InvGoogle'))return;
+    if((/iPhone|iPad|iPod/i.test(String(navigator.userAgent||''))||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1))&&navigator.standalone===true)return;
+    var a=document.getElementById('open')||document.getElementById('hSkip');if(!a)return;
+    a.insertAdjacentHTML('afterend','<a class="gbtn" id="ptF22InvGoogle" href="../app/?f22=google">'+G_SVG+'<span>המשך עם Google</span></a>'+
+      '<p class="small" style="text-align:center" id="ptF22InvNote">עם חשבון Google של המייל שאליו נשלחה ההזמנה</p>');
+  }
   var h=String(location.hash||''),d=h;
   try{d=decodeURIComponent(h)}catch(e){}
   var mm=/^#invite=([A-Za-z0-9_-]{43})\s*$/.exec(d);
