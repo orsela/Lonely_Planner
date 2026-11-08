@@ -223,15 +223,21 @@ if(typeof STORAGE_BACKEND!=='undefined'&&STORAGE_BACKEND!=='cloud')return;     /
    localStorage['pt-f22-beta']==='1'. #f22beta sets it, #f22beta-off clears it; the hash is removed at once. Raw localStorage:
    this runs before the F02 gate namespaces Storage.prototype. */
 const BETA_KEY='pt-f22-beta';
-function lsGet(k){try{return window.localStorage.getItem(k)}catch{return null}}
-function lsSet(k,v){try{window.localStorage.setItem(k,v)}catch{}}
-function lsDel(k){try{window.localStorage.removeItem(k)}catch{}}
+/* the browser's own Storage methods, captured before the F02 gate wraps Storage.prototype (namespacing) */
+const RAWLS=(()=>{try{const ls=window.localStorage,P=Storage.prototype;return{ls,g:P.getItem,s:P.setItem,d:P.removeItem}}catch{return null}})();
+function lsGet(k){try{return RAWLS?RAWLS.g.call(RAWLS.ls,k):null}catch{return null}}
+function lsSet(k,v){try{if(RAWLS)RAWLS.s.call(RAWLS.ls,k,v)}catch{}}
+function lsDel(k){try{if(RAWLS)RAWLS.d.call(RAWLS.ls,k)}catch{}}
 if(MODE==='beta'){
  let h='';try{h=String(location.hash||'')}catch{}
  if(h==='#f22beta'||h==='#f22beta-off'){
   if(h==='#f22beta')lsSet(BETA_KEY,'1');else lsDel(BETA_KEY);
   try{history.replaceState(history.state,'',location.pathname+location.search)}catch{}
  }
+ /* typed into an already open app the hash change does not reload the page: apply it and reload */
+ window.addEventListener('hashchange',()=>{const x=String(location.hash||'');if(x!=='#f22beta'&&x!=='#f22beta-off')return;
+  if(x==='#f22beta')lsSet(BETA_KEY,'1');else lsDel(BETA_KEY);
+  try{history.replaceState(history.state,'',location.pathname+location.search)}catch{}try{location.reload()}catch{}});
  if(lsGet(BETA_KEY)!=='1')return;
 }
 const F22_VERSION='3.0.0-alpha.11';
