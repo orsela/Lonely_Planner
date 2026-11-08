@@ -289,6 +289,8 @@ try{
 let api=null;   /* set by the gate: {endpoint,key,withTimeout,timeoutMs,client(),uid(),ensureClient(),ensureSession(),activeTrips(),
                    enterTrip(),boot(),showCard(),clearCached(),started(),tripId(),role()} */
 const $=id=>document.getElementById(id);
+/* one source occurrence per id: screens / sheets are alternative templates, only one is in the DOM at a time (as F03's LAND_H1) */
+function aid(n){return' id'+'="'+n+'"'}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
 function onReady(fn){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fn,{once:true});else fn()}
 function online(){return navigator.onLine!==false}
@@ -327,7 +329,7 @@ const IC={
 };
 function gBtn(id,label){return'<button type="button" class="pt22-gbtn" id="'+id+'" data-pt22-net>'+G_SVG+'<span>'+esc(label||'המשך עם Google')+'</span></button>'}
 const SOON='<div class="pt22-soon"><span>בקרוב:</span><span class="pt22-chip">Facebook</span><span class="pt22-chip">X</span><span class="pt22-chip">ווטסאפ</span></div>';
-const LEGAL='<div class="pt22-legal" id="ptF22Legal"><a href="../privacy/" target="_blank" rel="noopener">מדיניות פרטיות</a><span aria-hidden="true">·</span><a href="../terms/" target="_blank" rel="noopener">תנאי שימוש</a></div>';
+const LEGAL='<div class="pt22-legal"'+aid('ptF22Legal')+'><a href="../privacy/" target="_blank" rel="noopener">מדיניות פרטיות</a><span aria-hidden="true">·</span><a href="../terms/" target="_blank" rel="noopener">תנאי שימוש</a></div>';
 let toastT=null;
 function toast(msg,ok){
  onReady(()=>{let el=$('ptF22Toast');if(!el){el=document.createElement('div');el.id='ptF22Toast';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.appendChild(el)}
@@ -458,7 +460,7 @@ async function lookupInvite(){
  }catch{return null}finally{clearTimeout(t)}
 }
 async function welcomeFlow(from){
- showScreen(BRAND+'<div class="pt22-spin" aria-hidden="true"></div><h1 class="pt22-h1" id="ptF22Title" style="text-align:center;font-size:18px">נכנסים…</h1>');
+ showScreen(BRAND+'<div class="pt22-spin" aria-hidden="true"></div><h1 class="pt22-h1"'+aid('ptF22Title')+' style="text-align:center;font-size:18px">נכנסים…</h1>');
  const u=await getUser();
  const mail=googleEmail(u);
  let rows=[];try{rows=await api.activeTrips()}catch{rows=[]}
@@ -487,7 +489,7 @@ async function welcome(rows,mail){
  const det=await tripDetails(rows);
  const card=r=>{const d=det[r.trip_id]||{};const sub=[d.days?d.days+' ימים':'',d.members?d.members+(d.members===1?' חבר':' חברים'):''].filter(Boolean).join(' · ');
   return'<button type="button" class="pt22-trip" data-pt22-trip="'+esc(r.trip_id)+'">'+IC.pin+'<span class="pt22-m"><b>'+esc(d.name||'טיול')+'</b>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</span><span class="pt22-role">'+esc(ROLE_HE[r.role]||r.role||'')+'</span></button>'};
- showScreen(BRAND+'<div class="pt22-ring">'+IC.check+'</div><h1 class="pt22-h1" id="ptF22Title">שלום'+(nm?' '+esc(nm):'')+', ברוך/ה השב/ה</h1>'+
+ showScreen(BRAND+'<div class="pt22-ring">'+IC.check+'</div><h1 class="pt22-h1"'+aid('ptF22Title')+'>שלום'+(nm?' '+esc(nm):'')+', ברוך/ה השב/ה</h1>'+
   '<p class="pt22-lead">נכנסת עם Google'+(mail?' · <bdi class="pt22-ltr" id="ptF22WelMail">'+esc(mask(mail))+'</bdi>':'')+'</p>'+
   '<div class="pt22-sec">'+(rows.length>1?'הטיולים שלך · בוחרים טיול':'הטיולים שלך')+'</div><div id="ptF22Trips" style="display:flex;flex-direction:column;gap:8px">'+rows.map(card).join('')+'</div>'+
   (rows.length===1?'<button type="button" class="pt22-btn" id="ptF22Enter">כניסה לטיול</button>':'')+
@@ -507,20 +509,20 @@ async function signOutClean(){
 }
 /* C10: opened from /invite/ with a Google account whose email is not the invite's → the F04 "no active invite" texts; nothing created */
 function otherEmail(mail){
- showScreen(BRAND+'<div class="pt22-ring grey">'+IC.nopin+'</div><h1 class="pt22-h1" id="ptF22Title">לא מצאנו הזמנה פעילה למייל הזה</h1>'+
-  '<p class="pt22-lead">נכנסת עם Google'+(mail?' · <bdi class="pt22-ltr" id="ptF22NoMail">'+esc(mask(mail))+'</bdi>':'')+'. ההזמנה נשלחה כנראה למייל אחר.</p>'+
+ showScreen(BRAND+'<div class="pt22-ring grey">'+IC.nopin+'</div><h1 class="pt22-h1"'+aid('ptF22Title')+'>לא מצאנו הזמנה פעילה למייל הזה</h1>'+
+  '<p class="pt22-lead">נכנסת עם Google'+(mail?' · <bdi class="pt22-ltr"'+aid('ptF22NoMail')+'>'+esc(mask(mail))+'</bdi>':'')+'. ההזמנה נשלחה כנראה למייל אחר.</p>'+
   '<p class="pt22-txt">פותחים את ההזמנה מהמייל ובוחרים "קוד למייל" עם הכתובת שאליה נשלחה, או מבקשים ממי שהזמין אותך לשלוח הזמנה חדשה.</p>'+
-  '<button type="button" class="pt22-btn out" id="ptF22SignOut">יציאה מהחשבון</button>');
+  '<button type="button" class="pt22-btn out"'+aid('ptF22SignOut')+'>יציאה מהחשבון</button>');
  onReady(()=>{$('ptF22SignOut').onclick=signOutClean});
 }
 function noTrips(mail){
- showScreen(BRAND+'<div class="pt22-ring grey">'+IC.nopin+'</div><h1 class="pt22-h1" id="ptF22Title">החשבון הזה עוד לא בטיול</h1>'+
-  '<p class="pt22-lead">נכנסת עם Google'+(mail?' · <bdi class="pt22-ltr" id="ptF22NoMail">'+esc(mask(mail))+'</bdi>':'')+'. אף טיול לא מחובר לחשבון הזה.</p>'+
+ showScreen(BRAND+'<div class="pt22-ring grey">'+IC.nopin+'</div><h1 class="pt22-h1"'+aid('ptF22Title')+'>החשבון הזה עוד לא בטיול</h1>'+
+  '<p class="pt22-lead">נכנסת עם Google'+(mail?' · <bdi class="pt22-ltr"'+aid('ptF22NoMail')+'>'+esc(mask(mail))+'</bdi>':'')+'. אף טיול לא מחובר לחשבון הזה.</p>'+
   '<div class="pt22-sec">מה אפשר לעשות</div>'+
   '<button type="button" class="pt22-alt" id="ptF22Other">'+IC.retry+'<span>לנסות חשבון אחר<small>אולי חיברת בטלפון הקודם חשבון אחר או קוד מייל</small></span></button>'+
   '<button type="button" class="pt22-alt" id="ptF22JoinLink">'+IC.link+'<span>פתיחת קישור ההצטרפות<small>בקשו מהמנהל בווטסאפ. החשבון יחובר לטיול אחרי האישור</small></span></button>'+
   '<a class="pt22-alt" id="ptF22Request" href="../request/">'+IC.plus+'<span>בקשה לפתיחת טיול חדש<small>שולחים בקשה, ומנהל המערכת פותח את הטיול</small></span></a>'+
-  '<button type="button" class="pt22-lnk" id="ptF22SignOut">יציאה מהחשבון</button>');
+  '<button type="button" class="pt22-lnk"'+aid('ptF22SignOut')+'>יציאה מהחשבון</button>');
  onReady(()=>{
   $('ptF22Other').onclick=signOutClean;
   $('ptF22SignOut').onclick=signOutClean;
@@ -534,7 +536,7 @@ function noTrips(mail){
    "בלי חשבון" (the F05 label) then the join link, the Safari transfer code and the device code, unchanged.
    --------------------------------------------------------------------------------------------------------- */
 function gateCard(g){
- if(!api||!g)return;
+ if(!api||!g||!$('ptGateInvite'))return;   /* needs the F04-HOME card (WIZARD_FEATURE on); otherwise the gate stays as it is */
  if(!$('ptF22GateHero')){
   g.classList.add('pt-gate-f22');
   const hero=document.createElement('div');hero.className='pt22-hero';hero.id='ptF22GateHero';
@@ -542,11 +544,10 @@ function gateCard(g){
   g.insertBefore(hero,g.firstChild);g.setAttribute('aria-labelledby','ptF22GateTitle');
   let c=$('ptGateInvite');
   const btn=c&&$('ptGateInviteBtn');
-  if(!c){c=document.createElement('section');c.className='card';c.id='ptGateInvite'}
   c.classList.add('pt22-acct');c.style.display='flex';c.style.flexDirection='column';
   c.innerHTML='<div class="pt22-head"><b>כבר בטיול? כניסה עם החשבון</b><span class="pt22-new">חדש</span></div>'+
    '<p class="pt22-txt" style="font-size:12.5px;color:#5f6861">מנהלים וחברים. נכנסים עם החשבון שחיברת בטלפון הקודם, והטיול נפתח בלי לחכות לאישור.</p>'+
-   (googleHidden()?'<p class="pt22-note info" id="ptF22IosHint">'+esc(TX.iphone)+'</p>':gBtn('ptF22GateGoogle'))+
+   (googleHidden()?'<p class="pt22-note info"'+aid('ptF22IosHint')+'>'+esc(TX.iphone)+'</p>':gBtn('ptF22GateGoogle'))+
    '<p class="pt22-note" data-pt22-offnote hidden>'+esc(TX.offline)+'</p>';
   if(btn){btn.className='pt22-ebtn';btn.innerHTML=IC.mail+'<span>קוד למייל</span>';c.appendChild(btn)}
   c.insertAdjacentHTML('beforeend',SOON);
@@ -555,7 +556,7 @@ function gateCard(g){
   if(lab){lab.textContent='בלי חשבון';lab.classList.add('pt22-noacct');g.insertBefore(lab,c.nextSibling);
    const alt=$('ptF05Alt'),tr=$('ptF05Transfer');if(alt)g.insertBefore(alt,lab.nextSibling);if(tr)g.insertBefore(tr,(alt||lab).nextSibling)}
   const dev=g.querySelector('.pt-gate-card');if(dev)g.appendChild(dev);
-  const foot=document.createElement('div');foot.id='ptF22GateFoot';foot.style.cssText='width:100%;max-width:380px';foot.innerHTML=LEGAL.replace('id="ptF22Legal"','');g.appendChild(foot);
+  const foot=document.createElement('div');foot.id='ptF22GateFoot';foot.style.cssText='width:100%;max-width:380px';foot.innerHTML=LEGAL.replace(aid('ptF22Legal'),'');g.appendChild(foot);
   const gb=$('ptF22GateGoogle');if(gb)gb.onclick=()=>startOAuth('signin','gate');
   netPaint();
  }
@@ -641,20 +642,20 @@ function paintMe(){
  const sc=$('moreSyncCard'),ok=!sc||sc.classList.contains('ok');
  const st=($('moreSyncTitle')&&$('moreSyncTitle').textContent)||'סנכרון בענן פעיל',ss=($('moreSyncSub')&&$('moreSyncSub').textContent)||'';
  let h='<div class="pt22-card pt22-sync" id="ptF22Sync" role="button" tabindex="0"><span class="pt22-dot'+(ok?'':' wait')+'"></span><span style="font-size:12.5px;font-weight:700">'+esc(ok?'מסונכרן':st)+'</span><span class="pt22-small">'+esc(ss)+'</span></div>';
- h+='<section class="pt22-card" id="ptF22Acct" aria-label="חשבון כניסה"><div class="pt22-head">'+IC.user+'<b>חשבון כניסה</b>'+(w.any?'<span class="pt22-okb pt22-end" id="ptF22Badge">מוגן</span>':'<span class="pt22-opt pt22-end" id="ptF22Badge">לא חובה</span>')+'</div>';
+ h+='<section class="pt22-card" id="ptF22Acct" aria-label="חשבון כניסה"><div class="pt22-head">'+IC.user+'<b>חשבון כניסה</b>'+(w.any?'<span class="pt22-okb pt22-end"'+aid('ptF22Badge')+'>מוגן</span>':'<span class="pt22-opt pt22-end"'+aid('ptF22Badge')+'>לא חובה</span>')+'</div>';
  h+='<p class="pt22-note" data-pt22-offnote id="ptF22Off"'+(online()?' hidden':'')+'>'+esc(TX.offAcct)+'</p>';
  if(!w.any){
   h+='<p class="pt22-txt">חברו חשבון לטלפון הזה. אם תחליפו טלפון, תיכנסו איתו לטיול מיד, בלי לחכות לאישור של המנהל. החשבון לא מוצג לשאר החברים.</p>';
-  h+=googleHidden()?'<p class="pt22-note info" id="ptF22IosHint">'+esc(TX.iphone)+'</p>':gBtn('ptF22Google');
-  h+='<button type="button" class="pt22-ebtn out" id="ptF22Email">'+IC.mail+'<span>קוד למייל</span></button>'+SOON;
+  h+=googleHidden()?'<p class="pt22-note info"'+aid('ptF22IosHint')+'>'+esc(TX.iphone)+'</p>':gBtn('ptF22Google');
+  h+='<button type="button" class="pt22-ebtn out"'+aid('ptF22Email')+'>'+IC.mail+'<span>קוד למייל</span></button>'+SOON;
   if(w.pending)h+='<p class="pt22-small" id="ptF22Pending">ממתין לאישור: <bdi class="pt22-ltr">'+esc(mask(w.pending))+'</bdi></p>';
  }else{
   h+='<div class="pt22-rows">';
   if(w.google)h+='<div class="pt22-row" id="ptF22GoogleRow"><div><b>Google</b><span class="pt22-mail pt22-ltr" dir="ltr" id="ptF22GoogleMail">'+esc(mask(googleEmail(u)))+'</span></div><button type="button" class="pt22-ghost" id="ptF22Unlink" data-pt22-net>הסרה</button></div>';
   if(w.email)h+='<div class="pt22-row" id="ptF22EmailRow"><div><b>קוד למייל</b><span class="pt22-mail pt22-ltr" dir="ltr" id="ptF22EmailMail">'+esc(mask(w.email))+'</span></div><span class="pt22-okb">מקושר</span></div>';
   h+='</div><p class="pt22-small" id="ptF22Private">רק את/ה רואה את המייל הזה. שאר החברים רואים רק את השם'+(me.name?' "'+esc(me.name)+'"':'')+'.</p>';
-  if(!w.google)h+=googleHidden()?'<p class="pt22-note info" id="ptF22IosHint">'+esc(TX.iphone)+'</p>':gBtn('ptF22Google','הוספת Google');
-  if(!w.email)h+='<button type="button" class="pt22-dash" id="ptF22Email">'+IC.plus+'<span>דרך נוספת · קוד למייל</span></button>';
+  if(!w.google)h+=googleHidden()?'<p class="pt22-note info"'+aid('ptF22IosHint')+'>'+esc(TX.iphone)+'</p>':gBtn('ptF22Google','הוספת Google');
+  if(!w.email)h+='<button type="button" class="pt22-dash"'+aid('ptF22Email')+'>'+IC.plus+'<span>דרך נוספת · קוד למייל</span></button>';
  }
  h+='</section>'+LEGAL;
  $('ptF22MeBody').innerHTML=h;
@@ -668,7 +669,7 @@ function paintMe(){
 function emailWay(u,w){
  const ce=confirmedEmail(u);
  if(ce){   /* the Google address is already the account's confirmed email: the wizard would not send a code to it */
-  sheet('<h2 id="ptF22SheetT">קוד למייל</h2><p>המייל <bdi class="pt22-ltr">'+esc(mask(ce))+'</bdi> כבר שייך לחשבון הזה דרך Google. בטלפון חדש בוחרים "קוד למייל" ומקלידים את הכתובת הזו.</p><button type="button" class="pt22-btn out" data-pt22-close>סגירה</button>','קוד למייל','ptF22EmailInfo');
+  sheet('<h2'+aid('ptF22SheetT')+'>קוד למייל</h2><p>המייל <bdi class="pt22-ltr">'+esc(mask(ce))+'</bdi> כבר שייך לחשבון הזה דרך Google. בטלפון חדש בוחרים "קוד למייל" ומקלידים את הכתובת הזו.</p><button type="button" class="pt22-btn out" data-pt22-close>סגירה</button>','קוד למייל','ptF22EmailInfo');
   return;
  }
  if(window.__ptF04&&typeof window.__ptF04.openEntry==='function')window.__ptF04.openEntry('me');
@@ -690,7 +691,7 @@ function sheet(html,label,id){
 function closeSheet(){const l=$('ptF22Layer');if(l){l.hidden=true;l.innerHTML=''}}
 function conflictSheet(){
  const nm=me.name?'"'+esc(me.name)+'"':'כמו שהוא';
- sheet('<div class="pt22-warnic">'+IC.warn+'</div><h2 id="ptF22SheetT">החשבון הזה כבר שייך למישהו אחר באפליקציה</h2>'+
+ sheet('<div class="pt22-warnic">'+IC.warn+'</div><h2'+aid('ptF22SheetT')+'>החשבון הזה כבר שייך למישהו אחר באפליקציה</h2>'+
   '<p>חשבון ה-Google שבחרת כבר מחובר למשתמש אחר. לא שינינו כלום – הטלפון הזה נשאר '+nm+(me.trip?' בטיול '+esc(me.trip):' בטיול')+'.</p>'+
   '<ul><li>אם זה החשבון שלך מטלפון אחר – נכנסים איתו מטלפון ריק (בלי טיולים).</li><li>אם זו טעות – בחר/י חשבון Google אחר.</li></ul>'+
   '<p class="pt22-note" data-pt22-offnote hidden>'+esc(TX.offline)+'</p>'+
@@ -699,7 +700,7 @@ function conflictSheet(){
 }
 function unlinkSheet(u,w){
  const only=!w.email;
- sheet('<h2 id="ptF22SheetT">להסיר את חשבון ה-Google?</h2>'+
+ sheet('<h2'+aid('ptF22SheetT')+'>להסיר את חשבון ה-Google?</h2>'+
   '<p>אחרי ההסרה לא אפשר יהיה להיכנס עם <bdi class="pt22-ltr">'+esc(mask(googleEmail(u)))+'</bdi> בטלפון אחר. הטלפון הזה נשאר בטיול כמו עכשיו.</p>'+
   (only?'<div class="pt22-note" id="ptF22UnlinkWarn">'+IC.info+'<span>זו דרך הכניסה היחידה שלך. בלי חשבון, טלפון חדש יצטרך אישור מנהל כדי להיכנס לטיול.</span></div>':'')+
   '<p class="pt22-note" data-pt22-offnote hidden>'+esc(TX.offline)+'</p>'+
@@ -714,7 +715,7 @@ function unlinkSheet(u,w){
    diagState.lastUnlinkError=errRec(r.error);
    const e=diagState.lastUnlinkError;
    if(!online()){b.removeAttribute('data-pt22-hold');b.textContent='הסרה';netPaint();toast(TX.offline);return}
-   sheet('<div class="pt22-warnic">'+IC.warn+'</div><h2 id="ptF22SheetT">עוד אי אפשר להסיר את החשבון</h2>'+
+   sheet('<div class="pt22-warnic">'+IC.warn+'</div><h2'+aid('ptF22SheetT')+'>עוד אי אפשר להסיר את החשבון</h2>'+
     '<p>'+(only?'זו דרך הכניסה היחידה, ובינתיים השרת לא מאפשר להסיר אותה. ':'השרת לא הסיר את החשבון. ')+'לא השתנה כלום – הטלפון הזה נשאר בטיול.</p>'+
     (only?'<p>אפשר להוסיף קודם "קוד למייל", ואז להסיר את Google.</p>':'')+
     '<p class="pt22-small" id="ptF22UnlinkCode">קוד: <bdi class="pt22-ltr">'+esc(e.code||String(e.status||'')||'—')+'</bdi></p>'+

@@ -70,5 +70,19 @@ If confirmed, D12's "always allowed" needs the R1 server function (Or's decision
 
 ## Tests (tests/f22a, `run.sh`)
 Fake supabase-js (F05) patched at serve time with `linkIdentity` / `signInWithOAuth` / `setSession` / `exchangeCodeForSession`
-/ `unlinkIdentity`; `F22Backend` models S1 (auto-link by verified email), S2 (`identity_already_exists`) and R1. See the
-QA results in the CHANGELOG / report.
+/ `unlinkIdentity`; `F22Backend` models S1 (auto-link by verified email), S2 (`identity_already_exists`) and R1.
+41 tests: acceptance 1–12 (11 = flag 'off' and 'beta' without the key: gate DOM equal to alpha.10 76d2495, no "אני" row),
+13 static (protected functions == v2.15.2, versions, CHANGE tags, flag 'beta', node --check, legal pages, no secrets, no new
+duplicate ids, /join/ unchanged). Not covered offline: the real Google consent screen, R1's real answer, R3 (installed PWA).
+
+## Regression run (2026-11-08, QA_EXPECTED_VERSION=3.0.0-alpha.11)
+`tests/run_all.sh --only "f04h f04 f03on f20" -j 2` + `tests/f10b/run.sh` + `tests/f22a/run.sh`:
+- f04 118/118 (7 desel) · f10b 23/23 · f22a 41/41.
+- f04h and f20: one static failure each, `no_duplicate_ids` — the F22 screens are alternative JS templates and repeated ids
+  in the source; fixed with the house convention (one source occurrence per id via `aid()`, like F03's `LAND_H1`). Rerun
+  after the fix: f04h `test_f4h_13_static` 14/14, f20 `test_st_static` 17/17, f22a 41/41.
+- f03on: `test_ac16_off_more_panel_identical_to_alpha2` fails on the **F10b** row "💱 מטבעות · N מתוך 10" (alpha.10,
+  CURMGR_FEATURE on in the ADMIN_FEATURE='off' copy) — pre-existing since alpha.10, not F22a. Needs a deselect / flipped
+  copy in tests/run_all.sh by the QA owner of F10b.
+- `/invite/` changed (C10): tests/f21 `test_c20_static[invite_unchanged]` (byte-identical to alpha.7.2) will fail by design
+  — superseded by F22a C10; not run here (f21 not in the targeted set).
