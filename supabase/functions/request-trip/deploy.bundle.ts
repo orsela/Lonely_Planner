@@ -591,7 +591,7 @@ const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const SUGGEST_MODEL = "claude-haiku-5-5";
 const SUGGEST_TIMEOUT_MS = 10_000;
-const SUGGEST_MAX_TOKENS = 700;
+const SUGGEST_MAX_TOKENS = 4000;
 const AUTO_INVITER = "Lonely Planner";
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const TURNSTILE_HOST = "orsela.github.io";
@@ -1018,6 +1018,7 @@ function parseSuggestions(text, shown) {
 async function askModel(input, key) {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), SUGGEST_TIMEOUT_MS);
+    const t0 = deps.now();
     try {
         const r = await deps.fetch(ANTHROPIC_URL, {
             method: "POST",
@@ -1041,6 +1042,8 @@ async function askModel(input, key) {
                 types: Array.isArray(d?.content) ? d.content.map((c) => String(c?.type ?? "?").slice(0, 20)).slice(0, 8) : typeof d?.content,
                 keys: d && typeof d === "object" ? Object.keys(d).slice(0, 12) : [] });
         }
+        if (t)
+            log({ action: "suggest", event: "ai_answer", ms: deps.now() - t0, stop: String(d?.stop_reason ?? "").slice(0, 40), out: Number(d?.usage?.output_tokens) || 0 });
         return t || null;
     }
     catch (e) {

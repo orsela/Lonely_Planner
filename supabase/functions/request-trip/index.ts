@@ -67,7 +67,9 @@ export const ANTHROPIC_VERSION = "2023-06-01";
 /** Haiku-class model (C6). The secret SUGGEST_MODEL overrides it without a deploy. */
 export const SUGGEST_MODEL = "claude-haiku-5-5";
 export const SUGGEST_TIMEOUT_MS = 10_000;
-export const SUGGEST_MAX_TOKENS = 700;
+// CHANGE 2026-11-13 F23-FN-15: was 700. First real calls (13/11): the model's thinking tokens count toward max_tokens, so
+//   700 left no room for the answer (empty text, then a JSON cut after 137 characters). The answer itself is ~300 tokens.
+export const SUGGEST_MAX_TOKENS = 4000;
 /** shown as the inviter of an automatic invite (there is no admin) */
 export const AUTO_INVITER = "Lonely Planner";
 export const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -565,6 +567,7 @@ export function parseSuggestions(text: string, shown: string[]): Suggestion[] {
 async function askModel(input: SuggestInput, key: string): Promise<string | null> {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), SUGGEST_TIMEOUT_MS);
+  const t0 = deps.now();
   try {
     const r = await deps.fetch(ANTHROPIC_URL, {
       method: "POST",
@@ -581,7 +584,7 @@ async function askModel(input: SuggestInput, key: string): Promise<string | null
       log({ action: "suggest", event: "ai_http", http: r.status, etype });
       return null;
     }
-    const d = await r.json() as { content?: { type?: string; text?: string }[]; stop_reason?: string };
+    const d = await r.json() as { content?: { type?: string; text?: string }[]; stop_reason?: string; usage?: { output_tokens?: number } };
     const t = Array.isArray(d?.content) ? d.content.filter((c) => c?.type === "text" && typeof c.text === "string").map((c) => c.text).join("") : "";
     // CHANGE 2026-11-13 F23-FN-14: an answer without text is logged by its shape only (block types, stop reason, top-level
     //   keys) — needed to tell an API-shape problem from a model problem. Was: silent null.
@@ -590,6 +593,8 @@ async function askModel(input: SuggestInput, key: string): Promise<string | null
         types: Array.isArray(d?.content) ? d.content.map((c) => String(c?.type ?? "?").slice(0, 20)).slice(0, 8) : typeof d?.content,
         keys: d && typeof d === "object" ? Object.keys(d).slice(0, 12) : [] });
     }
+    // CHANGE 2026-11-13 F23-FN-15: + one line per answered call: duration, stop reason, output tokens (cost / timeout tuning)
+    if (t) log({ action: "suggest", event: "ai_answer", ms: deps.now() - t0, stop: String(d?.stop_reason ?? "").slice(0, 40), out: Number(d?.usage?.output_tokens) || 0 });
     return t || null;
   } catch (e) {
     log({ action: "suggest", event: "ai_error", name: e instanceof Error ? e.name : "unknown" });
