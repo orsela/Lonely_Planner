@@ -9,7 +9,8 @@ type Any = any;
 import { execFileSync } from "node:child_process";
 
 const REPO = new URL("../../", import.meta.url);
-const RT: Any = await import(new URL("supabase/functions/request-trip/index.ts", REPO).href);
+// CHANGE 2026-11-13 F23-QA-10: F23_RT_BUNDLE=1 runs the same cases against the generated deploy bundle (what is deployed)
+const RT: Any = await import(new URL(process.env.F23_RT_BUNDLE ? "supabase/functions/request-trip/deploy.bundle.ts" : "supabase/functions/request-trip/index.ts", REPO).href);
 const SH: Any = await import(new URL("supabase/functions/_shared/approve.ts", REPO).href);
 const CN: Any = await import(new URL("supabase/functions/_shared/countries.ts", REPO).href);
 const DB = process.env.F23_QA_DB || "pt_f23_int";

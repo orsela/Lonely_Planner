@@ -52,6 +52,11 @@ if want int; then
   F23_QA_DB="$DB" fnrun tests/f23/integration_test.ts >"$HERE/.last_run_int.txt" 2>&1; rc=$?
   echo "int         $(tail -1 "$HERE/.last_run_int.txt") (rc=$rc)"; [ $rc = 0 ] || { grep -B1 -A6 "FAIL\|not ok\|Error" "$HERE/.last_run_int.txt" | head -60; RC=1; }
 fi
+if want int; then   # CHANGE 2026-11-13 F23-QA-10: + the same cases against the deploy bundle, and the bundle is up to date
+  (cd "$REPO" && "$NODE" scripts/dev/build_fn_bundle.mjs --check) || { echo "bundle      OUT OF DATE (run: node scripts/dev/build_fn_bundle.mjs)"; RC=1; }
+  F23_RT_BUNDLE=1 F23_QA_DB="$DB" fnrun tests/f23/integration_test.ts >"$HERE/.last_run_bundle.txt" 2>&1; rc=$?
+  echo "int/bundle  $(tail -1 "$HERE/.last_run_bundle.txt") (rc=$rc)"; [ $rc = 0 ] || { grep -B1 -A6 "FAIL\|not ok\|Error" "$HERE/.last_run_bundle.txt" | head -40; RC=1; }
+fi
 if want db || want int; then (cd /tmp && sudo -u postgres psql -X -qc "drop database if exists $DB" >/dev/null 2>&1); fi
 if want f21; then
   for t in supabase/functions/request-trip/test.ts supabase/functions/invite-manager/test.ts supabase/functions/invite-manager/test_f21.ts tests/f21/function_test.ts; do

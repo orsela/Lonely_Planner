@@ -94,7 +94,7 @@ await T("P-01 [C1][C12] auto form (he): subtitle + 3 lines, where-choice, privac
   eq(await page.getAttribute("html", "dir"), "rtl", "dir");
   eq(await page.textContent(".rq-sub"), "מקימים כאן טיול משותף ומקבלים אפליקציה אחת לכל המטיילים.", "subtitle");
   eq(await page.$$eval("#rqWhat > div", (a) => a.map((d) => [d.className, d.textContent])), [["yes", "מסלול יומי ומפה, מסמכים והוצאות במקום אחד"],
-    ["yes", "צ'אט חכם שמכיר את הטיול, וקישורים לחיפוש טיסות ומלונות"], ["no", "לא מזמינים כאן טיסות או מלונות בעצמנו"]], "3 lines");
+    ["yes", "צ'אט חכם שמכיר את הטיול"], ["no", "לא מזמינים כאן טיסות או מלונות בעצמנו"]], "3 lines");
   eq([await page.getAttribute("#rqSegKnown", "aria-pressed"), await page.getAttribute("#rqSegUnd", "aria-pressed"), await page.isHidden("#rqUndBox"), await page.isVisible("#rqWhere")], ["true", "false", true, true], "default = knows");
   ok((await page.textContent(".rq-privacy")).includes("בקשה שהמייל שלה לא אומת נמחקת אחרי 5 ימים") && !(await page.textContent("#rqApp")).includes("אישור"), "privacy / no approval wording");
   ok(await noHScroll(page), "horizontal scroll");
