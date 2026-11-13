@@ -573,11 +573,23 @@ async function askModel(input: SuggestInput, key: string): Promise<string | null
       signal: ac.signal,
     });
     if (!r.ok) {
-      log({ action: "suggest", event: "ai_http", http: r.status });
+      // CHANGE 2026-11-13 F23-FN-14: + the API's error type (never the message body or the prompt). Was: status only.
+      let etype = "";
+      try {
+        etype = String(((await r.json()) as { error?: { type?: string } })?.error?.type || "").slice(0, 60);
+      } catch { /* not JSON */ }
+      log({ action: "suggest", event: "ai_http", http: r.status, etype });
       return null;
     }
-    const d = await r.json() as { content?: { type?: string; text?: string }[] };
+    const d = await r.json() as { content?: { type?: string; text?: string }[]; stop_reason?: string };
     const t = Array.isArray(d?.content) ? d.content.filter((c) => c?.type === "text" && typeof c.text === "string").map((c) => c.text).join("") : "";
+    // CHANGE 2026-11-13 F23-FN-14: an answer without text is logged by its shape only (block types, stop reason, top-level
+    //   keys) — needed to tell an API-shape problem from a model problem. Was: silent null.
+    if (!t) {
+      log({ action: "suggest", event: "ai_empty", stop: String(d?.stop_reason ?? "").slice(0, 40),
+        types: Array.isArray(d?.content) ? d.content.map((c) => String(c?.type ?? "?").slice(0, 20)).slice(0, 8) : typeof d?.content,
+        keys: d && typeof d === "object" ? Object.keys(d).slice(0, 12) : [] });
+    }
     return t || null;
   } catch (e) {
     log({ action: "suggest", event: "ai_error", name: e instanceof Error ? e.name : "unknown" });
@@ -614,6 +626,8 @@ async function actSuggest(body: Record<string, unknown>) {
     pref_note: typeof d.pref_note === "string" ? d.pref_note : null, shown,
   }, key);
   const items = text ? parseSuggestions(text, shown) : [];
+  // CHANGE 2026-11-13 F23-FN-14: + the answer's length and first character class when nothing in it was usable (no content)
+  if (text && !items.length) log({ action: "suggest", event: "ai_unusable", len: text.length, json: text.indexOf("{") >= 0, fence: text.indexOf("```") >= 0 });
   if (!items.length) return fallback(d.left, text ? "nothing_valid" : "ai_failed");
   await call("request_suggest_save", { p_request: id, p_session_hash: sess, p_countries: items.map((x) => x.country) });
   return { ok: true, request_id: id, items, left: typeof d.left === "number" ? d.left : 0 };

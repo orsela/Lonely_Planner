@@ -1026,11 +1026,21 @@ async function askModel(input, key) {
             signal: ac.signal,
         });
         if (!r.ok) {
-            log({ action: "suggest", event: "ai_http", http: r.status });
+            let etype = "";
+            try {
+                etype = String((await r.json())?.error?.type || "").slice(0, 60);
+            }
+            catch { }
+            log({ action: "suggest", event: "ai_http", http: r.status, etype });
             return null;
         }
         const d = await r.json();
         const t = Array.isArray(d?.content) ? d.content.filter((c) => c?.type === "text" && typeof c.text === "string").map((c) => c.text).join("") : "";
+        if (!t) {
+            log({ action: "suggest", event: "ai_empty", stop: String(d?.stop_reason ?? "").slice(0, 40),
+                types: Array.isArray(d?.content) ? d.content.map((c) => String(c?.type ?? "?").slice(0, 20)).slice(0, 8) : typeof d?.content,
+                keys: d && typeof d === "object" ? Object.keys(d).slice(0, 12) : [] });
+        }
         return t || null;
     }
     catch (e) {
@@ -1069,6 +1079,8 @@ async function actSuggest(body) {
         pref_note: typeof d.pref_note === "string" ? d.pref_note : null, shown,
     }, key);
     const items = text ? parseSuggestions(text, shown) : [];
+    if (text && !items.length)
+        log({ action: "suggest", event: "ai_unusable", len: text.length, json: text.indexOf("{") >= 0, fence: text.indexOf("```") >= 0 });
     if (!items.length)
         return fallback(d.left, text ? "nothing_valid" : "ai_failed");
     await call("request_suggest_save", { p_request: id, p_session_hash: sess, p_countries: items.map((x) => x.country) });
