@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Lonely Planner F23 developer test runner · version 1.0.0
 # CHANGE 2026-11-13 F23-QA-04: new file (no previous version).
-# usage: tests/f23/run.sh [--only db|int|f21]
+# usage: tests/f23/run.sh [--only db|int|f21|page|app]
 #   db    local PostgreSQL: 0001…0017 + 0020_f23.sql + 0021 harness (applied twice: idempotent) → qa.f23_run(),
 #         and qa.f01…f06 / f21_run() for regression (superseded rows listed below are reported, not failed)
 #   int   request-trip wired to that database (tests/f23/integration_test.ts)
 #   f21   the F21 function suites, pinned to REQUEST_MODE='manual' (criterion 11), + the function unit tests
+#   page  the /request/ page at 390 px with stubbed Turnstile + request-trip (tests/f23/request_page_test.mjs)
+#   app   the admin requests screen with the F23 data (tests/f23/test_f23_admin.py, F21 harness)
 # Offline: no Supabase, no network. PostgreSQL: `service postgresql start` (sudo -u postgres).
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -56,5 +58,15 @@ if want f21; then
     out=$(fnrun "$t" 2>&1); rc=$?
     echo "$(printf '%-52s' "$t") $(echo "$out" | tail -1) (rc=$rc)"; [ $rc = 0 ] || RC=1
   done
+fi
+# CHANGE 2026-11-13 F23-QA-09: + page (the /request/ page, Playwright + stubs) and app (admin screen, F21 harness)
+if want page; then
+  out=$(cd "$REPO" && "$NODE" tests/f23/request_page_test.mjs 2>&1); rc=$?
+  echo "page        $(echo "$out" | tail -1) (rc=$rc)"; [ $rc = 0 ] || { echo "$out" | grep -A3 FAIL | head -40; RC=1; }
+fi
+if want app; then
+  if ! $PY -c "import pytest" 2>/dev/null; then for d in /root/.local/share/uv/tools/pytest/lib/python3*/site-packages; do [ -d "$d" ] && export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$d"; done; fi
+  out=$(cd "$REPO" && QA_EXPECTED_VERSION=3.0.0-alpha.12 $PY -m pytest tests/f23/test_f23_admin.py -q 2>&1); rc=$?
+  echo "app         $(echo "$out" | tail -1) (rc=$rc)"; [ $rc = 0 ] || RC=1
 fi
 exit $RC

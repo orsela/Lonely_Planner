@@ -1,8 +1,7 @@
 # F23 — server dev notes (migration 0020/0021, `request-trip`, `invite-manager`)
 
 <!-- CHANGE 2026-11-13 F23-DOCS-10: new file (no previous version). Server stage of F23 only; the `/request/` page and the
-     admin screen are the next stage and get their own notes. Spec: project doc claude/Plan_Travel_F23_spec.md (not yet
-     copied to docs/F23_spec.md — do that with the client stage). -->
+     admin screen are in docs/F23_dev_notes_client.md. Spec: docs/F23_spec.md. -->
 
 Branch `f23`, base `main` e477da0 (3.0.0-alpha.11). Function versions **3.0.0-alpha.12.0** (`request-trip`,
 `invite-manager`). The app and `/request/` are untouched in this stage.

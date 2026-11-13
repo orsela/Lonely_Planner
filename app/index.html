@@ -79,6 +79,12 @@ const HOME_INSTALL_FEATURE='on';
    from a request. The /request/ page has its own REQUEST_FEATURE. 'off' = exactly the 3.0.0-alpha.7.2 behaviour: every F21
    line is a no-op (no tab, no badge, no admin_trip_requests call, wizard unchanged). Needs ADMIN_FEATURE and SWITCH_FEATURE. */
 const REQUEST_FEATURE='on';
+/* CHANGE 2026-11-13 F23-FLAG-01: new flag (no alpha.11 equivalent). 'on' = F23 app side (claude/Plan_Travel_F23_spec.md C7,
+   C11): in "ניהול מערכת → בקשות" the meter card also shows "הצעות AI היום: N מתוך 30", and under the pending requests a
+   history list "נפתחו אוטומטית" (requests that opened a trip without an approval, each with the state of its invite; a tap
+   on "פעולות" opens the existing invite sheet, where "ביטול" revokes it like any invite). Shown only when the server
+   sends the data (migration 0020). 'off' = exactly the 3.0.0-alpha.11 screen. Needs REQUEST_FEATURE. */
+const REQAUTO_FEATURE='on';
 /* CHANGE 2026-11-07 F10-FLAG-01: new flag (no alpha.8 equivalent). 'on' = F10 (docs/F10_spec.md): every trip converts in its
    own currencies — the trip's currency model TRIPCUR (trips.home_currency + trip_countries + trip_currencies, cached per trip)
    drives the add-expense chips, the budget converter + rate rows, the quick FX sheet, the floating FX button, the quick
@@ -1444,6 +1450,28 @@ async function doRevoke(id,btn,okMsg){
    rpc('admin_trip_requests') → {cap, mail_today, requests:[…]}; approve / reject = invite-manager admin actions (invoke()). */
 const REQ=typeof REQUEST_FEATURE!=='undefined'&&REQUEST_FEATURE==='on';
 const req={state:'idle',list:[],cap:50,today:0,tab:null,seq:0};
+/* CHANGE 2026-11-13 F23-ADMIN-01: new (no alpha.11 equivalent). F23 data of the same rpc answer: `auto` = auto-approved
+   requests (newest first), `ai_today` / `ai_cap` = AI suggestion calls today. null = the server did not send them. */
+const REQA=typeof REQAUTO_FEATURE!=='undefined'&&REQAUTO_FEATURE==='on';
+const reqA={list:[],ai:null,aiCap:30};
+function reqAutoState(x){
+ const i=x&&x.invite;
+ if(!i||typeof i!=='object'||!i.id)return{cls:'done',txt:'ההזמנה נמחקה',open:false,id:''};
+ if(i.used_at)return{cls:'ok',txt:'הטיול הוקם',open:false,id:i.id};
+ if(i.revoked_at)return{cls:'done',txt:'ההזמנה בוטלה',open:false,id:i.id};
+ if(new Date(i.expires_at).getTime()<=Date.now())return{cls:'exp',txt:'פג תוקף · הטיול לא הוקם',open:true,id:i.id};
+ return{cls:'wait',txt:'ממתין להקמה · בתוקף עד '+dm(i.expires_at),open:true,id:i.id};
+}
+function reqAutoCard(x,off){
+ const st=reqAutoState(x);
+ const when=(x.month&&reqMonth(x.month,'he')?reqMonth(x.month,'he'):'עוד לא יודעים מתי')+' · '+reqTrav(x.travellers);
+ return'<article class="pt-icard" data-auto-request="'+esc(x.id)+'">'+
+  '<div class="pt-top"><span class="pt-nm" dir="auto">'+esc(x.name)+'</span><span class="pt-f21-tr">'+(x.lang==='en'?'<span class="pt-badge pt-f21-en" lang="en">EN</span>':'')+'<span class="pt-l2">'+esc(reqAgo(x.decided_at))+'</span></span></div>'+
+  '<div class="pt-l1 pt-ltr">'+esc(x.email)+'</div>'+
+  '<div class="pt-f21-marks"><span class="pt-badge adm">נפתח אוטומטית</span><span class="pt-badge '+st.cls+'">'+esc(st.txt)+'</span>'+(x.where_mode==='undecided'?'<span class="pt-badge done">יעד מהצעות AI</span>':'')+'</div>'+
+  '<div class="pt-l1">'+esc(reqWhere(x))+'</div><div class="pt-l2">'+esc(when)+'</div>'+
+  (st.open?'<div class="pt-actions"><button type="button" class="pt-btn pt-out pt-sm" data-f23-invite="'+esc(st.id)+'"'+(off?' disabled':'')+'>פעולות · ביטול ההזמנה</button></div>':'')+'</article>';
+}
 const REQ_MONTHS={he:['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'],
  en:['January','February','March','April','May','June','July','August','September','October','November','December']};
 const REQ_REJECT={he:{s:'הבקשה שלך ל-Lonely Planner',b:'תודה על ההתעניינות ב-Lonely Planner. כרגע לא נוכל לפתוח את הטיול שלך. אפשר לשלוח בקשה חדשה בעתיד.'},
@@ -1503,6 +1531,10 @@ async function loadReq(){
    req.cap=Number(d.cap)>0?Number(d.cap):50;req.today=Math.max(0,Number(d.mail_today)||0);
    req.list=(Array.isArray(d.requests)?d.requests:[]).filter(x=>x&&typeof x==='object'&&x.id)
     .sort((a,b)=>String(a.verified_at||'').localeCompare(String(b.verified_at||'')));   /* oldest first */
+   /* CHANGE 2026-11-13 F23-ADMIN-02: + the F23 keys of the answer (was: cap, mail_today, requests only). Absent keys (a
+      server without migration 0020) leave the list empty and the counter hidden. */
+   reqA.list=REQA&&Array.isArray(d.auto)?d.auto.filter(x=>x&&typeof x==='object'&&x.id):[];
+   reqA.ai=REQA&&d.ai_cap!=null?Math.max(0,Number(d.ai_today)||0):null;reqA.aiCap=Number(d.ai_cap)>0?Number(d.ai_cap):30;
    req.state='ready';
   }
  }catch(e){if(seq!==req.seq)return;req.state=online()?'error':'offline'}
@@ -1537,9 +1569,16 @@ function reqBody(){
   const k=req.today,cap=req.cap,pct=Math.min(100,Math.round(k/cap*100));
   h+='<section class="pt-icard pt-f21-meter" id="ptReqMeter"><div class="pt-f21-mrow"><b>מיילים מהטופס היום</b><span><b>'+k+'</b> מתוך '+cap+'</span></div>'+
    '<div class="pt-f21-bar'+(k>=cap?' pt-f21-full':'')+'" role="img" aria-label="'+k+' מתוך '+cap+' מיילים מהטופס היום"><span style="width:'+pct+'%"></span></div>'+
-   '<div class="pt-l2" style="margin-top:6px">קודי אימות והודעות דחייה. בתקרה הטופס מציג "נסו שוב מחר"; הזמנות מנהל וקודי כניסה לא נחסמים.</div></section>';
-  h+=req.list.length?req.list.map(r=>reqCard(r,off)).join(''):'<div class="pt-empty" id="ptReqEmpty">אין בקשות חדשות</div>';
+   '<div class="pt-l2" style="margin-top:6px">קודי אימות והודעות דחייה. בתקרה הטופס מציג "נסו שוב מחר"; הזמנות מנהל וקודי כניסה לא נחסמים.</div>'+
+   /* CHANGE 2026-11-13 F23-ADMIN-03: + the AI counter row inside the meter card (C7). Was: the card ended after the line above. */
+   (reqA.ai!=null?'<div class="pt-f21-mrow" id="ptReqAi" style="margin-top:10px;padding-top:10px;border-top:1px solid #efeee8"><b>הצעות AI היום</b><span><b>'+reqA.ai+'</b> מתוך '+reqA.aiCap+'</span></div>'+
+    '<div class="pt-l2" style="margin-top:6px">הצעות יעד למי שעוד לא החליט לאן. בתקרה הטופס מציג בורר מדינות רגיל.</div>':'')+'</section>';
+  h+=req.list.length?req.list.map(r=>reqCard(r,off)).join(''):'<div class="pt-empty" id="ptReqEmpty">'+(reqA.list.length?'אין בקשות שמחכות לאישור':'אין בקשות חדשות')+'</div>';
   h+='<p class="pt-f21-foot">כאן מופיעות רק בקשות שהמייל שלהן אומת. בקשה ממייל שיש לו הזמנה פעילה – אישור מבטל את ההזמנה הישנה ושולח חדשה.</p>';
+  /* CHANGE 2026-11-13 F23-ADMIN-04: + history of automatically opened requests (C11), under the pending ones */
+  if(reqA.list.length)h+='<h3 class="pt-l1" id="ptReqAutoTitle" style="margin:14px 4px 2px;font-weight:800">נפתחו אוטומטית · '+reqA.list.length+'</h3>'+
+   '<div id="ptReqAuto" style="display:flex;flex-direction:column;gap:10px">'+reqA.list.map(x=>reqAutoCard(x,off)).join('')+'</div>'+
+   '<p class="pt-f21-foot">בקשות שהמייל שלהן אומת והמשיכו ישר להקמת טיול, בלי אישור. אפשר לבטל הזמנה עד שהטיול מוקם.</p>';
  }
  return h;
 }
@@ -1556,6 +1595,9 @@ function reqDecorate(el){
 function reqClick(t){
  if(t.dataset.f21Tab){req.tab=t.dataset.f21Tab==='req'?'req':'grp';renderAdmin();const b=$(req.tab==='req'?'ptReqTabReq':'ptReqTabGrp');try{b&&b.focus({preventScroll:true})}catch{}return true}
  if(t.id==='ptReqRetry'){req.state='loading';renderAdmin();loadReq();return true}
+ /* CHANGE 2026-11-13 F23-ADMIN-05: + the history card's button → the existing invite actions sheet (resend / revoke with
+    confirmation, F03). When the invite is not in the loaded groups list yet, the groups tab opens instead. */
+ if(t.dataset.f23Invite){const x=findInvite(t.dataset.f23Invite);if(x)openActions(x);else{req.tab='grp';renderAdmin();loadAdmin()}return true}
  if(t.dataset.f21Approve){const r=findReq(t.dataset.f21Approve);if(r)openApprove(r);return true}
  if(t.dataset.f21Reject){const r=findReq(t.dataset.f21Reject);if(r)openReject(r);return true}
  return false;
@@ -4857,7 +4899,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.11'; /* CHANGE 2026-11-07 F22A-VER-02: was '3.0.0-alpha.10' (F22a: sign in with Google) */ /* CHANGE 2026-11-07 F10B-VER-02: was '3.0.0-alpha.9' (F10b: trip currencies screen) */ /* CHANGE 2026-11-07 F10-VER-02: was '3.0.0-alpha.8' (F10: every trip converts in its own currencies) */ /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.12'; /* CHANGE 2026-11-13 F23-VER-02: was '3.0.0-alpha.11' (F23) */ /* CHANGE 2026-11-07 F22A-VER-02: was '3.0.0-alpha.10' (F22a: sign in with Google) */ /* CHANGE 2026-11-07 F10B-VER-02: was '3.0.0-alpha.9' (F10b: trip currencies screen) */ /* CHANGE 2026-11-07 F10-VER-02: was '3.0.0-alpha.8' (F10: every trip converts in its own currencies) */ /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -9723,7 +9765,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.11';/* CHANGE 2026-11-07 F22A-VER-01: was '3.0.0-alpha.10' (F22a) *//* CHANGE 2026-11-07 F10B-VER-01: was '3.0.0-alpha.9' (F10b) *//* CHANGE 2026-11-07 F10-VER-01: was '3.0.0-alpha.8' (F10) *//* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.12';/* CHANGE 2026-11-13 F23-VER-01: was '3.0.0-alpha.11' (F23: requests history + AI counter in the admin screen) *//* CHANGE 2026-11-07 F22A-VER-01: was '3.0.0-alpha.10' (F22a) *//* CHANGE 2026-11-07 F10B-VER-01: was '3.0.0-alpha.9' (F10b) *//* CHANGE 2026-11-07 F10-VER-01: was '3.0.0-alpha.8' (F10) *//* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;

@@ -7,7 +7,25 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#0f5c43">
 <title>בקשה להקמת טיול · Lonely Planner</title>
-<!-- Lonely Planner request page · version 3.0.0-alpha.8 · F21
+<!-- Lonely Planner request page · version 3.0.0-alpha.12 · F23 (first version: F21, 3.0.0-alpha.8)
+     CHANGE 2026-11-13 F23-REQ-01: what changed from 3.0.0-alpha.8 (claude/Plan_Travel_F23_spec.md, mockup row 17 artboards
+     FB_Request, FB_Suggest, FB_Ready):
+       (1) flag REQUEST_MODE 'auto' | 'manual'. auto: new subtitle + three "what we do / don't" lines in the hero (D1), no
+           "if approved" wording, and after the email code the page goes straight to the new "ready" screen with the
+           button to the trip wizard (/invite/#invite=<token>, D2). manual = the alpha.8 page text for text.
+       (2) flag SUGGEST_FEATURE 'on' | 'off'. on: "לאן?" gets the choice "יודע/ת לאן" / "עוד לא החלטתי" (C9); undecided
+           asks for interests, max flight time and a short note, and after the code the new "suggest" screen shows up to
+           3 AI destination ideas (refresh twice), or the regular country picker when ideas are unavailable (C8).
+           off = no choice, the alpha.8 form.
+       What the server answers decides the screen after the code (next: 'ready' | 'suggest' | none), not the flags.
+     New device key (sessionStorage, this tab only): pt:_device:rq_ready — the ready screen's data incl. the invite token,
+     so a reload of the tab does not lose the way into the wizard. pt:_device:rq_resume gains `u` (1 = undecided).
+     New stable ids for QA: #rqApp[data-screen = … suggest|ready], #rqWhat, #rqSegKnown, #rqSegUnd, #rqKnownBox, #rqUndBox,
+     #rqInts (buttons [data-int]), #rqFlight, #rqPref, #rqInterestsErr, #rqPrefErr, #rqNoteBox, #rqSgList (cards
+     [data-country], buttons [data-pick]), #rqSgMore, #rqSgGo, #rqSgRetry, #rqSgFallback, #rqPick, #rqPickList, #rqSgLoading,
+     #rqStart, #rqReadyMail, #rqSumWhere / #rqSumWhen / #rqSumCount (ready screen too).
+
+     Lonely Planner request page · version 3.0.0-alpha.8 · F21
      CHANGE 2026-10-27 F21-REQ-01: new file (no previous version). The public, bilingual (Hebrew RTL / English LTR) page where
      anyone asks to open a trip (docs/F21_spec.md §1.0–§1.5; artboards F21_InApp, F21_Request, F21_RequestEN, F21_Limit,
      F21_Code, F21_Sent). Outside the app's PWA scope, like /invite/ and /join/. No supabase-js and no session: plain fetch to
@@ -132,6 +150,37 @@ textarea.rq-in{resize:none;line-height:1.45}
 .rq-closed .rq-card{text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
 .rq-closed h1{margin:0;font-size:20px}
 .rq-closed p{margin:0;font-size:14px;line-height:1.6;color:#3a443d}
+/* CHANGE 2026-11-13 F23-REQ-02: new rules only (no alpha.8 rule changed) — hero lines, where-choice, undecided box,
+   suggestion cards, ready screen. */
+.rq-what{display:flex;flex-direction:column;gap:6px;margin-top:14px;background:#ffffff14;border:1px solid #ffffff33;border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.45}
+.rq-what div{display:flex;gap:8px;align-items:flex-start}
+.rq-what .ic{flex-shrink:0;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.rq-what .yes .ic{background:#fff}
+.rq-what .no .ic{background:#ffffff33}
+.rq-seg{display:flex;gap:6px;margin-bottom:8px}
+.rq-seg button{flex:1;min-height:44px;border:1px solid #d6d9cf;border-radius:12px;background:#fff;color:#3a443d;font-size:13.5px;font-weight:700;cursor:pointer;padding:0 6px}
+.rq-seg button[aria-pressed="true"]{border:1.5px solid #0f6b4f;background:#edf8f3;color:#0b5841}
+.rq-und{background:#fbfbf8;border:1px solid #efeee8;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px}
+.rq-und .rq-help{margin:0}
+.rq-pick{display:flex;flex-wrap:wrap;gap:6px}
+.rq-pick:focus{outline:none}
+.rq-pick button{min-height:44px;border:1px solid #d6d9cf;border-radius:999px;background:#fff;color:#3a443d;font-size:13px;font-weight:700;padding:0 14px;cursor:pointer}
+.rq-pick button[aria-pressed="true"]{border:1.5px solid #0f6b4f;background:#edf8f3;color:#0b5841}
+.rq-okb{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#0b5841;background:#e7f3ec;border-radius:999px;padding:4px 10px}
+.rq-sum{margin:0;font-size:13.5px;color:#5f6861;line-height:1.5}
+.rq-dest{display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid #e4e6df;border-radius:18px;padding:14px}
+.rq-dest.on{border:2px solid #0f6b4f;box-shadow:0 4px 14px #0f6b4f26;padding:13px}
+.rq-dest .top{display:flex;align-items:center;gap:10px}
+.rq-dest .flag{font-size:28px;line-height:1}
+.rq-dest .nm{font-size:17px;font-weight:800;overflow-wrap:anywhere}
+.rq-dest .fit{font-size:13px;color:#3a443d;line-height:1.5;margin:0;overflow-wrap:anywhere}
+.rq-facts{display:flex;flex-wrap:wrap;gap:6px}
+.rq-facts span{font-size:11.5px;font-weight:700;color:#3a443d;background:#f1f2ec;border-radius:999px;padding:4px 10px;overflow-wrap:anywhere}
+.rq-choose{min-height:44px;border:1.5px solid #0f6b4f;border-radius:12px;background:#fff;color:#0b5841;font-size:14px;font-weight:800;cursor:pointer}
+.rq-dest.on .rq-choose{background:#0f6b4f;color:#fff}
+.rq-ghost{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;border:1px solid #d6d9d0;border-radius:12px;background:#fff;color:#3a443d;font-size:13.5px;font-weight:700;cursor:pointer}
+.rq-ghost[disabled]{color:#5f6861;background:#f1f0ea;cursor:default}
+.rq-wait{display:flex;gap:10px;align-items:center;justify-content:center;padding:28px 12px;font-size:13.5px;color:#3a443d}
 </style>
 </head>
 <body>
@@ -142,6 +191,13 @@ textarea.rq-in{resize:none;line-height:1.45}
    neutral card "הבקשות סגורות כרגע / Requests are closed right now" and no network at all (no countries.json, no Turnstile,
    no request-trip). */
 const REQUEST_FEATURE='on';
+/* CHANGE 2026-11-13 F23-REQ-03: two new flags (no alpha.8 equivalent).
+   REQUEST_MODE 'auto' = F23: the verified email is the gate, the page says so and continues to the wizard; 'manual' = the
+   alpha.8 (F21) page: "after approval" wording and the "request sent" screen. The server has its own switch (the secret
+   REQUEST_MODE of request-trip) — set both when going back to manual approval.
+   SUGGEST_FEATURE 'on' = the "עוד לא החלטתי" choice and the AI destination ideas; 'off' = the alpha.8 "לאן?" field only. */
+const REQUEST_MODE='auto';
+const SUGGEST_FEATURE='on';
 /* CHANGE 2026-10-27 F21-REQ-03: Cloudflare Turnstile site key. For now Cloudflare's documented always-pass TEST key; Or
    replaces it with the real site key of the orsela.github.io widget at deploy (docs/F21_spec.md §7 step 1). The site key is
    public by design; the secret lives only in the Supabase secret TURNSTILE_SECRET. */
@@ -158,6 +214,11 @@ const TS_SRC='https://challenges.cloudflare.com/turnstile/v0/api.js?render=expli
 const COUNTRIES_URL='../app/countries.json';
 const LANG_KEY='pt:_device:rq_lang',RESUME_KEY='pt:_device:rq_resume';
 const RESUME_TTL_MS=600000,RESEND_S=60,CALL_TIMEOUT_MS=15000,MONTHS_AHEAD=18;
+/* CHANGE 2026-11-13 F23-REQ-04: new constants (no alpha.8 equivalent) */
+const AUTO=REQUEST_MODE==='auto',SUG=SUGGEST_FEATURE==='on';
+const READY_KEY='pt:_device:rq_ready',READY_TTL_MS=86400000,SUGGEST_TIMEOUT_MS=25000;
+const INTS=['nature','food','beaches','cities','kids','extreme'];
+const TOKEN_RE=/^[A-Za-z0-9_-]{43}$/;
 
 const T={
  he:{
@@ -194,7 +255,27 @@ const T={
   rWhere:'לאן',rWhen:'מתי',rCount:'מטיילים',rEmail:'מייל',notSure:'עוד לא יודעים',
   nowT:'מה עכשיו?',s1:'אנחנו עוברים על הבקשה.',s2:'אם היא מאושרת, מגיע מייל עם קישור להקמת הטיול.',
   s3:'בקישור מוסיפים את האפליקציה למסך הבית ומקימים את הטיול – כשלוש דקות. היעדים והחודש כבר ממולאים מהבקשה.',
-  months:['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'],sep:' · '
+  months:['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'],sep:' · ',
+  /* CHANGE 2026-11-13 F23-REQ-05: new keys (no alpha.8 key changed) — copy of artboards FB_Request / FB_Suggest / FB_Ready */
+  heroS2:'מקימים כאן טיול משותף ומקבלים אפליקציה אחת לכל המטיילים.',
+  w1:'מסלול יומי ומפה, מסמכים והוצאות במקום אחד',w2:'צ\'אט חכם שמכיר את הטיול, וקישורים לחיפוש טיסות ומלונות',w3:'לא מזמינים כאן טיסות או מלונות בעצמנו',
+  whereGroup:'לאן?',segKnown:'יודע/ת לאן',segUnd:'✨ עוד לא החלטתי',
+  likeLbl:'מה בא לכם בטיול?',ints:{nature:'טבע ונופים',food:'אוכל',beaches:'חופים',cities:'ערים ותרבות',kids:'אטרקציות לילדים',extreme:'אקסטרים'},
+  flightLbl:'כמה זמן טיסה זה בסדר?',fl:{'5':'עד 5 שעות','8':'עד 8 שעות',any:'לא משנה'},
+  prefLbl:'עוד משהו?',undHelp:'אחרי אימות המייל נציע 3 יעדים שמתאימים לחודש ולמה שבחרתם.',
+  eInterests:'בחרו לפחות דבר אחד.',ePref:'עד 100 תווים.',
+  privacy2:'המייל משמש רק לכניסה לטיול שלך ולא מוצג לאף אחד. בקשה שהמייל שלה לא אומת נמחקת אחרי 5 ימים.',
+  codeFoot2:'לא הגיע? בדקו בתיקיית הספאם.',verify2:'אימות והמשך',
+  verified:'המייל אומת',sgT3:'3 יעדים שמתאימים לכם',sgT:'יעדים שמתאימים לכם',sgLoad:'מחפשים יעדים שמתאימים לכם…',
+  trav:n=>n===1?'מטייל אחד':n+' מטיילים',flightSum:{'5':'טיסה עד 5 שעות','8':'טיסה עד 8 שעות',any:''},
+  pick:'בחירה',picked:'✓ נבחר',sgMore:n=>'↻ 3 הצעות אחרות · נשארו '+n,sgGo:n=>'המשך עם '+n,sgGoNone:'בחרו יעד כדי להמשיך',sgGoing:'ממשיכים…',
+  sgNote:'ההצעות נוצרות על ידי AI לפי מה שבחרתם. כדאי לבדוק מזג אוויר וטיסות לפני שמחליטים. אפשר לשנות יעד גם באשף ההקמה.',
+  fbT:'אי אפשר להציע יעדים כרגע',fbP:'בוחרים מדינה מהרשימה וממשיכים כרגיל.',pickLbl:'לאן?',pickPh:'חיפוש מדינה…',
+  sgErr:'לא הצלחנו להביא הצעות.',retry:'נסו שוב',tExpired:'עבר יותר מדי זמן. מתחילים מחדש.',
+  rdT:'אפשר להתחיל',rdP:'המייל אומת. ממשיכים ישר להקמת הטיול, בלי לחכות לאישור.',rdGo:'הקמת הטיול · כ-3 דקות',
+  rdNow:'מה יקרה עכשיו',rd1:'קובעים תאריכים ושם לטיול. היעד והחודש כבר ממולאים.',rd1b:'קובעים תאריכים ושם לטיול. היעד כבר ממולא.',
+  rd2:'מוסיפים את האפליקציה למסך הבית.',rd3:'שולחים קישור הצטרפות בווטסאפ לשאר המטיילים.',
+  rdMail:'שמרנו גם קישור במייל, למקרה שתרצו להמשיך אחר כך.'
  },
  en:{
   closedT:'Requests are closed right now',
@@ -231,7 +312,27 @@ const T={
   rWhere:'Where',rWhen:'When',rCount:'Travelers',rEmail:'Email',notSure:'Not sure yet',
   nowT:'What now?',s1:'We review your request.',s2:'If it\'s approved, you\'ll get an email with a link to set up your trip.',
   s3:'From the link you add the app to your home screen and set up the trip – about three minutes. Your destinations and month are already filled in from the request.',
-  months:['January','February','March','April','May','June','July','August','September','October','November','December'],sep:' · '
+  months:['January','February','March','April','May','June','July','August','September','October','November','December'],sep:' · ',
+  /* CHANGE 2026-11-13 F23-REQ-05: new keys (no alpha.8 key changed) */
+  heroS2:'Set up a shared trip here and get one app for all the travelers.',
+  w1:'Daily itinerary and map, documents and expenses in one place',w2:'A smart chat that knows your trip, and links for finding flights and hotels',w3:'We don\'t book flights or hotels ourselves',
+  whereGroup:'Where to?',segKnown:'I know where',segUnd:'✨ Not decided yet',
+  likeLbl:'What are you in the mood for?',ints:{nature:'Nature & views',food:'Food',beaches:'Beaches',cities:'Cities & culture',kids:'Fun for kids',extreme:'Adventure'},
+  flightLbl:'How long a flight is OK?',fl:{'5':'Up to 5 hours','8':'Up to 8 hours',any:'Doesn\'t matter'},
+  prefLbl:'Anything else?',undHelp:'After you verify your email we\'ll suggest 3 destinations that fit the month and what you picked.',
+  eInterests:'Choose at least one.',ePref:'Up to 100 characters.',
+  privacy2:'Your email is used only to get into your trip and is never shown to anyone. Unverified requests are deleted after 5 days.',
+  codeFoot2:'Didn\'t get it? Check your spam folder.',verify2:'Verify and continue',
+  verified:'Email verified',sgT3:'3 destinations that fit you',sgT:'Destinations that fit you',sgLoad:'Looking for destinations that fit you…',
+  trav:n=>n===1?'1 traveler':n+' travelers',flightSum:{'5':'flight up to 5 hours','8':'flight up to 8 hours',any:''},
+  pick:'Choose',picked:'✓ Chosen',sgMore:n=>'↻ 3 other ideas · '+n+' left',sgGo:n=>'Continue with '+n,sgGoNone:'Choose a destination to continue',sgGoing:'Continuing…',
+  sgNote:'These ideas are generated by AI from what you picked. Check the weather and flights before you decide. You can change the destination in the setup wizard too.',
+  fbT:'We can\'t suggest destinations right now',fbP:'Choose a country from the list and continue as usual.',pickLbl:'Where to?',pickPh:'Search for a country…',
+  sgErr:'We couldn\'t get suggestions.',retry:'Try again',tExpired:'Too much time has passed. Let\'s start again.',
+  rdT:'You\'re good to go',rdP:'Your email is verified. Go straight to setting up the trip — no approval to wait for.',rdGo:'Set up the trip · about 3 minutes',
+  rdNow:'What happens now',rd1:'Set the dates and a name for the trip. The destination and month are already filled in.',rd1b:'Set the dates and a name for the trip. The destination is already filled in.',
+  rd2:'Add the app to your home screen.',rd3:'Send a join link on WhatsApp to the other travelers.',
+  rdMail:'We also saved a link in your email, in case you want to continue later.'
  }
 };
 const ICON={
@@ -243,6 +344,10 @@ const ICON={
  mail:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5f6861" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
  browser:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8a4b05" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M14 14l3 3m0-3l-3 3"/></svg>',
  compass:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>',
+ /* CHANGE 2026-11-13 F23-REQ-06: three new icons (hero ticks / cross, small verified tick) */
+ yes:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0f5c43" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+ no:'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+ okb:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0b5841" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
  closed:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#4b524c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
 };
 
@@ -267,7 +372,9 @@ function deviceLang(){
 }
 function storedLang(){const v=lsGet(LANG_KEY);return v==='he'||v==='en'?v:''}
 const S={lang:linkLang()||storedLang()||deviceLang(),screen:'',
- f:{name:'',email:'',countries:[],month:'',unsure:false,travellers:2,note:''},hasForm:false,
+ /* CHANGE 2026-11-13 F23-REQ-07: + whereMode / interests / maxFlight / pref in `f`; + sg (suggest screen) and ready */
+ f:{name:'',email:'',countries:[],month:'',unsure:false,travellers:2,note:'',whereMode:'known',interests:[],maxFlight:'5',pref:''},hasForm:false,
+ sg:null,ready:null,
  rq:null,resumed:false,codeErr:'',codeBad:false,busy:false,lastAuto:'',timer:null,
  list:null,listP:null,tsId:null,tsToken:'',tsLoading:false,hopped:false,inAppDone:false,sent:null};
 function tx(){return T[S.lang]}
@@ -349,7 +456,8 @@ function readResume(){
  if(age>=RESUME_TTL_MS||age<-60000){lsDel(RESUME_KEY);return null}
  return o;
 }
-function writeResume(){if(S.rq)lsSet(RESUME_KEY,JSON.stringify({request_id:S.rq.id,email:S.rq.email,sentAt:S.rq.sentAt,lang:S.rq.lang,v:1}))}
+/* CHANGE 2026-11-13 F23-REQ-08: + u (1 = the request was sent as "undecided"; verify needs it after a reload). Was without it. */
+function writeResume(){if(S.rq)lsSet(RESUME_KEY,JSON.stringify({request_id:S.rq.id,email:S.rq.email,sentAt:S.rq.sentAt,lang:S.rq.lang,u:S.rq.und?1:0,v:1}))}
 function clearResume(){lsDel(RESUME_KEY)}
 
 /* ---------- in-app browser (§1.1) ---------- */
@@ -392,6 +500,7 @@ function switchLang(l){
  else if(S.screen==='code'){showCode();if(code)fillFrom(0,code,true)}
  else if(S.screen==='limit')showLimit();
  else if(S.screen==='sent')showSent();
+ else if(S.screen==='ready')showReady();   /* CHANGE 2026-11-13 F23-REQ-09: new screen */
  const f=focusId&&$(focusId);if(f&&/^rqLang/.test(focusId))try{f.focus()}catch(e){}
 }
 
@@ -416,29 +525,65 @@ function showInApp(rerender){
 function errHtml(id,msg){return msg?'<div class="rq-err" id="'+id+'" role="alert">'+ICON.alert+'<span>'+esc(msg)+'</span></div>':''}
 function showForm(){
  const t=tx(),f=S.f,en=S.lang==='en';
+ /* CHANGE 2026-11-13 F23-REQ-10: what changed from alpha.8 in this function — (a) auto mode: subtitle heroS2 + the three
+    lines (#rqWhat) and privacy2; (b) SUGGEST_FEATURE on: the where-choice, the known box (#rqKnownBox = the alpha.8 chips
+    + input + list, unchanged) and the undecided box (#rqUndBox); the note field is wrapped in #rqNoteBox and hidden while
+    undecided. With REQUEST_MODE 'manual' and SUGGEST_FEATURE 'off' the markup is the alpha.8 markup plus two wrappers. */
+ const und=SUG&&f.whereMode==='undecided';
+ const what=AUTO?'<div class="rq-what" id="rqWhat"><div class="yes"><span class="ic">'+ICON.yes+'</span><span>'+t.w1+'</span></div>'+
+  '<div class="yes"><span class="ic">'+ICON.yes+'</span><span>'+t.w2+'</span></div><div class="no"><span class="ic">'+ICON.no+'</span><span>'+t.w3+'</span></div></div>':'';
+ const seg=SUG?'<div class="rq-seg" role="group" aria-label="'+esc(t.whereGroup)+'"><button type="button" id="rqSegKnown" aria-pressed="'+!und+'">'+t.segKnown+'</button>'+
+  '<button type="button" id="rqSegUnd" aria-pressed="'+und+'">'+t.segUnd+'</button></div>':'';
+ const undBox=SUG?'<div class="rq-und" id="rqUndBox"'+(und?'':' hidden')+'>'+
+  '<div><span class="rq-lbl" id="rqLikeLbl">'+t.likeLbl+'</span><div class="rq-pick" id="rqInts" role="group" aria-labelledby="rqLikeLbl" tabindex="-1">'+
+   INTS.map(k=>'<button type="button" data-int="'+k+'" aria-pressed="'+(f.interests.indexOf(k)>=0)+'">'+esc(t.ints[k])+'</button>').join('')+'</div><div id="rqInterestsErrBox"></div></div>'+
+  '<div><label class="rq-lbl" for="rqFlight">'+t.flightLbl+'</label><select id="rqFlight" class="rq-in">'+
+   ['5','8','any'].map(k=>'<option value="'+k+'"'+(f.maxFlight===k?' selected':'')+'>'+esc(t.fl[k])+'</option>').join('')+'</select></div>'+
+  '<div><label class="rq-lbl" for="rqPref">'+t.prefLbl+' <span class="opt">'+t.optional+'</span></label><input id="rqPref" class="rq-in" maxlength="100" autocomplete="off" value="'+esc(f.pref)+'" aria-describedby="rqPrefErr"><div id="rqPrefErrBox"></div></div>'+
+  '<p class="rq-help">'+t.undHelp+'</p></div>':'';
  const months=monthList();
  const mOpts='<option value="">'+esc(t.whenPh)+'</option>'+months.map(m=>'<option value="'+m.v+'"'+(f.month===m.v?' selected':'')+'>'+esc(t.months[m.m-1]+' '+m.y)+'</option>').join('');
- paint('form','<header class="rq-hero">'+topRow()+'<h1 id="rqTitle">'+t.heroT+'</h1><div class="rq-sub">'+t.heroS+'</div></header>'+
+ paint('form','<header class="rq-hero">'+topRow()+'<h1 id="rqTitle">'+t.heroT+'</h1><div class="rq-sub">'+(AUTO?t.heroS2:t.heroS)+'</div>'+what+'</header>'+
   '<div class="rq-body"><section class="rq-card lift" id="rqForm">'+
   '<div><label class="rq-lbl" for="rqName">'+t.name+'</label><input id="rqName" class="rq-in" maxlength="40" autocomplete="name" value="'+esc(f.name)+'" aria-describedby="rqNameErr"><div id="rqNameErrBox"></div></div>'+
   '<div><label class="rq-lbl" for="rqEmail">'+t.email+'</label><input id="rqEmail" class="rq-in rq-ltr" dir="ltr" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" value="'+esc(f.email)+'" aria-describedby="rqEmailHelp rqEmailErr">'+
    '<p class="rq-help" id="rqEmailHelp">'+t.emailHelp+'</p><div id="rqEmailErrBox"></div></div>'+
-  '<div><label class="rq-lbl" for="rqWhere">'+t.where+'</label><div class="rq-chips" id="rqChips"></div>'+
+  '<div><label class="rq-lbl" for="rqWhere">'+t.where+'</label>'+seg+'<div id="rqKnownBox"'+(und?' hidden':'')+'><div class="rq-chips" id="rqChips"></div>'+
    '<input id="rqWhere" class="rq-in" autocomplete="off" placeholder="'+esc(t.wherePh)+'" aria-controls="rqWhereList" aria-expanded="false" aria-describedby="rqCountriesErr">'+
-   '<div class="rq-list" id="rqWhereList" role="group" aria-label="'+esc(t.suggest)+'" hidden></div><div id="rqCountriesErrBox"></div></div>'+
+   '<div class="rq-list" id="rqWhereList" role="group" aria-label="'+esc(t.suggest)+'" hidden></div><div id="rqCountriesErrBox"></div></div>'+undBox+'</div>'+
   '<div><label class="rq-lbl" for="rqWhen">'+t.when+'</label><select id="rqWhen" class="rq-in"'+(f.unsure?' disabled':'')+' aria-describedby="rqMonthErr">'+mOpts+'</select>'+
    '<label class="rq-chk"><input type="checkbox" id="rqUnsure"'+(f.unsure?' checked':'')+'> '+t.unsure+'</label><div id="rqMonthErrBox"></div></div>'+
   '<div><span class="rq-lbl" id="rqCountLbl">'+t.count+'</span><div class="rq-step" role="group" aria-labelledby="rqCountLbl">'+
    '<button type="button" id="rqMinus" aria-label="'+esc(t.fewer)+'">−</button>'+
    '<input id="rqCount" type="number" inputmode="numeric" min="1" max="30" step="1" value="'+esc(f.travellers)+'" aria-labelledby="rqCountLbl" aria-describedby="rqTravellersErr">'+
    '<button type="button" id="rqPlus" aria-label="'+esc(t.more)+'">+</button></div><div id="rqTravellersErrBox"></div></div>'+
-  '<div><label class="rq-lbl" for="rqNote">'+t.note+' <span class="opt">'+t.optional+'</span></label><textarea id="rqNote" class="rq-in" rows="3" maxlength="200" aria-describedby="rqNoteCount rqNoteErr">'+esc(f.note)+'</textarea>'+
+  '<div id="rqNoteBox"'+(und?' hidden':'')+'><label class="rq-lbl" for="rqNote">'+t.note+' <span class="opt">'+t.optional+'</span></label><textarea id="rqNote" class="rq-in" rows="3" maxlength="200" aria-describedby="rqNoteCount rqNoteErr">'+esc(f.note)+'</textarea>'+
    '<div class="rq-count" id="rqNoteCount" dir="ltr">'+f.note.length+'/200</div><div id="rqNoteErrBox"></div></div>'+
   (en?'<section class="rq-info" id="rqEnInfo" role="note">'+ICON.info+'<span>'+t.info+'</span></section>':'')+
   '<div><div class="rq-ts" id="rqTurnstile"></div><div id="rqTsErrBox"></div></div>'+
   '<button type="button" class="rq-btn" id="rqSend">'+t.send+'</button></section>'+
-  '<p class="rq-privacy">'+t.privacy+'</p></div>');
+  '<p class="rq-privacy">'+(AUTO?t.privacy2:t.privacy)+'</p></div>');
  S.hasForm=true;
+ /* CHANGE 2026-11-13 F23-REQ-11: new handlers (where-choice, interests, flight, short note). No re-render on a switch, so
+    the Turnstile widget and everything typed stay as they are. */
+ if(SUG){
+  const setMode=m=>{
+   S.f.whereMode=m;const u=m==='undecided';
+   $('rqSegKnown').setAttribute('aria-pressed',String(!u));$('rqSegUnd').setAttribute('aria-pressed',String(u));
+   $('rqKnownBox').hidden=u;$('rqUndBox').hidden=!u;$('rqNoteBox').hidden=u;
+   setErr('countries','');setErr('interests','');hideList();
+  };
+  $('rqSegKnown').onclick=()=>setMode('known');
+  $('rqSegUnd').onclick=()=>setMode('undecided');
+  $('rqInts').addEventListener('click',e=>{
+   const b=e.target.closest('button[data-int]');if(!b)return;
+   const k=b.dataset.int,i=S.f.interests.indexOf(k);
+   if(i>=0)S.f.interests.splice(i,1);else S.f.interests.push(k);
+   b.setAttribute('aria-pressed',String(i<0));if(S.f.interests.length)setErr('interests','');
+  });
+  $('rqFlight').onchange=()=>{S.f.maxFlight=$('rqFlight').value};
+  $('rqPref').addEventListener('input',()=>{if($('rqPref').value.length<=100)setErr('pref','')});
+ }
  paintChips();
  const w=$('rqWhere'),list=$('rqWhereList');
  const openList=()=>{loadCountries().then(()=>paintList()).catch(()=>{list.innerHTML='<div class="none">'+esc(tx().countriesFail)+'</div>';list.hidden=false})};
@@ -495,7 +640,8 @@ function addCountry(code){
  paintChips();paintList();liveCountriesErr();
 }
 function liveCountriesErr(){const n=S.f.countries.length;setErr('countries',n>10?tx().eCountries11:'')}
-function fieldEl(k){return $({name:'rqName',email:'rqEmail',countries:'rqWhere',month:'rqWhen',travellers:'rqCount',note:'rqNote',ts:'rqTurnstile'}[k])}
+/* CHANGE 2026-11-13 F23-REQ-12: + interests / pref (was name … ts only) */
+function fieldEl(k){return $({name:'rqName',email:'rqEmail',countries:'rqWhere',month:'rqWhen',travellers:'rqCount',note:'rqNote',ts:'rqTurnstile',interests:'rqInts',pref:'rqPref'}[k])}
 function setErr(k,msg){
  const box=$('rq'+k.charAt(0).toUpperCase()+k.slice(1)+'ErrBox'),el=fieldEl(k);
  if(!box)return;
@@ -510,19 +656,29 @@ function collect(){
  f.month=v('rqWhen');f.unsure=!!($('rqUnsure')&&$('rqUnsure').checked);
  const n=String(v('rqCount')).trim();f.travellers=/^\d+$/.test(n)?parseInt(n,10):NaN;
  f.note=String(v('rqNote'));
+ /* CHANGE 2026-11-13 F23-REQ-12: + the undecided fields (interests live in S.f already) */
+ if($('rqPref'))f.pref=String(v('rqPref')).trim().replace(/\s+/g,' ');
+ if($('rqFlight'))f.maxFlight=v('rqFlight')||'5';
 }
+function isUnd(){return SUG&&S.f.whereMode==='undecided'}
 function validEmail(e){return e.length<=254&&/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(e)}
 function validate(){
  const f=S.f,t=tx(),errs={};
  if(!f.name||f.name.length>40)errs.name=t.eName;
  if(!validEmail(f.email))errs.email=t.eEmail;
+ /* CHANGE 2026-11-13 F23-REQ-12: undecided → interests (≥1) and the short note (≤100) instead of the countries and the
+    long note; known → the alpha.8 checks, unchanged. */
+ if(isUnd()){
+  if(f.interests.length<1)errs.interests=t.eInterests;
+  if(f.pref.length>100)errs.pref=t.ePref;
+ }else
  if(f.countries.length<1)errs.countries=t.eCountries0;else if(f.countries.length>10)errs.countries=t.eCountries11;
  if(!f.unsure&&!monthList().some(m=>m.v===f.month))errs.month=t.eMonth;
  if(!(Number.isInteger(f.travellers)&&f.travellers>=1&&f.travellers<=30))errs.travellers=t.eCount;
- if(f.note.length>200)errs.note=t.eNote;
+ if(!isUnd()&&f.note.length>200)errs.note=t.eNote;   /* CHANGE 2026-11-13 F23-REQ-12: the hidden long note is not checked while undecided */
  return errs;
 }
-const ORDER=['name','email','countries','month','travellers','note'];
+const ORDER=['name','email','countries','interests','pref','month','travellers','note'];   /* CHANGE 2026-11-13 F23-REQ-12: + interests, pref */
 function showErrs(errs){
  ORDER.forEach(k=>setErr(k,errs[k]||''));
  const first=ORDER.find(k=>errs[k]);
@@ -537,14 +693,19 @@ async function submit(){
  if(showErrs(validate()))return;
  if(!online()){toast(tx().tOffline);return}
  if(!S.tsToken){setErr('ts',tx().eTs);if(!window.turnstile)mountTurnstile();return}
- const f=S.f,body={action:'start',lang:S.lang,name:f.name,email:f.email,countries:f.countries.slice(),month:f.unsure?null:f.month,
+ /* CHANGE 2026-11-13 F23-REQ-13: an undecided request sends where_mode + interests / max_flight / pref_note and no countries
+    (C9). A known request sends exactly the alpha.8 body. */
+ const und=isUnd();
+ const f=S.f,body=und?{action:'start',lang:S.lang,name:f.name,email:f.email,where_mode:'undecided',interests:f.interests.slice(),max_flight:f.maxFlight,
+   pref_note:f.pref?f.pref:null,month:f.unsure?null:f.month,travellers:f.travellers,note:null,turnstile_token:S.tsToken}
+  :{action:'start',lang:S.lang,name:f.name,email:f.email,countries:f.countries.slice(),month:f.unsure?null:f.month,
   travellers:f.travellers,note:f.note.trim()?f.note.trim():null,turnstile_token:S.tsToken};
  S.busy=true;setBusy('rqSend',true,tx().sending);
  const r=await call(body);
  S.busy=false;
  S.tsToken='';   /* a Turnstile token is single-use */
  if(r.ok===true&&r.request_id){
-  S.rq={id:String(r.request_id),email:f.email,sentAt:Date.now(),lang:S.lang};S.resumed=false;S.codeErr='';S.codeBad=false;
+  S.rq={id:String(r.request_id),email:f.email,sentAt:Date.now(),lang:S.lang,und:und};S.resumed=false;S.codeErr='';S.codeBad=false;   /* CHANGE 2026-11-13 F23-REQ-13: + und */
   writeResume();removeTurnstile();showCode();return;
  }
  setBusy('rqSend',false,tx().send);
@@ -554,9 +715,10 @@ async function submit(){
  if(c==='turnstile_failed'){toast(tx().tTs);return}
  if(c==='invalid_request'&&r.field&&ORDER.indexOf(r.field)>=0){const e={};e[r.field]=fieldMsg(r.field);showErrs(e);return}
  if(c==='invalid_request'&&r.field==='travelers'){showErrs({travellers:tx().eCount});return}
+ if(c==='invalid_request'&&r.field==='pref_note'){showErrs({pref:tx().ePref});return}   /* CHANGE 2026-11-13 F23-REQ-13 */
  genericToast(c);
 }
-function fieldMsg(k){const t=tx();return{name:t.eName,email:t.eEmail,countries:S.f.countries.length>10?t.eCountries11:t.eCountries0,month:t.eMonth,travellers:t.eCount,note:t.eNote}[k]}
+function fieldMsg(k){const t=tx();return{name:t.eName,email:t.eEmail,countries:S.f.countries.length>10?t.eCountries11:t.eCountries0,month:t.eMonth,travellers:t.eCount,note:t.eNote,interests:t.eInterests,pref:t.ePref}[k]}   /* CHANGE 2026-11-13 F23-REQ-13: + interests, pref */
 
 /* ---------- Turnstile (managed, explicit render, language = page language) ---------- */
 function mountTurnstile(){
@@ -599,8 +761,8 @@ function showCode(){
    '<div class="subj"><span dir="ltr">••••••</span>'+esc(t.subj)+'</div></div></div></section>'+
   '<div class="rq-links"><button type="button" class="rq-link" id="rqResend" disabled>'+esc(t.resend)+'</button><span class="rq-dot" aria-hidden="true">·</span>'+
   '<button type="button" class="rq-link" id="rqFix">'+esc(t.fix)+'</button></div>'+
-  '<p class="rq-tiny" style="margin:0 4px;font-size:12px">'+esc(t.codeFoot)+'</p></div>'+
-  '<div class="rq-foot"><button type="button" class="rq-btn" id="rqVerify" disabled>'+esc(t.verify)+'</button></div>');
+  '<p class="rq-tiny" style="margin:0 4px;font-size:12px">'+esc(AUTO?t.codeFoot2:t.codeFoot)+'</p></div>'+
+  '<div class="rq-foot"><button type="button" class="rq-btn" id="rqVerify" disabled>'+esc(verifyLbl())+'</button></div>');   /* CHANGE 2026-11-13 F23-REQ-14: auto mode → no "sent for approval" wording */
  const ins=otpInputs();
  ins.forEach((inp,i)=>{
   inp.addEventListener('input',()=>{
@@ -630,6 +792,7 @@ function showCode(){
  S.timer=setInterval(paintCooldown,1000);
  try{ins[0].focus({preventScroll:true})}catch(e){}
 }
+function verifyLbl(){return AUTO?tx().verify2:tx().verify}   /* CHANGE 2026-11-13 F23-REQ-14: new */
 function otpInputs(){return[0,1,2,3,4,5].map(i=>$('rqOtp'+i)).filter(Boolean)}
 function codeValue(){return otpInputs().map(x=>x.value).join('')}
 function fillFrom(i,v,quiet){
@@ -667,10 +830,14 @@ async function verify(){
  if(!/^\d{6}$/.test(code))return;
  if(!online()){toast(tx().tOffline);return}
  S.busy=true;setBusy('rqVerify',true,tx().verifying);
- const r=await call({action:'verify',request_id:S.rq.id,code});
+ /* CHANGE 2026-11-13 F23-REQ-15: + undecided:true for an undecided request; the answer's `next` picks the screen —
+    'suggest' → the ideas, 'ready' → straight to the wizard button, none → the alpha.8 "request sent". */
+ const r=await call(S.rq.und?{action:'verify',request_id:S.rq.id,code,undecided:true}:{action:'verify',request_id:S.rq.id,code});
  S.busy=false;
  if(S.screen!=='code')return;
- setBusy('rqVerify',false,tx().verify);paintVerify();
+ setBusy('rqVerify',false,verifyLbl());paintVerify();
+ if(r.ok===true&&r.next==='suggest'&&TOKEN_RE.test(String(r.token||''))){clearResume();startSuggest(r);return}
+ if(r.ok===true&&r.next==='ready'&&TOKEN_RE.test(String(r.invite_token||''))){clearResume();S.rq=null;S.resumed=false;toReady(r);return}
  if(r.ok===true){clearResume();S.sent={rq:S.rq,f:S.hasForm?JSON.parse(JSON.stringify(S.f)):null,server:r.request||null};S.rq=null;S.resumed=false;showSent();return}
  const c=r.code;
  if(c==='code_wrong'){const n=Number(r.attempts_left);resetOtp();setCodeErr(Number.isFinite(n)?tx().cWrong(n):tx().cWrong0,true);return}
@@ -734,11 +901,189 @@ function showSent(){
  if(countries&&countries.length&&!S.list)loadCountries().then(()=>{if(S.screen==='sent')showSent()}).catch(()=>{});
 }
 
+/* ---------- F23: suggestions (artboard FB_Suggest) ---------- */
+/* CHANGE 2026-11-13 F23-REQ-16: new section (no alpha.8 equivalent). After the code of an undecided request: up to 3 AI
+   ideas, 2 refreshes (D4), pick one → choose. When ideas are unavailable (C8) the regular country picker, and the flow
+   continues. The session token lives in memory only; the server accepts it for 30 minutes. */
+function startSuggest(r){
+ const f=S.hasForm?S.f:null,left=Number(r.left);
+ S.sg={id:S.rq.id,token:String(r.token),email:S.rq.email,left:Number.isFinite(left)?left:3,items:null,pick:'',fallback:false,loading:false,err:false,busy:false,
+  sum:f?{month:f.unsure?'':f.month,travellers:f.travellers,interests:f.interests.slice(),maxFlight:f.maxFlight}:null};
+ S.rq=null;S.resumed=false;
+ loadCountries().catch(()=>{});
+ fetchSuggest();
+}
+function callLong(body){
+ /* suggest waits for the model (≤10 s on the server) → a longer limit than the other calls */
+ if(!online())return Promise.resolve({ok:false,code:'offline'});
+ const ac=typeof AbortController!=='undefined'?new AbortController():null;
+ const t=setTimeout(()=>{try{ac&&ac.abort()}catch(e){}},SUGGEST_TIMEOUT_MS);
+ return fetch(FN_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify(body),signal:ac?ac.signal:undefined,cache:'no-store'})
+  .then(r=>r.json().then(j=>j&&typeof j==='object'?j:{ok:false,code:'server_error'},()=>({ok:false,code:'server_error'})))
+  .catch(()=>({ok:false,code:online()?'network':'offline'}))
+  .finally(()=>clearTimeout(t));
+}
+function cleanItems(a){
+ const seen={},out=[];
+ (Array.isArray(a)?a:[]).forEach(x=>{
+  const c=x&&typeof x.country==='string'?x.country.toUpperCase():'';
+  if(!/^[A-Z]{2}$/.test(c)||seen[c]||out.length>=3)return;
+  seen[c]=1;out.push({country:c,reason:String(x.reason||'').slice(0,140),tags:(Array.isArray(x.tags)?x.tags:[]).slice(0,3).map(t=>String(t).slice(0,20)).filter(Boolean)});
+ });
+ return out;
+}
+async function fetchSuggest(){
+ const g=S.sg;if(!g||g.loading)return;
+ g.loading=true;g.err=false;showSuggest();
+ const r=await callLong({action:'suggest',request_id:g.id,token:g.token});
+ if(S.sg!==g)return;
+ g.loading=false;
+ if(r.ok===true){
+  const items=cleanItems(r.items),left=Number(r.left);
+  if(Number.isFinite(left))g.left=Math.max(0,left);
+  if(items.length&&r.fallback!==true){g.items=items;g.pick='';g.fallback=false}
+  else if(!g.items)g.fallback=true;            /* nothing to show at all → the picker (C8) */
+  else{g.left=0;toast(tx().fbT)}                /* a refresh failed: keep the ideas already on screen */
+ }else if(r.code==='request_unknown'){endSuggest('tExpired');return}
+ else if(r.code==='suggest_limit'){g.left=0;if(!g.items)g.fallback=true}
+ else{if(!g.items)g.err=true;genericToast(r.code)}
+ showSuggest();
+}
+function endSuggest(msgKey){
+ const em=S.sg&&S.sg.email;S.sg=null;
+ if(!S.f.email&&em)S.f.email=em;
+ showForm();toast(tx()[msgKey]);
+}
+function sgSummary(){
+ const g=S.sg,t=tx(),m=g&&g.sum;if(!m)return'';
+ const parts=[];
+ if(m.month)parts.push(monthLabel(m.month));
+ parts.push(t.trav(m.travellers));
+ if(m.interests.length)parts.push(m.interests.map(k=>t.ints[k]).join(', '));
+ if(t.flightSum[m.maxFlight])parts.push(t.flightSum[m.maxFlight]);
+ return parts.join(t.sep);
+}
+function pickMatches(q){
+ const L=S.list||[],lang=S.lang;q=String(q||'').trim().toLowerCase();
+ const res=q?L.filter(c=>String(c.he||'').toLowerCase().indexOf(q)>=0||String(c.en||'').toLowerCase().indexOf(q)>=0||c.code.toLowerCase()===q):L.filter(c=>c.popular);
+ const nm=c=>String(c[lang]||c.en||'');
+ const starts=c=>q&&(String(c.he||'').toLowerCase().indexOf(q)===0||String(c.en||'').toLowerCase().indexOf(q)===0)?0:1;
+ res.sort((a,b)=>(starts(a)-starts(b))||((b.popular?1:0)-(a.popular?1:0))||nm(a).localeCompare(nm(b),lang));
+ return res.slice(0,8);
+}
+function showSuggest(){
+ const g=S.sg,t=tx();if(!g)return;
+ const sum=sgSummary();
+ const head='<div class="rq-bar"><div class="rq-top">'+(S.lang==='he'?'<span class="rq-okb">'+ICON.okb+esc(t.verified)+'</span><span class="rq-brand">Lonely Planner</span>'
+   :'<span class="rq-brand">Lonely Planner</span><span class="rq-okb">'+ICON.okb+esc(t.verified)+'</span>')+'</div>';
+ let body;
+ if(g.loading&&!g.items){
+  body=head+'<h1 class="rq-h1" id="rqTitle">'+t.sgT+'</h1>'+(sum?'<p class="rq-sum">'+esc(sum)+'</p>':'')+'</div>'+
+   '<div class="rq-pad"><div class="rq-wait" id="rqSgLoading" role="status"><span class="rq-spin" aria-hidden="true"></span><span>'+esc(t.sgLoad)+'</span></div></div>';
+ }else if(g.err&&!g.items){
+  body=head+'<h1 class="rq-h1" id="rqTitle">'+t.sgT+'</h1></div><div class="rq-pad"><section class="rq-card" role="alert" style="text-align:center;font-size:14px">'+esc(t.sgErr)+'</section>'+
+   '<button type="button" class="rq-btn" id="rqSgRetry">'+esc(t.retry)+'</button></div>';
+ }else if(g.fallback){
+  const pn=g.pick?cName(g.pick):'';
+  body=head+'<h1 class="rq-h1" id="rqTitle">'+t.fbT+'</h1><p class="rq-lead">'+t.fbP+'</p></div>'+
+   '<div class="rq-pad" id="rqSgFallback"><div><label class="rq-lbl" for="rqPick">'+t.pickLbl+'</label>'+
+   '<div class="rq-chips" id="rqPickChip">'+(g.pick?'<span class="rq-chip" style="padding-inline:12px"><span>'+esc((cFlag(g.pick)?cFlag(g.pick)+' ':'')+pn)+'</span></span>':'')+'</div>'+
+   '<input id="rqPick" class="rq-in" autocomplete="off" placeholder="'+esc(t.pickPh)+'" aria-controls="rqPickList">'+
+   '<div class="rq-list" id="rqPickList" role="group" aria-label="'+esc(t.suggest)+'" hidden></div></div>'+
+   '<button type="button" class="rq-btn" id="rqSgGo"'+(g.pick&&!g.busy?'':' disabled')+'>'+esc(g.busy?t.sgGoing:g.pick?t.sgGo(pn):t.sgGoNone)+'</button></div>';
+ }else{
+  const items=g.items||[];
+  const cards=items.map(x=>{const on=g.pick===x.country,n=cName(x.country),fl=cFlag(x.country);
+   return '<section class="rq-dest'+(on?' on':'')+'" data-country="'+x.country+'" aria-label="'+esc(n)+'"><div class="top">'+(fl?'<span class="flag" aria-hidden="true">'+esc(fl)+'</span>':'')+'<span class="nm">'+esc(n)+'</span></div>'+
+    '<p class="fit" dir="auto">'+esc(x.reason)+'</p>'+(x.tags.length?'<div class="rq-facts">'+x.tags.map(k=>'<span dir="auto">'+esc(k)+'</span>').join('')+'</div>':'')+
+    '<button type="button" class="rq-choose" data-pick="'+x.country+'" aria-pressed="'+on+'">'+esc(on?t.picked:t.pick)+'</button></section>'}).join('');
+  body=head+'<h1 class="rq-h1" id="rqTitle">'+(items.length===3?t.sgT3:t.sgT)+'</h1>'+(sum?'<p class="rq-sum">'+esc(sum)+'</p>':'')+'</div>'+
+   '<div class="rq-pad" style="padding-top:12px"><div id="rqSgList" style="display:flex;flex-direction:column;gap:12px">'+cards+'</div>'+
+   '<button type="button" class="rq-ghost" id="rqSgMore"'+(g.left>0&&!g.loading&&!g.busy?'':' disabled')+'>'+(g.loading?'<span class="rq-spin" style="width:16px;height:16px;border-width:2px;margin-inline-end:8px" aria-hidden="true"></span>':'')+esc(t.sgMore(g.left))+'</button>'+
+   '<button type="button" class="rq-btn" id="rqSgGo"'+(g.pick&&!g.busy?'':' disabled')+'>'+esc(g.busy?t.sgGoing:g.pick?t.sgGo(cName(g.pick)):t.sgGoNone)+'</button>'+
+   '<p class="rq-privacy">'+t.sgNote+'</p></div>';
+ }
+ paint('suggest',body);
+ const list=$('rqSgList');
+ if(list)list.addEventListener('click',e=>{const b=e.target.closest('button[data-pick]');if(!b||g.busy)return;g.pick=g.pick===b.dataset.pick?'':b.dataset.pick;showSuggest();const nb=app.querySelector('button[data-pick="'+b.dataset.pick+'"]');if(nb)try{nb.focus({preventScroll:true})}catch(e){}});
+ const more=$('rqSgMore');if(more)more.onclick=()=>{if(g.left>0)fetchSuggest()};
+ const retry=$('rqSgRetry');if(retry)retry.onclick=fetchSuggest;
+ const go=$('rqSgGo');if(go)go.onclick=choose;
+ const pk=$('rqPick'),pl=$('rqPickList');
+ if(pk&&pl){
+  const open=()=>{loadCountries().then(()=>{const r=pickMatches(pk.value);
+    pl.innerHTML=r.length?r.map(c=>'<button type="button" data-code="'+c.code+'"><span aria-hidden="true">'+esc(c.flag||'')+'</span><span>'+esc(c[S.lang]||c.en)+'</span></button>').join('')
+     :(String(pk.value||'').trim()?'<div class="none">'+esc(tx().noMatch)+'</div>':'');
+    pl.hidden=!pl.innerHTML}).catch(()=>{pl.innerHTML='<div class="none">'+esc(tx().countriesFail)+'</div>';pl.hidden=false})};
+  pk.addEventListener('focus',open);pk.addEventListener('input',open);
+  pk.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const b=pl.querySelector('button[data-code]');if(b)b.click()}});
+  pl.addEventListener('mousedown',e=>{if(e.target.closest('button'))e.preventDefault()});
+  pl.addEventListener('click',e=>{const b=e.target.closest('button[data-code]');if(!b)return;g.pick=b.dataset.code;showSuggest();const gb=$('rqSgGo');if(gb)try{gb.focus()}catch(x){}});
+ }
+ if(!S.list)loadCountries().then(()=>{if(S.screen==='suggest'&&S.sg===g&&!g.loading)showSuggest()}).catch(()=>{});
+}
+async function choose(){
+ const g=S.sg;if(!g||g.busy||!g.pick)return;
+ if(!online()){toast(tx().tOffline);return}
+ g.busy=true;showSuggest();
+ const r=await call({action:'choose',request_id:g.id,token:g.token,country:g.pick});
+ if(S.sg!==g)return;
+ g.busy=false;
+ if(r.ok===true&&r.next==='ready'&&TOKEN_RE.test(String(r.invite_token||''))){S.sg=null;toReady(r);return}
+ if(r.ok===true){   /* manual mode on the server: the request now waits for approval, with its destination */
+  const f=S.hasForm?JSON.parse(JSON.stringify(S.f)):null;if(f)f.countries=[g.pick];
+  S.sent={rq:{email:g.email},f:f,server:f?null:{countries:[g.pick]}};S.sg=null;showSent();return;
+ }
+ if(r.code==='request_unknown'){endSuggest('tExpired');return}
+ showSuggest();genericToast(r.code);
+}
+
+/* ---------- F23: ready (artboard FB_Ready) ---------- */
+/* CHANGE 2026-11-13 F23-REQ-17: new section (no alpha.8 equivalent). The email is verified and the invite exists: summary +
+   the button into the existing /invite/ → wizard path (C3). The invite token came in the answer to this browser only; it
+   is kept in sessionStorage (this tab) so a reload still shows the button. */
+function ssGet(k){try{return sessionStorage.getItem(k)}catch(e){return null}}
+function ssSet(k,v){try{sessionStorage.setItem(k,v)}catch(e){}}
+function ssDel(k){try{sessionStorage.removeItem(k)}catch(e){}}
+function toReady(r){
+ S.ready={token:String(r.invite_token),countries:(Array.isArray(r.countries)?r.countries:[]).map(String).filter(c=>/^[A-Z]{2}$/.test(c)),
+  month:typeof r.month==='string'?r.month:'',travellers:Number(r.travellers)||0,mail:r.mail_sent===true,at:Date.now(),v:1};
+ ssSet(READY_KEY,JSON.stringify(S.ready));
+ showReady();
+}
+function readReady(){
+ const raw=ssGet(READY_KEY);if(!raw)return null;
+ let o=null;try{o=JSON.parse(raw)}catch(e){o=null}
+ if(!o||o.v!==1||!TOKEN_RE.test(String(o.token||''))||typeof o.at!=='number'||Date.now()-o.at>=READY_TTL_MS||!Array.isArray(o.countries)){ssDel(READY_KEY);return null}
+ return o;
+}
+function showReady(){
+ const t=tx(),d=S.ready;if(!d)return;
+ const rows=[];
+ if(d.countries.length)rows.push('<div class="rq-row"><span>'+t.rWhere+'</span><b id="rqSumWhere">'+d.countries.map(c=>esc((cFlag(c)?cFlag(c)+' ':'')+cName(c))).join(t.sep)+'</b></div>');
+ rows.push('<div class="rq-row"><span>'+t.rWhen+'</span><b id="rqSumWhen">'+esc(d.month?monthLabel(String(d.month).slice(0,7)+'-01'):t.notSure)+'</b></div>');
+ if(d.travellers)rows.push('<div class="rq-row"><span>'+t.rCount+'</span><b id="rqSumCount">'+esc(d.travellers)+'</b></div>');
+ paint('ready','<div class="rq-bar">'+topRow()+'</div>'+
+  '<div class="rq-center"><div class="rq-ring" style="background:#edf8f3">'+ICON.big+'</div><h1 id="rqTitle">'+t.rdT+'</h1><p>'+t.rdP+'</p></div>'+
+  '<div class="rq-pad"><section class="rq-card" style="padding:8px 16px">'+rows.join('')+'</section>'+
+  '<a class="rq-btn" id="rqStart" style="min-height:50px;font-size:15.5px" href="../invite/#invite='+encodeURIComponent(d.token)+'">'+esc(t.rdGo)+'</a>'+
+  '<section class="rq-card rq-steps"><b>'+t.rdNow+'</b>'+
+  '<div class="rq-tick"><span class="rq-n">1</span><span>'+(d.month?t.rd1:t.rd1b)+'</span></div>'+
+  '<div class="rq-tick"><span class="rq-n">2</span><span>'+t.rd2+'</span></div>'+
+  '<div class="rq-tick"><span class="rq-n">3</span><span>'+t.rd3+'</span></div></section>'+
+  (d.mail?'<p class="rq-privacy" id="rqReadyMail">'+t.rdMail+'</p>':'')+'</div>');
+ if(d.countries.length&&!S.list)loadCountries().then(()=>{if(S.screen==='ready')showReady()}).catch(()=>{});
+}
+
 /* ---------- boot ---------- */
-const res=readResume();
-if(res){
+/* CHANGE 2026-11-13 F23-REQ-18: what changed from alpha.8 — a ready screen saved in this tab comes first (F23); the resume
+   record carries `und`. The rest of the boot order is unchanged. */
+const res=readResume(),rdy=readReady();
+if(rdy&&!res){
+ S.ready=rdy;showReady();
+}else if(res){
  if(!linkLang()&&(res.lang==='he'||res.lang==='en'))S.lang=res.lang;
- S.rq={id:res.request_id,email:res.email,sentAt:res.sentAt,lang:res.lang};S.resumed=true;
+ S.rq={id:res.request_id,email:res.email,sentAt:res.sentAt,lang:res.lang,und:res.u===1};S.resumed=true;
  showCode();
 }else if(IN_APP&&(IS_IOS||IS_ANDROID)&&!S.inAppDone){
  showInApp(false);

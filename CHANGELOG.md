@@ -20,6 +20,16 @@
 - Tests: `tests/f23/run.sh` (db 49/49, integration 11/11); F21 suites pinned to manual mode and green.
   Details: `docs/F23_dev_notes_server.md`.
 
+### F23 · client stage (2026-11-13)
+<!-- CHANGE 2026-11-13 F23-DOCS-13: new entry (draft). Not merged, not deployed. -->
+- `/request/` 3.0.0-alpha.12 (flags `REQUEST_MODE` 'auto', `SUGGEST_FEATURE` 'on'): new subtitle + three "what we do /
+  don't" lines; "לאן?" choice "יודע/ת לאן" / "עוד לא החלטתי" with interests, flight time and a short note; after the code
+  either the ideas screen (3 AI destinations, 2 refreshes, country picker as fallback) or straight to the new ready screen
+  with the button into the trip wizard. `'manual'` + `'off'` = the alpha.8 page.
+- App 3.0.0-alpha.12 (flag `REQAUTO_FEATURE`): "ניהול מערכת → בקשות" shows "הצעות AI היום N מתוך 30" and the history
+  "נפתחו אוטומטית" with each invite's state and a button to the existing invite sheet.
+- Tests: `tests/f23/run.sh --only page` 8/8, `--only app` 3/3. Details: `docs/F23_dev_notes_client.md`; spec `docs/F23_spec.md`.
+
 ## 3.0.0-alpha.11 — F22a (2026-11-07)
 
 ### F22a · Sign in with Google (account backup for every member)
