@@ -20,7 +20,9 @@ const ICONS = ["icon-192.png", "icon-512.png"];
 /* CHANGE 2026-11-13 F08-SW-01: app/js/f08.js (F08, v3.0.0-alpha.13) is a separate file, so offline (AC10) it must come from the shell cache like the
    page itself: precached at install, then network-first with a cache fallback (online the family still gets the live version).
    Nothing else in this file changed from the previous version. */
-const SHELL_FILES = ["js/f08.js"];
+/* CHANGE 2026-11-13 F08-SW-02: was ["js/f08.js"]. countries.json added: the F08 range sheet needs the country names and
+   time zones to save a range offline (AC10). */
+const SHELL_FILES = ["js/f08.js", "countries.json"];
 const NAV_TIMEOUT_MS = 6000;
 
 self.addEventListener("install", (e) => {

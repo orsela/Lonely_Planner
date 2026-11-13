@@ -106,7 +106,16 @@ const CURMGR_FEATURE='on';
    'off' = exactly the 3.0.0-alpha.10 behaviour: the F22 head block returns on its first line and the gate hooks F22A-GATE-0x
    are no-ops (no Google anywhere, no new DOM). /invite/ has its own copy of this flag. Needs STORAGE_BACKEND='cloud'. */
 const ACCOUNT_FEATURE='beta';
+/* CHANGE 2026-11-13 F08-FLAG-01: new flag (no alpha.12.1 equivalent). 'on' = F08 (docs/F08_spec.md): country, city and time
+   zone for every day. All the code is in app/js/f08.js (loaded by the script tag right below); this file only has the
+   connection points: this flag, the gate hook F08-GATE-01 and the main-script hook F08-MOUNT-01 ("עוד → מדינות לפי ימים"
+   and the range sheet, spec §4.1–§4.2). 'off' = exactly the 3.0.0-alpha.12.1 behaviour: both hooks are no-ops and every
+   f08 helper answers as alpha.12.1 does. No server part. */
+const F08_FEATURE='on';
 </script>
+<!-- CHANGE 2026-11-13 F08-SCRIPT-01: new tag (no alpha.12.1 equivalent). F08 lives in its own file (LEAN rule 4). If the file
+     does not load, window.__ptF08 is absent and both F08 hooks are no-ops. Cached for offline by sw.js (F08-SW-01). -->
+<script src="js/f08.js"></script>
 <!-- CHANGE 2026-11-07 F22A-UI-01: NEW block (no 3.0.0-alpha.10 equivalent) — F22a "sign in with Google" (docs/F22a_spec.md,
      rulings C1–C13, mockup row 15 F22_Me / F22_Linked / F22_Gate / F22_Welcome / F22_NoTrips / F22_Conflict). Style + one classic
      script, placed right after the flags script and BEFORE the F03 block, because the OAuth return (token hash / ?code= /
@@ -5296,6 +5305,11 @@ if(window.__ptF10){
    'off': no-op (alpha.9). */
 if(window.__ptF10b&&STORAGE_BACKEND==='cloud'){
  window.__ptF10b.attach({withTimeout,timeoutMs:PT_TIMEOUT_MS,client:()=>sb,tripId:()=>state.tripId,role:()=>state.role});
+}
+/* CHANGE 2026-11-13 F08-GATE-01: new lines (no alpha.12.1 equivalent), additive. Hands app/js/f08.js (window.__ptF08; absent
+   when the file did not load) the client, timeout helper, current trip and role, cloud only. F08_FEATURE='off': no-op. */
+if(window.__ptF08&&typeof window.__ptF08.attach==='function'&&typeof F08_FEATURE!=='undefined'&&F08_FEATURE==='on'&&STORAGE_BACKEND==='cloud'){
+ window.__ptF08.attach({withTimeout,timeoutMs:PT_TIMEOUT_MS,client:()=>sb,tripId:()=>state.tripId,role:()=>state.role});
 }
 
 /* CHANGE 2026-11-07 F22A-GATE-02: new lines (no alpha.10 equivalent), additive — no existing statement changed. Hands the F22
@@ -11159,6 +11173,13 @@ window.__ptF10.onChange(()=>{paintMore();if(panelOpen()){load().then(()=>{paintP
 window.addEventListener('online',()=>{if(panelOpen())load().then(()=>{paintPanel();paintMore()})});
 window.addEventListener('offline',()=>{if(panelOpen())paintPanel()});
 })();
+/* CHANGE 2026-11-13 F08-MOUNT-01: new lines (no alpha.12.1 equivalent), additive — no existing function body is changed.
+   Starts the F08 screens of app/js/f08.js: "עוד → מדינות לפי ימים" and the range sheet (spec §4.1–§4.2). A save replaces
+   tripData with the new array and calls the existing saveTrip() (one SS.set: offline queue and viewer guard as for any
+   other edit). F08_FEATURE='off' or the file missing: no-op (alpha.12.1). */
+if(typeof F08_FEATURE!=='undefined'&&F08_FEATURE==='on'&&window.__ptF08&&typeof window.__ptF08.mount==='function'){
+ try{window.__ptF08.mount({$,days:()=>tripData,setDays:async a=>{tripData=a;await saveTrip()},switchPanel,toast:ciToast})}catch(e){console.warn('[pt] f08 mount failed',e)}
+}
 </script>
 </body>
 </html>
