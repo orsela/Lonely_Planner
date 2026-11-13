@@ -4,6 +4,13 @@
 <!-- CHANGE 2026-11-13 F23-DOCS-15: heading was "F23 (in progress, branch `f23`)". Deployed and merged 13/11: migrations 0020 + 0021, request-trip
      3.0.0-alpha.12.0 (deploy bundle), main = f23. invite-manager not redeployed. See docs/F23_dev_notes_server.md → Deploy. -->
 
+### 3.0.0-alpha.12.1 · wizard calendar opens on the requested month (2026-11-13)
+<!-- CHANGE 2026-11-13 F23-DOCS-16: new entry. Found by Or on the phone check of F23. -->
+- App: in the trip wizard, an empty "יציאה" / "חזרה" date field now opens its calendar on the month chosen in the request
+  (was: today's month, with only a help line naming the requested month). Nothing is pre-chosen and no date is forbidden.
+  Flag `WZMONTH_FEATURE` ('off' = alpha.12). Test: `tests/f23/test_f23_wizard_month.py` (2). Not verifiable in the test
+  browser: the native picker itself on Android / iPhone — phone check.
+
 ### F23 · Trip request without approval + AI destination ideas — server stage (2026-11-13)
 <!-- CHANGE 2026-11-13 F23-DOCS-11: new entry (draft). Base: main e477da0 (3.0.0-alpha.11). Server only; the `/request/`
      page and the admin screen follow. Nothing deployed yet. -->

@@ -71,7 +71,7 @@ if want page; then
 fi
 if want app; then
   if ! $PY -c "import pytest" 2>/dev/null; then for d in /root/.local/share/uv/tools/pytest/lib/python3*/site-packages; do [ -d "$d" ] && export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$d"; done; fi
-  out=$(cd "$REPO" && QA_EXPECTED_VERSION=3.0.0-alpha.12 $PY -m pytest tests/f23/test_f23_admin.py -q 2>&1); rc=$?
+  out=$(cd "$REPO" && QA_EXPECTED_VERSION=3.0.0-alpha.12.1 $PY -m pytest tests/f23/test_f23_admin.py tests/f23/test_f23_wizard_month.py -q 2>&1); rc=$?
   echo "app         $(echo "$out" | tail -1) (rc=$rc)"; [ $rc = 0 ] || RC=1
 fi
 exit $RC
