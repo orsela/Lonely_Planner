@@ -105,7 +105,7 @@ const HE_HASHES = [
 ];
 
 Deno.test("F21 version 3.0.0-alpha.8.0", () => {
-  eq(FN_VERSION, "3.0.0-alpha.8.0");
+  eq(FN_VERSION, "3.0.0-alpha.12.0"); // CHANGE 2026-11-13 F23-FN-10: was alpha.8.0 (approve_request sends through _shared/approve.ts)
 });
 
 Deno.test("F21 renderInviteEmail lang he / absent → byte-identical to alpha.7.2 (snapshot hashes)", async () => {

@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 tests/**/.last_run_*.txt
+tests/**/.last_build.txt
+tests/**/.last_apply.txt

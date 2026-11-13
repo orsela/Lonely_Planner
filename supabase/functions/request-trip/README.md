@@ -1,6 +1,12 @@
 # request-trip · Edge Function (F21)
 
 <!-- CHANGE 2026-10-27 F21-FN-04: new file (no previous version). -->
+<!-- CHANGE 2026-11-13 F23-FN-09: what changed from the alpha.8 text: the note below. The table that follows still describes
+     the F21 contract (= REQUEST_MODE 'manual'). -->
+
+> **F23 (3.0.0-alpha.12.0):** auto-approval on `verify`, new actions `suggest` / `choose`, new secrets
+> (`ANTHROPIC_API_KEY`, optional `REQUEST_MODE`, `SUGGEST_FEATURE`, `SUGGEST_MODEL`) and two more files in the deploy
+> (`_shared/approve.ts`, `_shared/countries.ts`). Contract: `docs/F23_dev_notes_server.md` → "Contracts".
 
 Public endpoint of the `/request/` page, version **3.0.0-alpha.8.0**. Contract: `docs/F21_spec.md` §3.1, §4; the exact
 result codes and field names are in `docs/F21_dev_notes_server.md` → "Contracts". `POST` body `{action, …}`, no session

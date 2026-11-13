@@ -22,6 +22,8 @@ import { join } from "node:path";
 
 const REPO = new URL("../../", import.meta.url);
 const RT: Any = await import(new URL("supabase/functions/request-trip/index.ts", REPO).href);
+// CHANGE 2026-11-13 F23-QA-02: this F21 suite pins REQUEST_MODE='manual' (F23 criterion 11: manual = F21 behaviour). Only edit.
+RT.setRequestMode?.("manual");
 const IM: Any = await import(new URL("supabase/functions/invite-manager/index.ts", REPO).href);
 const CT: Any = await import(new URL("supabase/functions/create-trip/index.ts", REPO).href);
 const QV: Any = JSON.parse(readFileSync(new URL("tests/qa_versions.json", REPO), "utf8"));

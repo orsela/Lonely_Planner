@@ -30,12 +30,13 @@
 // Never logs tokens, request bodies or email addresses; never returns token_hash.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
+import { sendApprovalInvite } from "../_shared/approve.ts"; // CHANGE 2026-11-13 F23-FN-10: new import (shared approval module)
 // CHANGE 2026-10-09 F03-MAIL-04: denomailer removed (it broke Hebrew subjects into raw MIME in Gmail, twice).
 
 // =====================================================================================================
 // 1. Pure helpers
 // =====================================================================================================
-export const FN_VERSION = "3.0.0-alpha.8.0"; // CHANGE 2026-10-27 F21-FN-10: F21 approve/reject actions + English template (was "3.0.0-alpha.4.1"); // CHANGE 2026-10-12 F04-NAME-01: app display name → Lonely Planner (was "3.0.0-alpha.4.0"); // CHANGE 2026-10-12 F04-FN-05: APP_URL hardening + check.email (was "3.0.0-alpha.3.7"); // CHANGE 2026-10-10 F03-LAND-05: link via /invite/ bridge; F03-LAND-03: ?invite=1 in the link; F03-MAIL-04: own MIME+SMTP (denomailer removed); F03-MAIL-03: subject pre-encoded; F03-MAIL-02: redesigned invite email; F03-FN-03: mailer error logging; // CHANGE 2026-10-09 F03-FN-02: bumped for the startServer()/main.ts entry split
+export const FN_VERSION = "3.0.0-alpha.12.0"; // CHANGE 2026-11-13 F23-FN-10: approve_request sends through _shared/approve.ts (was "3.0.0-alpha.8.0"); // CHANGE 2026-10-27 F21-FN-10: F21 approve/reject actions + English template (was "3.0.0-alpha.4.1"); // CHANGE 2026-10-12 F04-NAME-01: app display name → Lonely Planner (was "3.0.0-alpha.4.0"); // CHANGE 2026-10-12 F04-FN-05: APP_URL hardening + check.email (was "3.0.0-alpha.3.7"); // CHANGE 2026-10-10 F03-LAND-05: link via /invite/ bridge; F03-LAND-03: ?invite=1 in the link; F03-MAIL-04: own MIME+SMTP (denomailer removed); F03-MAIL-03: subject pre-encoded; F03-MAIL-02: redesigned invite email; F03-FN-03: mailer error logging; // CHANGE 2026-10-09 F03-FN-02: bumped for the startServer()/main.ts entry split
 export const INVITE_TTL_DAYS = 7;
 export const DEFAULT_APP_URL = "https://orsela.github.io/Lonely_Planner/app/"; // CHANGE 2026-10-12 F04-NAME-02: was /Plan_Travel/app/ (repo renamed)
 export const FALLBACK_INVITER = "מנהל המערכת";
@@ -528,11 +529,13 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     const inviteId = String(d.invite_id || ""), revoked = typeof d.revoked_invite_id === "string" ? d.revoked_invite_id : null;
     const email = String(d.email || ""), lang = d.lang === "en" ? "en" : "he", expiresAt = String(d.expires_at || "");
     if (!UUID_RE.test(inviteId) || !email || !expiresAt) throw new Error("rpc_bad_result");
-    const link = inviteLink(appUrl, token);
+    // CHANGE 2026-11-13 F23-FN-10: the send goes through the shared approval module (supabase/functions/_shared/approve.ts),
+    //   the same code request-trip runs for an automatic approval (F23 C1). What changed from 3.0.0-alpha.8.0: the three
+    //   lines that built the link and picked the Hebrew / English render call moved there unchanged; same email, same errors.
     try {
-      await deps.sendMail(lang === "en"
-        ? renderInviteEmail({ to: email, inviter, draftName: draft, link, expiresAt, lang, greetName: typeof d.name === "string" ? d.name : null })
-        : renderInviteEmail({ to: email, inviter, draftName: draft, link, expiresAt }));
+      await sendApprovalInvite({ sendMail: deps.sendMail, render: renderInviteEmail, link: inviteLink }, {
+        appUrl, token, email, inviter, draftName: draft, expiresAt, lang, greetName: typeof d.name === "string" ? d.name : null,
+      });
     } catch (e) {
       deps.log("email_error", mailErr(e));
       try {

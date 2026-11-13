@@ -8,8 +8,12 @@
 //        supabase/functions/request-trip/test.ts
 // With Deno: deno test --allow-env --no-check --import-map=supabase/functions/request-trip/test_import_map.json supabase/functions/request-trip/test.ts
 
-import { codeHash, FN_VERSION, handler, jerusalemMonth, makeCode, renderCodeEmail, resetDeps, setDeps, SITEVERIFY_URL } from "./index.ts";
+import { codeHash, FN_VERSION, handler, jerusalemMonth, makeCode, renderCodeEmail, resetDeps, setDeps, setRequestMode, SITEVERIFY_URL } from "./index.ts";
 import { sha256Hex, type MailMessage } from "../invite-manager/index.ts";
+
+// CHANGE 2026-11-13 F23-FN-08: these are the F21 tests — they pin REQUEST_MODE='manual' (F23 criterion 11). The F23
+//   behaviour is tested in test_f23.ts.
+setRequestMode("manual");
 
 function assert(cond: unknown, msg = "assertion failed"): asserts cond {
   if (!cond) throw new Error(msg);
@@ -111,7 +115,7 @@ function captureLogs<T>(fn: () => Promise<T>): Promise<{ out: T; lines: string[]
 
 // ---------------------------------------------------------------------------------------------------
 Deno.test("version, CORS, method, unknown action, version header", async () => {
-  eq(FN_VERSION, "3.0.0-alpha.8.1"); // CHANGE 2026-10-30 F21-FN-03: was alpha.8.0
+  eq(FN_VERSION, "3.0.0-alpha.12.0"); // CHANGE 2026-11-13 F23-FN-08: was alpha.8.1 (F23); CHANGE 2026-10-30 F21-FN-03: was alpha.8.0
   const s = setup();
   const pre = await handler(new Request("https://x/f", { method: "OPTIONS", headers: { origin: "http://localhost:5173" } }));
   eq([pre.status, pre.headers.get("access-control-allow-origin")], [204, "http://localhost:5173"]);
