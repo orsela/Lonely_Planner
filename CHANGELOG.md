@@ -1,6 +1,8 @@
 # Plan_Travel – CHANGELOG
 
-## 3.0.0-alpha.12 — F23 (in progress, branch `f23`)
+## 3.0.0-alpha.12 — F23 (live 2026-11-13; phone check and independent QA pending)
+<!-- CHANGE 2026-11-13 F23-DOCS-15: heading was "F23 (in progress, branch `f23`)". Deployed and merged 13/11: migrations 0020 + 0021, request-trip
+     3.0.0-alpha.12.0 (deploy bundle), main = f23. invite-manager not redeployed. See docs/F23_dev_notes_server.md → Deploy. -->
 
 ### F23 · Trip request without approval + AI destination ideas — server stage (2026-11-13)
 <!-- CHANGE 2026-11-13 F23-DOCS-11: new entry (draft). Base: main e477da0 (3.0.0-alpha.11). Server only; the `/request/`

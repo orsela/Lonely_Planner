@@ -83,3 +83,23 @@ insert now succeeds and adds one mail to the counts read by 101 and 128. Expecte
 - Until the F23 page is merged, the live F21 page keeps working against the new function in auto mode, but shows its old
   "request sent" screen while the invite email already arrives. Deploy the server and merge the client close together,
   or deploy with the secret `REQUEST_MODE=manual` first.
+
+## Deploy (2026-11-13) — what is live and how it got there
+<!-- CHANGE 2026-11-13 F23-DOCS-14: new section (no previous version). -->
+- Or: secret `ANTHROPIC_API_KEY`; migrations 0020 + 0021 in the SQL Editor. On the real database: `qa.f23_run()` 49/49,
+  f21 98/101 (7, 101, 128), f06 169/171, f05 118/120 — as expected.
+- **`request-trip` is live at 3.0.0-alpha.12.0 (Supabase version 6).** Deployed file: only `request-trip/main.ts`, which
+  statically imports the generated bundle from the repo at a pinned commit:
+  `https://raw.githubusercontent.com/orsela/Lonely_Planner/514631376fc88c279522c20a013c270c23ead12d/supabase/functions/request-trip/deploy.bundle.ts`
+  (bundled at deploy time; the running function does not depend on GitHub). To deploy a change: edit the sources →
+  `node scripts/dev/build_fn_bundle.mjs` → `tests/f23/run.sh --only int` → commit + push → deploy `main.ts` with the new
+  commit id in the URL. This answers R2: no relative imports and no hand-shortened copy.
+- **`invite-manager` was NOT redeployed** (still 3.0.0-alpha.8.0). Its F23 change is a refactor with the same output, and
+  the automatic invite email is rendered by the copy inside the request-trip bundle. Redeploy it with the next change.
+- First real AI calls: `max_tokens` 700 was too small (thinking tokens count toward it) → empty / cut answers → raised to
+  4000 (F23-FN-15). After that: 3 valid Hebrew suggestions for a test request. `x-api-key` + `anthropic-version:
+  2023-06-01` + model `claude-haiku-5-5` are accepted. New log events: `ai_answer` (ms, stop, out), `ai_empty`,
+  `ai_unusable`, `ai_http` (+ error type).
+- The check used a staging function `request-trip-f23` and one test request row (deleted). The staging function now
+  answers 410 to everything and can be deleted in the dashboard. 3 AI calls were counted on 13/11.
+- `f23` was fast-forwarded into `main` (5146313) right after the function went live.
