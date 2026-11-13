@@ -158,7 +158,10 @@ export function resolveAppUrl(v: string | undefined | null): { url: string; fall
 export const BUTTON_TEXT = "קבלת ההזמנה והקמת הטיול";
 // CHANGE 2026-10-27 F21-FN-11: + optional `lang` / `greetName` (D11b). What changed from 3.0.0-alpha.4.1: lang 'en' returns
 //   renderInviteEmailEn(); with lang absent or 'he' the code below is untouched, so the output is byte-identical (test.ts).
-export function renderInviteEmail(p: { to: string; inviter: string; draftName: string | null; link: string; expiresAt: string; lang?: string; greetName?: string | null }): MailMessage {
+// CHANGE 2026-11-13 F23-FN-11: + optional `auto` (F23: the invite of a request that was opened without an approval).
+//   What changed from 3.0.0-alpha.8.0: only the English template reads it (see renderInviteEmailEn); absent / false = the
+//   alpha.8.0 output byte for byte in both languages.
+export function renderInviteEmail(p: { to: string; inviter: string; draftName: string | null; link: string; expiresAt: string; lang?: string; greetName?: string | null; auto?: boolean }): MailMessage {
   if (p.lang === "en") return renderInviteEmailEn(p);
   const exp = fmtDate(p.expiresAt);
   const name = p.draftName ? `"${p.draftName}"` : "";
@@ -214,14 +217,25 @@ export function renderInviteEmail(p: { to: string; inviter: string; draftName: s
 //   same /invite/ link as F03 (same link builder), the Hebrew-for-now note, validity dd/mm/yyyy, footer. LTR.
 export const EMAIL_SUBJECT_EN = "Your trip request was approved";
 export const BUTTON_TEXT_EN = "Accept and set up the trip";
-export function renderInviteEmailEn(p: { to: string; draftName: string | null; link: string; expiresAt: string; greetName?: string | null }): MailMessage {
+const EMAIL_SUBJECT_EN_F21 = EMAIL_SUBJECT_EN, BUTTON_TEXT_EN_F21 = BUTTON_TEXT_EN; // CHANGE 2026-11-13 F23-FN-11: aliases (the function below shadows the two names)
+// CHANGE 2026-11-13 F23-FN-11: + optional `auto`. What changed from 3.0.0-alpha.8.0: with auto === true nobody approved
+//   anything, so the subject is EMAIL_SUBJECT_EN_AUTO, the sentence opens with "Your email is verified, so your trip is
+//   ready to set up." instead of "Your request was approved." and the button reads BUTTON_TEXT_EN_AUTO (Or, 2026-11-13:
+//   change the English wording). Everything else — layout, link, note, validity, footer — is the same code. Without
+//   `auto` the output is unchanged.
+export const EMAIL_SUBJECT_EN_AUTO = "Your trip is ready to set up";
+export const BUTTON_TEXT_EN_AUTO = "Set up the trip";
+export function renderInviteEmailEn(p: { to: string; draftName: string | null; link: string; expiresAt: string; greetName?: string | null; auto?: boolean }): MailMessage {
+  const EMAIL_SUBJECT_EN = p.auto === true ? EMAIL_SUBJECT_EN_AUTO : EMAIL_SUBJECT_EN_F21;
+  const BUTTON_TEXT_EN = p.auto === true ? BUTTON_TEXT_EN_AUTO : BUTTON_TEXT_EN_F21;
+  const lead = p.auto === true ? "Your email is verified, so your trip is ready to set up." : "Your request was approved.";
   const exp = fmtDate(p.expiresAt);
   const who = (p.greetName || "").trim();
   const hi = who ? `Hi ${who},` : "Hi,";
   const trip = p.draftName ? `the trip "${p.draftName}"` : "a new trip";
   const tripHtml = p.draftName ? `the trip <b style="white-space:nowrap">"${htmlEscape(p.draftName)}"</b>` : "a new trip";
-  const approved = `Your request was approved. You're invited to set up ${trip} and manage its group: invite your fellow travelers and decide who can edit and who can only view.`;
-  const approvedHtml = `Your request was approved. You're invited to set up ${tripHtml} and manage its group: invite your fellow travelers and decide who can edit and who can only view.`;
+  const approved = `${lead} You're invited to set up ${trip} and manage its group: invite your fellow travelers and decide who can edit and who can only view.`;
+  const approvedHtml = `${lead} You're invited to set up ${tripHtml} and manage its group: invite your fellow travelers and decide who can edit and who can only view.`;
   const note = "Heads-up: the setup screens and the app are in Hebrew for now.";
   const valid = `This link is personal, valid until ${exp}, and meant for this address only. Not expecting it? You can ignore this email.`;
   const footer = "Sent by Lonely Planner. Please don't reply to this email.";

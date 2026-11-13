@@ -252,9 +252,13 @@ begin
       (public.find_invite_for_email('f23-u@qa.invalid')->>'found'));
     r := qa.f21_rec(r, 403, 'admin list refused for a non-admin', 'error 42501',
       qa.f21_val(u_out, 'authenticated', 'select public.admin_trip_requests()::text'));
-    update private.trip_requests q set verified_at = now() - interval '6 days' where q.id = q8;
+    -- CHANGE 2026-11-13 F23-QA-05: 3 days (Or's decision), was 5 in the first draft; + the "not yet" half (row 408)
+    update private.trip_requests q set verified_at = now() - interval '2 days 23 hours' where q.id = q8;
     perform private.f23_cleanup();
-    r := qa.f21_rec(r, 404, 'cleanup: a verified request without a destination goes after 5 days; auto_approved stays', '∅/auto_approved', qa.f21_st(q8) || '/' || qa.f21_st(q2));
+    r := qa.f21_rec(r, 408, 'cleanup: a verified request without a destination is kept for 3 days', 'pending', qa.f21_st(q8));
+    update private.trip_requests q set verified_at = now() - interval '3 days 1 hour' where q.id = q8;
+    perform private.f23_cleanup();
+    r := qa.f21_rec(r, 404, 'cleanup: a verified request without a destination goes after 3 days; auto_approved stays', '∅/auto_approved', qa.f21_st(q8) || '/' || qa.f21_st(q2));
     r := qa.f21_rec(r, 405, 'grants: the new functions are closed to anon / authenticated', 'false/false/false/false/false',
       pg_catalog.has_function_privilege('anon', 'public.request_verify2(uuid,text,text,boolean,text,text,text)', 'execute')::text || '/' ||
       pg_catalog.has_function_privilege('authenticated', 'public.request_suggest_begin(uuid,text,boolean)', 'execute')::text || '/' ||

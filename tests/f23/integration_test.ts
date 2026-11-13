@@ -166,8 +166,12 @@ T("F23-INT-02 [C3] English request → English invite email with the requester's
   psql(`insert into public.manager_invites (email, token_hash, draft_name, expires_at) values ('en@example.com', 'old-hash', 'Old', now() + interval '2 days')`);
   const { v } = await startAndVerify(KNOWN("en@example.com", "en", { name: "Ann" }));
   eq([v.body.next, v.body.mail_sent, v.body.draft_name.startsWith("Portugal & Spain · ")], ["ready", true, true], "verify " + v.raw);
-  eq(MAILS[1].subject, "Your trip request was approved", "English subject");
+  // CHANGE 2026-11-13 F23-QA-06: the automatic English email no longer says "approved" (Or's decision); was the F21 subject
+  eq(MAILS[1].subject, "Your trip is ready to set up", "English subject");
   ok(MAILS[1].text.startsWith("Hi Ann,") && MAILS[1].text.includes(`"${v.body.draft_name}"`), "greeting + trip name");
+  ok(MAILS[1].text.includes("Your email is verified, so your trip is ready to set up. You're invited to set up the trip") && MAILS[1].text.includes("Set up the trip:"), "auto wording");
+  ok(!/approved/i.test(MAILS[1].text + MAILS[1].html + MAILS[1].subject) && !/Accept and set up/.test(MAILS[1].text + MAILS[1].html), "no 'approved' / 'Accept' in the automatic email");
+  ok(MAILS[1].html.includes(">Set up the trip</a>") && MAILS[1].html.includes("<title>Your trip is ready to set up</title>"), "html button + title");
   eq(sql1(`select count(*) filter (where revoked_at is not null)||'/'||count(*) filter (where revoked_at is null and used_at is null) from public.manager_invites where email='en@example.com'`), "1/1", "old revoked, one active");
 });
 

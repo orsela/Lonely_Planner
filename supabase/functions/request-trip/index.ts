@@ -469,7 +469,7 @@ async function finishAuto(id: string, token: string, d: Record<string, unknown>)
       await sendApprovalInvite({ sendMail: deps.sendMail, render: renderInviteEmail, link: inviteLink }, {
         appUrl: resolveAppUrl(deps.env("APP_URL")).url, token, email: String(d.email || ""), inviter: AUTO_INVITER,
         draftName: draft, expiresAt: String(d.expires_at || ""), lang,
-        greetName: typeof d.name === "string" ? d.name : null,
+        greetName: typeof d.name === "string" ? d.name : null, auto: true, // CHANGE 2026-11-13 F23-FN-12: English wording without "approved"
       });
       mailSent = true;
     } catch (e) {

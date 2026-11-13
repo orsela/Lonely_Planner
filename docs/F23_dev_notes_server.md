@@ -11,7 +11,7 @@ Branch `f23`, base `main` e477da0 (3.0.0-alpha.11). Function versions **3.0.0-al
 | Piece | File | Notes |
 |---|---|---|
 | Migration | `supabase/migrations/0020_f23.sql` | idempotent; requires 0016 |
-| QA harness | `supabase/migrations/0021_qa_f23_harness.sql` | `select * from qa.f23_run() order by id;` → 48 rows |
+| QA harness | `supabase/migrations/0021_qa_f23_harness.sql` | `select * from qa.f23_run() order by id;` → 49 rows |
 | Shared approval module (C1, R2) | `supabase/functions/_shared/approve.ts` | token, invite email send, D16 draft name |
 | Country list for functions (C6) | `supabase/functions/_shared/countries.ts` | generated: `python3 scripts/dev/gen_fn_countries.py` |
 | `request-trip` | `supabase/functions/request-trip/index.ts` | auto-approval, `suggest`, `choose` |
@@ -50,15 +50,16 @@ Branch `f23`, base `main` e477da0 (3.0.0-alpha.11). Function versions **3.0.0-al
 2. **Two columns/kinds beyond C10:** `session_hash` (above); `mail_log.kind 'invite'` (C4 counts the invite email in the
    50/day cap); `request_attempts.kind 'auto'` (C13 one auto-approval per email per day) next to `'suggest'`.
 3. **Auto invite has no admin:** `invited_by` null, `inviter_name` "Lonely Planner" — the Hebrew email headline reads
-   "Lonely Planner מזמין אותך לנהל את הטיול …". The English email keeps the F21 text "Your request was approved".
-   Copy not covered by the spec — Or to confirm or reword.
+   "Lonely Planner מזמין אותך לנהל את הטיול …" (**approved by Or 2026-11-13**). The English automatic email was reworded
+   on Or's decision (2026-11-13): subject "Your trip is ready to set up", opening "Your email is verified, so your trip is
+   ready to set up.", button "Set up the trip". The admin's approval email (manual mode) keeps the F21 text.
 4. **Draft trip name (F21 D16)** is built in the function after the approve transaction (the database has no country
    names) and stored with `request_invite_draft`.
 5. **Mail failure / cap on the auto invite** never fails the flow: the token is already returned to the browser.
 6. **AI count:** a call counts when it starts (per request and per day), also when the model fails; "AI off" and "no key"
    count nothing. The daily cap answers the fallback without calling the model.
-7. **A verified request that never got a destination** is deleted after 5 days (same rule as unverified, D5) and is not
-   listed for the admin.
+7. **A verified request that never got a destination** is deleted after **3 days** (Or, 2026-11-13) and is not listed
+   for the admin. Unverified requests keep the F21 rule (5 days).
 8. `request_start` and `admin_trip_requests` were **replaced** (same signatures); `request_verify`, `request_approve`,
    `request_approve_undo`, `request_reject`, `find_invite_for_email` are untouched.
 9. F21 test files got one line each pinning `REQUEST_MODE='manual'` (`RT.setRequestMode`), and the version pins moved.
@@ -68,7 +69,7 @@ Branch `f23`, base `main` e477da0 (3.0.0-alpha.11). Function versions **3.0.0-al
 insert now succeeds and adds one mail to the counts read by 101 and 128. Expected on the real database: f21 98/101.
 
 ## Test results (local, 2026-11-13)
-- `tests/f23/run.sh --only db`: qa.f23_run 48/48; f01 109/109, f02 37/37, f03 49/49, f04 90/90, f05 118/120 (100, 101),
+- `tests/f23/run.sh --only db`: qa.f23_run 49/49; f01 109/109, f02 37/37, f03 49/49, f04 90/90, f05 118/120 (100, 101),
   f06 169/171 (910, 911), f21 98/101 (7, 101, 128). Migrations applied twice (idempotent).
 - `tests/f23/run.sh --only int`: 11/11 (criteria 2–9, 11 server side, logs).
 - `tests/f23/run.sh --only f21`: request-trip 14/14, invite-manager 21/21 + 14/14, tests/f21/function_test 33/33.

@@ -19,7 +19,7 @@ export interface ApprovalMail {
 export interface ApprovalIo {
   sendMail(m: ApprovalMail): Promise<void>;
   /** invite-manager's renderInviteEmail */
-  render(p: { to: string; inviter: string; draftName: string | null; link: string; expiresAt: string; lang?: string; greetName?: string | null }): ApprovalMail;
+  render(p: { to: string; inviter: string; draftName: string | null; link: string; expiresAt: string; lang?: string; greetName?: string | null; auto?: boolean }): ApprovalMail;
   /** invite-manager's inviteLink */
   link(appUrl: string, token: string): string;
 }
@@ -34,6 +34,9 @@ export interface ApprovalInvite {
   lang: "he" | "en";
   /** requester name for the English greeting; ignored for Hebrew */
   greetName: string | null;
+  /** CHANGE 2026-11-13 F23-FN-12: new field (no previous version). true = opened without an approval (F23): the English
+   *  email says "your trip is ready to set up" instead of "your request was approved". Absent for the admin's approval. */
+  auto?: boolean;
 }
 
 function b64url(bytes: Uint8Array): string {
@@ -59,7 +62,9 @@ export async function newInviteToken(random: (n: number) => Uint8Array): Promise
 export async function sendApprovalInvite(io: ApprovalIo, p: ApprovalInvite): Promise<void> {
   const link = io.link(p.appUrl, p.token);
   await io.sendMail(p.lang === "en"
-    ? io.render({ to: p.email, inviter: p.inviter, draftName: p.draftName, link, expiresAt: p.expiresAt, lang: "en", greetName: p.greetName })
+    ? io.render(p.auto === true
+      ? { to: p.email, inviter: p.inviter, draftName: p.draftName, link, expiresAt: p.expiresAt, lang: "en", greetName: p.greetName, auto: true }
+      : { to: p.email, inviter: p.inviter, draftName: p.draftName, link, expiresAt: p.expiresAt, lang: "en", greetName: p.greetName })
     : io.render({ to: p.email, inviter: p.inviter, draftName: p.draftName, link, expiresAt: p.expiresAt }));
 }
 

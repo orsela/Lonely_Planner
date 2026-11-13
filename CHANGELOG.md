@@ -5,7 +5,7 @@
 ### F23 · Trip request without approval + AI destination ideas — server stage (2026-11-13)
 <!-- CHANGE 2026-11-13 F23-DOCS-11: new entry (draft). Base: main e477da0 (3.0.0-alpha.11). Server only; the `/request/`
      page and the admin screen follow. Nothing deployed yet. -->
-- Migration `0020_f23.sql` (+ QA harness `0021`, `qa.f23_run()` 48 rows): `trip_requests` gains `where_mode`, `interests`,
+- Migration `0020_f23.sql` (+ QA harness `0021`, `qa.f23_run()` 49 rows): `trip_requests` gains `where_mode`, `interests`,
   `max_flight`, `pref_note`, `suggestions`, `session_hash`, status `auto_approved`; new service-role functions
   `request_verify2`, `request_suggest_begin`, `request_suggest_save`, `request_choose`, `request_invite_mail_failed`,
   `request_invite_draft`; `request_start` and `admin_trip_requests` replaced (same signatures).
@@ -14,7 +14,10 @@
   Messages API, no name / email in the prompt, 3 per request, 30 per day, 10 s, fallback to the country picker) and
   `choose`; one auto-approval per email per day.
 - `invite-manager` 3.0.0-alpha.12.0: `approve_request` sends through the new shared module `_shared/approve.ts` (same email).
-- Tests: `tests/f23/run.sh` (db 48/48, integration 11/11); F21 suites pinned to manual mode and green.
+- Or's decisions 2026-11-13: the Hebrew automatic invite keeps "Lonely Planner מזמין אותך…"; the English automatic invite
+  no longer says "approved" (subject "Your trip is ready to set up", button "Set up the trip"); a verified request that
+  never got a destination is deleted after 3 days.
+- Tests: `tests/f23/run.sh` (db 49/49, integration 11/11); F21 suites pinned to manual mode and green.
   Details: `docs/F23_dev_notes_server.md`.
 
 ## 3.0.0-alpha.11 — F22a (2026-11-07)

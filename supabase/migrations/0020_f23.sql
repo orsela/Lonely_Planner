@@ -78,14 +78,15 @@ returns int language sql stable security definer set search_path = '' as $$
    where a.kind = 'suggest' and a.at >= private.f21_day_start()
 $$;
 
--- F21 clean-up + verified requests that never got a destination (abandoned on the suggestions screen): 5 days, as D5
+-- F21 clean-up + verified requests that never got a destination (abandoned on the suggestions screen): 3 days
+-- CHANGE 2026-11-13 F23-DB-04: was 5 days in the first draft of this file; Or decided 3 days (2026-11-13).
 create or replace function private.f23_cleanup()
 returns void language plpgsql volatile security definer set search_path = '' as $$
 begin
   perform private.f21_cleanup();
   delete from private.trip_requests r
    where r.status = 'pending' and pg_catalog.cardinality(r.countries) = 0
-     and r.verified_at < pg_catalog.now() - interval '5 days';
+     and r.verified_at < pg_catalog.now() - interval '3 days';
 end;
 $$;
 
