@@ -135,3 +135,55 @@ test("R2 · a request that cannot be built falls back to the site's own page", (
   assert.equal(F.f24BookingUrl({}), "https://www.booking.com/"); assert.equal(F.f24GoogleHotelsUrl({}), "https://www.google.com/travel/hotels");
   assert.equal(F.f24SkyscannerUrl({ from: tlv, to: tbs, date: "2027-05-03", returnDate: "2027-05-01", adults: 2 }), "https://www.skyscanner.net/transport/flights/tlv/tbs/270503/?adultsv2=2");
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// CHANGE 2026-11-14 F24-A2-02: conversation 2 — the pure HTML of the cards and the origin sheet (what the browser draws), AC1 / AC2 / AC4 / AC7 at the markup level.
+test("A2 · flight card: legs, chips, two prefilled links that open in a new tab", () => {
+  setup(georgia());
+  const html = F.f24FlightCardHtml(F.f24FlightSearch(0), { online: true, fromDay: "" });
+  assert.match(html, /עוד אין טיסה ליום הזה/); assert.match(html, /TLV · תל אביב/); assert.match(html, /TBS · טביליסי/);
+  assert.match(html, /ברירת מחדל/); assert.match(html, /03\/05 · הלוך/); assert.match(html, /חזור 17\/05/); assert.match(html, /5 נוסעים · מחברי הטיול/);
+  assert.equal((html.match(/<a class="p24-go/g) || []).length, 2); assert.match(html, /target="_blank" rel="noopener"/);
+  assert.match(html, /href="https:\/\/www\.google\.com\/travel\/flights\?q=/); assert.match(html, /href="https:\/\/www\.skyscanner\.net\/transport\/flights\/tlv\/tbs\/270503\/270517\/\?adultsv2=5"/);
+  assert.ok(!/p24-off/.test(html));
+});
+test("A2 · flight card with a manual origin says so, and a one-way search has no return chip", () => {
+  setup(georgia());
+  const c = F.f24FlightSearch(0, { origin: "LCA" }), html = F.f24FlightCardHtml(c, { online: true, manual: true });
+  assert.match(html, /LCA · לרנקה/); assert.match(html, /נבחר ידנית/); assert.match(html, /03\/05 · כיוון אחד/); assert.ok(!/חזור/.test(html));
+});
+test("A2 · mid-trip (return) flight card names the previous day as the source of the origin", () => {
+  setup(georgia());
+  days[13].day = 14;
+  const c = F.f24FlightSearch(14), html = F.f24FlightCardHtml(c, { online: true, fromDay: 14 });
+  assert.equal(c.from.iata, "BUS"); assert.equal(c.to.iata, "TLV");
+  assert.match(html, /מהמסלול · יום 14/); assert.match(html, /BUS · /); assert.match(html, /TLV · תל אביב/); assert.match(html, /כיוון אחד/);
+});
+test("AC7 · offline: both buttons are disabled spans, no href, with the offline line", () => {
+  setup(georgia());
+  const html = F.f24FlightCardHtml(F.f24FlightSearch(0), { online: false });
+  assert.equal((html.match(/<a /g) || []).length, 0); assert.equal((html.match(/aria-disabled="true"/g) || []).length, 2); assert.match(html, /אין חיבור/);
+  const h = F.f24HotelCardHtml(F.f24LodgingSearch(1), { online: false });
+  assert.equal((h.match(/<a /g) || []).length, 0); assert.match(h, /אין חיבור/);
+});
+test("AC4 · lodging card: city, nights, guests, checkout in the title, Booking + Google Hotels", () => {
+  setup(georgia());
+  const s = F.f24LodgingSearch(1), html = F.f24HotelCardHtml(s, { online: true });
+  assert.match(html, /עוד אין לינה ל-04\/05 עד 07\/05/); assert.match(html, /טביליסי/); assert.match(html, /3 לילות/); assert.match(html, /5 אורחים · מחברי הטיול/);
+  assert.match(html, /booking\.com\/searchresults\.html\?ss=/); assert.match(html, /google\.com\/travel\/hotels\?q=/);
+});
+test("A2 · origin sheet: suggestions are TLV, ETM and the recent origins; the selected one is pressed; a search lists matches", () => {
+  setup(georgia());
+  let h = F.f24OriginSheetHtml({ sel: "TLV", q: "" }, ["LCA"]);
+  assert.match(h, /data-p24-ap="TLV"[^>]*aria-pressed="true"/); assert.match(h, /data-p24-ap="ETM"[^>]*aria-pressed="false"/);
+  assert.match(h, /data-p24-ap="LCA"/); assert.match(h, /חיפשתם מכאן קודם/); assert.match(h, /השינוי חל רק על החיפוש הזה/);
+  h = F.f24OriginSheetHtml({ sel: "LCA", q: "אתונה" }, []);
+  assert.match(h, /data-p24-ap="ATH"/); assert.ok(!/data-p24-ap="TLV"/.test(h));
+  h = F.f24OriginSheetHtml({ sel: "TLV", q: "zzzzqq" }, []);
+  assert.match(h, /לא נמצא שדה תעופה/);
+});
+test("A2 · card HTML escapes city names from the trip", () => {
+  setup([fl("03/05/2027", "IL", "GE", "", '<img src=x onerror=1>')]);
+  const s = F.f24FlightSearch(0), html = F.f24FlightCardHtml(s, { online: true });
+  assert.ok(!/<img/.test(html));
+});

@@ -22,7 +22,9 @@ const ICONS = ["icon-192.png", "icon-512.png"];
    Nothing else in this file changed from the previous version. */
 /* CHANGE 2026-11-13 F08-SW-02: was ["js/f08.js"]. countries.json added: the F08 range sheet needs the country names and
    time zones to save a range offline (AC10). */
-const SHELL_FILES = ["js/f08.js", "countries.json"];
+/* CHANGE 2026-11-14 F24-SW-01: was ["js/f08.js", "countries.json"]. js/f24.js (F24, v3.0.0-alpha.14) and airports.json (the origin sheet) added, so the
+   flight / lodging cards and the origin search work offline (C9). Nothing else in this file changed. */
+const SHELL_FILES = ["js/f08.js", "js/f24.js", "countries.json", "airports.json"];
 const NAV_TIMEOUT_MS = 6000;
 
 self.addEventListener("install", (e) => {

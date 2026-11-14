@@ -1,5 +1,17 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.14 — F24 · flight and hotel search links (2026-11-14; branch f24, phone check pending)
+<!-- CHANGE 2026-11-14 F24-DOCS-03: new entry. Spec claude/Plan_Travel_F24_spec.md (project doc), conversations 1–2 of 3 (the chat part, C8, is conversation 3). No server part, no migration. -->
+- Day card under the day's reservations: a flight day with no flight reservation shows "עוד אין טיסה ליום הזה" (origin TLV by default or the previous
+  city, destination from the route, dates, round trip on the first flight when a later day flies home, member count) with prefilled Google Flights and
+  Skyscanner links; the first night of a run of unbooked nights in one city shows "עוד אין לינה ל-…" with Booking and Google Hotels links.
+  A booked day has no new node at all (its HTML is identical to the flag-off page). Offline: the buttons are disabled with an offline line.
+- Origin sheet ("שינוי"): TLV and ETM pinned, the last 3 origins used on this device (per trip), search over `app/airports.json` (289 airports).
+  The change applies to this day's search only.
+- The card is part of the day card, so it shows in the "ציר זמן" view of "מסלול ומפה" (the map view hides the day card, as before).
+- Flag `TRAVELSEARCH_FEATURE` ('off' = alpha.13.1). Code: `app/js/f24.js`; `sw.js` also caches `js/f24.js` and `airports.json`.
+- Tests: `tests/f24/run.sh` (16 Node), `tests/f24/run_browser.sh` (real app, 390 px: AC1–AC5, AC7–AC9). F08 browser test: version string updated to alpha.14.
+
 ## 3.0.0-alpha.13.1 — F08 stage B · the rest of the hard-coded Vietnam (2026-11-14; phone check pending)
 <!-- CHANGE 2026-11-14 F08-DOCS-02: new entry. Spec docs/F08_spec.md §5 (rows marked stage B), AC5–AC8. No server part. -->
 - Converter: the "local" currency follows the country of today's day (flight day: origin until landing, then destination), only when

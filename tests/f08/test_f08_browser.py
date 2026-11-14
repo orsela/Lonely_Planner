@@ -46,7 +46,7 @@ def test_f08_stage_a_in_the_real_app(env):
     # 1 · version + more row + screen
     ver = page.evaluate("()=>window.__ptF08&&window.__ptF08.version")
     if ver != "3.0.0-alpha.13.1": P.append("f08 version: %r" % ver)
-    if "3.0.0-alpha.13.1" not in page.content(): P.append("app version string alpha.13 missing")
+    if "3.0.0-alpha.14" not in page.content(): P.append("app version string alpha.14 missing")  # CHANGE 2026-11-14 F24-A2-05: was alpha.13.1 (app version bumped by F24)
     page.evaluate("()=>document.querySelector('.tab[data-panel=more]').click()")
     page.wait_for_timeout(400)
     if not page.locator("#ptF08Row").is_visible(): P.append("עוד → מדינות לפי ימים row not visible")
