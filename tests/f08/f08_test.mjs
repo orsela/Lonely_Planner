@@ -362,3 +362,59 @@ test("landing time from the reservation text, on the destination clock; none →
   const next = F.f08LandingFromRes([{ type: "flight", datetime: "15/01/2027 22:00", notes: "נחיתה 05:10" }], 5, d);
   assert.equal(next, T("2027-01-16T05:10:00+09:00"));                                                                       // lands after midnight
 });
+
+// ---- stage B (alpha.13.1): converter currency, places country, weather coordinates, Timeline zones, flight-card instants ----
+// CHANGE 2026-11-14 F08-B-02: new tests (AC5, AC6, AC7, AC8, AC11, AC12 for stage B).
+const RICHB = { ...RICH_FOR_B() };
+function RICH_FOR_B() {
+  const c = (code, he, cur, tz, cap) => ({ code, he, en: code, currency: cur, tz: [tz], capital: cap });
+  return {
+    IL: c("IL", "ישראל", "ILS", "Asia/Jerusalem", { he: "ירושלים", lat: 31.77, lng: 35.21 }),
+    TH: c("TH", "תאילנד", "THB", "Asia/Bangkok", { he: "בנגקוק", lat: 13.75, lng: 100.5 }),
+    JP: c("JP", "יפן", "JPY", "Asia/Tokyo", { he: "טוקיו", lat: 35.68, lng: 139.69 }),
+    VN: c("VN", "וייטנאם", "VND", "Asia/Ho_Chi_Minh", { he: "האנוי", lat: 21.03, lng: 105.85 }),
+  };
+}
+function setupB(o = {}) { setup(ac1Trip(), { landing: AC1_LAND, ...o }); F.f08Configure({ countries: () => RICHB }); }
+test("AC5 · converter currency: ¥ on a day in Japan, ฿ until landing on the flight day and ¥ after it, '' outside the trip / flag off", () => {
+  setupB();
+  assert.equal(F.f08HereCurrency(T("2027-01-16T12:00:00+09:00")), "JPY");
+  assert.equal(F.f08HereCurrency(T("2027-01-15T12:00:00+07:00")), "THB");      // flight day, before landing
+  assert.equal(F.f08HereCurrency(T("2027-01-15T17:00:00+09:00")), "JPY");      // after landing 16:00 Tokyo
+  assert.equal(F.f08HereCurrency(T("2026-12-01T12:00:00Z")), "");
+  setupB({ feature: "off" });
+  assert.equal(F.f08HereCurrency(T("2027-01-16T12:00:00+09:00")), "");
+});
+test("AC7 · places country: the day's country, the destination on a flight day, '' with the flag off", () => {
+  setupB();
+  assert.equal(F.f08PlacesCountry(days[6]), "jp");
+  assert.equal(F.f08PlacesCountry(days[5]), "jp");     // flight TH → JP
+  setupB({ feature: "off" });
+  assert.equal(F.f08PlacesCountry(days[6]), "");
+});
+test("AC6 · weather coordinates: own lat/lng first, else the capital of the day's country, else null", () => {
+  setupB();
+  assert.deepEqual(F.f08WxCoords({ ...days[6], lat: 35.6, lng: 139.7 }), { lat: 35.6, lng: 139.7, capital: false });
+  const cap = F.f08WxCoords(days[6]);
+  assert.equal(cap.lat, 35.68); assert.equal(cap.capital, true);
+  assert.equal(F.f08WxCoords({ date: "10/01/2027", country: "ZZ" }), null);
+});
+test("AC8 · Timeline: 23:30 in Tokyo belongs to the Japanese date, clock shown in Tokyo time; legacy trip stays UTC+7", () => {
+  setupB();
+  const t = T("2027-01-16T23:30:00+09:00");
+  assert.equal(F.f08DateKeyAt(t), "2027-01-16"); assert.equal(F.f08ClockHM(t), "23:30");
+  assert.equal(F.f08DateKeyAt(T("2027-01-17T00:10:00+09:00")), "2027-01-17");
+  const bkk = T("2027-01-13T23:30:00+07:00");
+  assert.equal(F.f08DateKeyAt(bkk), "2027-01-13");
+  setup([{ date: "15/09/2026" }, { date: "16/09/2026" }]);
+  assert.equal(F.f08ClockHM(T("2026-09-15T20:00:00Z")), "03:00");               // UTC+7 as alpha.12.1
+  setupB({ feature: "off" });
+  assert.equal(F.f08ClockHM(T("2027-01-16T23:30:00+09:00")), "21:30");          // flag off: UTC+7
+});
+test("flight card instants: HH:MM read on the origin zone; zone of the card = departure zone of that day", () => {
+  setupB();
+  assert.equal(F.f08Instant("2027-01-15", 10, 30, "Asia/Bangkok"), T("2027-01-15T10:30:00+07:00"));
+  assert.equal(F.f08FlightFromTzOfDay(5), "Asia/Bangkok");
+  assert.equal(F.f08FlightFromTzOfDay(8), "Asia/Tokyo");
+  assert.equal(F.f08FlightFromTzOfDay(2), "Asia/Bangkok");
+});

@@ -45,8 +45,8 @@ def test_f08_stage_a_in_the_real_app(env):
     page.wait_for_timeout(800)
     # 1 · version + more row + screen
     ver = page.evaluate("()=>window.__ptF08&&window.__ptF08.version")
-    if ver != "3.0.0-alpha.13": P.append("f08 version: %r" % ver)
-    if "3.0.0-alpha.13" not in page.content(): P.append("app version string alpha.13 missing")
+    if ver != "3.0.0-alpha.13.1": P.append("f08 version: %r" % ver)
+    if "3.0.0-alpha.13.1" not in page.content(): P.append("app version string alpha.13 missing")
     page.evaluate("()=>document.querySelector('.tab[data-panel=more]').click()")
     page.wait_for_timeout(400)
     if not page.locator("#ptF08Row").is_visible(): P.append("עוד → מדינות לפי ימים row not visible")
@@ -84,6 +84,13 @@ def test_f08_stage_a_in_the_real_app(env):
     if tz != "Asia/Bangkok": P.append("here tz on 12/01: %r" % tz)
     tz2 = page.evaluate("()=>window.__ptF08.f08HereTz(new Date('2027-01-15T03:00:00Z'))")
     if tz2 != "Asia/Tokyo": P.append("here tz on 15/01 (Japan day): %r" % tz2)
+    # 4b · stage B: converter "local" currency follows today's day (day 6 set to Vietnam; fixture local is THB) – wired through the 30 s tick
+    page.evaluate("()=>{const a=tripData;a[5]=Object.assign({},a[5],{country:'VN',tz:'Asia/Ho_Chi_Minh'});}")
+    before = page.evaluate("()=>window.__ptF10.get().local")
+    page.clock.set_fixed_time("2027-01-15T05:00:00Z")      # 12:00 Ho Chi Minh on 15/01 = day index 5
+    page.wait_for_timeout(32000)
+    after = page.evaluate("()=>window.__ptF10.get().local")
+    if before != "THB" or after != "VND": P.append("converter local currency: before=%r after=%r (want THB → VND)" % (before, after))
     # 5 · layout at 390: no horizontal scroll with the sheet and the day box open
     sw = page.evaluate("()=>document.documentElement.scrollWidth"); 
     if sw > 392: P.append("horizontal scroll: %s" % sw)

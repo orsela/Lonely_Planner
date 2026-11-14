@@ -1,5 +1,20 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.13.1 — F08 stage B · the rest of the hard-coded Vietnam (2026-11-14; phone check pending)
+<!-- CHANGE 2026-11-14 F08-DOCS-02: new entry. Spec docs/F08_spec.md §5 (rows marked stage B), AC5–AC8. No server part. -->
+- Converter: the "local" currency follows the country of today's day (flight day: origin until landing, then destination), only when
+  that currency is in the trip's list; re-applied every 30 s and on every currency-model change (`__ptF10.setLocal`, new, not cached).
+- Weather: a day without lat/lng uses the capital of its country (countries.json).
+- Place search (Google autocomplete): limited to the country of today's day (flight day: destination) instead of Vietnam only.
+- Flight card: departure time is read on the origin's zone (explicit `flightFrom`, or a day-derived zone when the airport is not
+  TLV/AUH); the card's clock times (leave, check-in, take-off) show on that zone.
+- Google Timeline import and "ביקרנו בפועל": the date and clock of a point use the zone of the trip day it falls in (23:30 Tokyo
+  belongs to the Japanese date); outside the trip, the nearest day's zone. Legacy Vietnam trip: still UTC+7.
+- `F08_FEATURE='off'` = alpha.12.1. Changed existing bodies (all flagged in code): `tlVnDateKey`, `visVnHM`, `fcHHMM`, `fcVnHour`,
+  `fcParse` (departure line), the weather functions' coordinate lines, the Places `componentRestrictions`.
+- Tests: `tests/f08/run.sh` 31 Node; `tests/f08/run_browser.sh` (adds converter wiring). F10 browser suite: same 4 failures as before
+  stage B (static checks of an old base: sw precache, versions, no_migration) – not caused by this change.
+
 ## 3.0.0-alpha.13 — F08 stage A · country and time zone for every day (2026-11-14; phone check pending)
 <!-- CHANGE 2026-11-14 F08-DOCS-01: new entry (no previous version). Branch f08 → main. Spec: docs/F08_spec.md. -->
 - App: "עוד → מדינות לפי ימים" (ranges of days by country / city / zone, range sheet); inside "✎ עריכת יום" a new box: the

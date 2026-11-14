@@ -8,13 +8,15 @@
    f08DayFormState / f08ApplyDayForm / f08DayFormHtml (spec §4.3, pure, Node-tested), paintClocks (§4.4), f08LandingFromRes
    (landing time from the flight reservation text), mount now also builds the day-edit box and returns fillDay / beforeSave.
    All helpers of conversations 1–2 are unchanged except that one line of f08IsFlight.
+   CHANGE 2026-11-14 F08-B-01 (stage B, alpha.13.1): new section "stage B" before the browser part: f08HereCurrency, f08PlacesCountry,
+   f08WxCoords, f08TzAt / f08ClockHM / f08DateKeyAt (Timeline, "ביקרנו"), f08Instant / f08FlightFromTzOfDay (flight card). Nothing above changed.
    Everything the helpers need from the app arrives through f08Configure(); in the browser the defaults read the app's own
    globals (tripData, isFlightDay, F08_FEATURE, window.__ptF10), under Node the tests inject them.
    F08_FEATURE === 'off' → every helper returns what alpha.12.1 does (device clock, Asia/Jerusalem at home, 'VN', isFlightDay).
    Day fields (all optional, spec §1): country (ISO-2), city (≤ 60), tz (IANA), isFlight, flightFrom / flightTo {country, tz, city?}. */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.13';
+  const VERSION = '3.0.0-alpha.13.1';
   const LEGACY_COUNTRY = 'VN', LEGACY_TZ = 'Asia/Ho_Chi_Minh', ISRAEL_TZ = 'Asia/Jerusalem';
   const MIN = 60000, DAY = 86400000;
 
@@ -466,6 +468,47 @@
     } else if (dest) dest.style.display = 'none';
   }
 
+
+  /* =====================================================================================================================
+     CHANGE 2026-11-14 F08-B-01: new section (stage B, spec §5 rows "ממיר", "מזג אוויר", "השלמת מקומות", "כרטיס טיסה",
+     "ייבוא Timeline / ביקרנו"). Pure helpers; index.html calls them through wrappers that fall back to alpha.13 when absent.
+     ===================================================================================================================== */
+  /* AC5: the currency of "כאן" (country of today's day; flight day: origin until landing, then destination). '' = unknown → the caller keeps what it did. */
+  function f08HereCurrency(now) {
+    if (off()) return '';
+    const c = f08HereCountry(now); if (!c) return '';
+    const r = countryRow(c); return r && /^[A-Z]{3}$/.test(String(r.currency || '')) ? r.currency : '';
+  }
+  /* AC7: ISO-2 lower-case for Places autocomplete: the country of the day (flight day: the destination); '' → caller keeps 'vn' */
+  function f08PlacesCountry(d) {
+    if (off() || !d) return '';
+    const c = f08IsFlight(d) ? f08FlightTo(d).country : f08DayCountry(d);
+    return validCountry(c) ? c.toLowerCase() : '';
+  }
+  /* AC6: a day without lat/lng uses the capital of its country; null when that is unknown too */
+  function f08WxCoords(d) {
+    if (!d) return null;
+    const ok = (a, b) => a !== '' && a != null && b !== '' && b != null && Number.isFinite(+a) && Number.isFinite(+b) && Math.abs(+a) <= 90 && Math.abs(+b) <= 180;
+    if (ok(d.lat, d.lng)) return { lat: +d.lat, lng: +d.lng, capital: false };
+    if (off()) return null;
+    const r = countryRow(f08PlacesCountry(d).toUpperCase()), cap = r && r.capital;
+    return cap && ok(cap.lat, cap.lng) ? { lat: +cap.lat, lng: +cap.lng, capital: true, name: cap.he || cap.en || '' } : null;
+  }
+  /* AC8: the zone an instant belongs to = the zone of the trip day it falls in; outside the trip the nearest day's zone; flag off / no days: UTC+7 as before */
+  function f08TzAt(t) {
+    if (off()) return LEGACY_TZ;
+    const ms = asMs(t), a = days(); if (!a.length || !Number.isFinite(ms)) return LEGACY_TZ;
+    const h = here(ms); if (h && h.tz) return h.tz;
+    const first = dayStart(0);
+    return f08DayTz(a[Number.isFinite(first) && ms < first ? 0 : a.length - 1]) || LEGACY_TZ;
+  }
+  function f08ClockHM(t) { const ms = asMs(t); if (!Number.isFinite(ms)) return ''; const p = parts(ms, f08TzAt(ms)); return pad(p.h) + ':' + pad(p.mi); }
+  function f08DateKeyAt(t) { const ms = asMs(t); return Number.isFinite(ms) ? localDate(ms, f08TzAt(ms)) : null; }
+  /* the instant of HH:MM on date iso, read on the wall clock of tz */
+  function f08Instant(iso, h, m, tz) { return localMidnight(iso, validTz(tz) ? tz : LEGACY_TZ) + (h * 60 + m) * MIN; }
+  /* the zone a flight card's departure times are read in: the origin of that day's flight */
+  function f08FlightFromTzOfDay(i) { const d = days()[i]; return !d || off() ? '' : (f08IsFlight(d) ? f08FlightFrom(d).tz : f08DayTz(d)); }
+
   /* ---------------- browser part ---------------- */
   let gate = null, ui = null;
   function attach(a) { if (!gate && a && typeof a === 'object') gate = a; }
@@ -672,7 +715,8 @@ button.p08-row{cursor:pointer}.p08-row.fl{background:#f1f0ea;border-style:dashed
 
   const api = { version: VERSION, f08Configure, f08DayIso, f08DayCountry, f08DayTz, f08IsFlight, f08FlightFrom, f08FlightTo, f08TodayIndex, f08HereSide, f08HereTz, f08HereCountry, f08HomeTz, f08SameClock, f08Ranges, f08ApplyRange, f08ClearRange, f08NeedsTzPicker, f08LocalDate: localDate,
     /* CHANGE 2026-11-13 F08-A2-01: conversation 2 additions */ f08RangesView, f08RangesHtml, f08NewRangeState, f08EditRangeState, f08SheetHtml, f08CountryListHtml, f08UiCommit, attach, mount,
-    /* CHANGE 2026-11-14 F08-A3-01: conversation 3 additions */ f08DayFormState, f08ApplyDayForm, f08DayFormHtml, f08LandingFromRes, paintClocks, fillDay() { if (ui) ui.fillDay(); }, beforeSave() { if (ui) ui.beforeSave(); } };
+    /* CHANGE 2026-11-14 F08-A3-01: conversation 3 additions */ f08DayFormState, f08ApplyDayForm, f08DayFormHtml, f08LandingFromRes, paintClocks,
+    /* CHANGE 2026-11-14 F08-B-01: stage B */ f08HereCurrency, f08PlacesCountry, f08WxCoords, f08TzAt, f08ClockHM, f08DateKeyAt, f08Instant, f08FlightFromTzOfDay, fillDay() { if (ui) ui.fillDay(); }, beforeSave() { if (ui) ui.beforeSave(); } };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else { root.__ptF08 = api; Object.keys(api).forEach(k => { if (k.indexOf('f08') === 0) root[k] = api[k]; }); }
 })(typeof window !== 'undefined' ? window : globalThis);
