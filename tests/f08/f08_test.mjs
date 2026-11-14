@@ -313,3 +313,52 @@ test("AC12 · F08_FEATURE='off': the writer writes nothing and mount does nothin
   assert.equal(d.calls.length, 0);
   assert.equal(F.mount({ $: () => null }), false);
 });
+
+// ---- conversation 3: day edit (§4.3), landing text, explicit flight off ----
+// CHANGE 2026-11-14 F08-A3-02: new tests (conversation 3).
+test("§4.3 · day form: a normal day changed to another country saves country+tz; unchanged saves nothing new; back to the derived value clears", () => {
+  setup(ac1Trip(), { trip: ["TH"] });
+  const d = days[6];                                   // Tokyo day
+  const st = F.f08DayFormState(d);
+  assert.equal(st.isFlight, false); assert.equal(st.country, "JP"); assert.equal(st.tz, "Asia/Tokyo");
+  const same = F.f08ApplyDayForm(d, { ...st });
+  assert.deepEqual(same, d);                           // unchanged → identical content
+  assert.notEqual(same, d);                            // …but a new object
+  const moved = F.f08ApplyDayForm(d, { ...st, country: "TH", city: "Phuket", tz: "Asia/Bangkok" });
+  assert.equal(moved.country, "TH"); assert.equal(moved.city, "Phuket"); assert.equal(d.country, "JP");
+  const back = F.f08ApplyDayForm(days[4], { country: "TH", city: "", tz: "Asia/Bangkok" });   // explicit Bangkok day → the same as derived
+  assert.equal(back.country, undefined); assert.equal(back.tz, undefined);                    // fields cleared: back to the §3 derivation
+});
+test("§4.3 · flight switch on: stores isFlight and only the sides that differ from the derived default", () => {
+  setup(ac1Trip());
+  const d = days[3];                                   // Thailand day, neighbours Thailand
+  const st = F.f08DayFormState(d);
+  const on = F.f08ApplyDayForm(d, { ...st, isFlight: true, from: { country: "TH", tz: "Asia/Bangkok", city: "Bangkok" }, to: { country: "JP", tz: "Asia/Tokyo", city: "Tokyo" } });
+  assert.equal(on.isFlight, true);
+  assert.equal(on.flightFrom, undefined);              // = previous day → derived, not stored
+  assert.deepEqual(on.flightTo, { country: "JP", tz: "Asia/Tokyo", city: "Tokyo" });
+  assert.equal(F.f08IsFlight(on), true);
+});
+test("§4.3 · flight switch off: isFlight=false, sides removed, and it beats the legacy region test", () => {
+  setup([{ date: "10/01/2027", region: "טיסות", country: "IL" }, { date: "11/01/2027", country: "TH" }]);
+  const d = days[0]; assert.equal(F.f08IsFlight(d), true);
+  const off = F.f08ApplyDayForm({ ...d, flightTo: { country: "TH" } }, { ...F.f08DayFormState(d), isFlight: false, country: "IL", tz: "Asia/Jerusalem" });
+  assert.equal(off.isFlight, false); assert.equal(off.flightTo, undefined); assert.equal(F.f08IsFlight(off), false);
+});
+test("§4.3 · day form html: flight shows origin+destination, normal day shows one group; text is escaped", () => {
+  setup(ac1Trip());
+  const h1 = F.f08DayFormHtml({ ...F.f08DayFormState(days[5]) }, T("2027-01-15T00:00:00Z"));
+  assert.ok(h1.includes('data-g="from"') && h1.includes('data-g="to"') && !h1.includes('data-g="n"'));
+  const h2 = F.f08DayFormHtml({ ...F.f08DayFormState(days[2]), city: '"><b>x' }, T("2027-01-12T00:00:00Z"));
+  assert.ok(h2.includes('data-g="n"') && !h2.includes("<b>x") && h2.includes("&lt;b&gt;x"));
+});
+test("landing time from the reservation text, on the destination clock; none → null", () => {
+  setup(ac1Trip());
+  const d = days[5];                                   // 15/01 Bangkok → Tokyo
+  const res = [{ type: "flight", datetime: "15/01/2027 10:30", title: "TG 642 BKK→NRT", notes: "נחיתה 18:40" }];
+  assert.equal(F.f08LandingFromRes(res, 5, d), T("2027-01-15T18:40:00+09:00"));
+  assert.equal(F.f08LandingFromRes([{ type: "flight", datetime: "15/01/2027 10:30", title: "TG 642" }], 5, d), null);
+  assert.equal(F.f08LandingFromRes([{ type: "flight", datetime: "16/01/2027 10:30", notes: "landing 18:40" }], 5, d), null);   // other date
+  const next = F.f08LandingFromRes([{ type: "flight", datetime: "15/01/2027 22:00", notes: "נחיתה 05:10" }], 5, d);
+  assert.equal(next, T("2027-01-16T05:10:00+09:00"));                                                                       // lands after midnight
+});

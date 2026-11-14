@@ -1,5 +1,19 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.13 — F08 stage A · country and time zone for every day (2026-11-14; phone check pending)
+<!-- CHANGE 2026-11-14 F08-DOCS-01: new entry (no previous version). Branch f08 → main. Spec: docs/F08_spec.md. -->
+- App: "עוד → מדינות לפי ימים" (ranges of days by country / city / zone, range sheet); inside "✎ עריכת יום" a new box: the
+  "יום טיסה" switch with origin + destination, or country / city / zone for that single day (only a value that differs from
+  what the day derives is saved). Home clocks: "כאן" = the zone of today's trip day (flight day: the origin until landing,
+  then the destination), "בבית" = Israel for shekel trips, otherwise the device zone; one clock when they are the same;
+  a destination clock on a flight day. `isFlightDay` now answers through `f08IsFlight` (an explicit switch-off beats the old
+  region / hotel test). Landing time is read from the flight reservation text ("נחיתה 18:40" / "landing 18:40" on the
+  destination clock); none found → midnight on the departure clock.
+- Flag `F08_FEATURE` ('off' = alpha.12.1 behaviour). No server part, no migration. Code: `app/js/f08.js` (+ `sw.js`, `countries.json` offline).
+- Not in this stage (stage B, alpha.13.1): converter, weather, place autocomplete, flight card zones, Timeline / "ביקרנו" zones.
+- Tests: `tests/f08/run.sh` (26 Node), `tests/f08/run_browser.sh` (real app, 390 px). Known: F10b `c14` compares "עוד" with alpha.9 and
+  now sees the F08 row (expected difference).
+
 ## 3.0.0-alpha.12 — F23 (live 2026-11-13; phone check and independent QA pending)
 <!-- CHANGE 2026-11-13 F23-DOCS-15: heading was "F23 (in progress, branch `f23`)". Deployed and merged 13/11: migrations 0020 + 0021, request-trip
      3.0.0-alpha.12.0 (deploy bundle), main = f23. invite-manager not redeployed. See docs/F23_dev_notes_server.md → Deploy. -->

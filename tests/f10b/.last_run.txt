@@ -1,0 +1,20 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________________ test_c14_flag_off_equals_alpha9 ________________________
+test_f10b.py:657: in test_c14_flag_off_equals_alpha9
+    assert not P, "\n".join(P)
+E   AssertionError: #more differs:
+E     --- alpha.9
+E     +++ flag off
+E     @@ -21,2 +21,7 @@
+E      SPAN~ptF06MembersSub~pt6-sub~~~~v "N חברים · תפקידים · קישור הצטרפות"
+E     +DIV~~chev~~~~v "‹"
+E     +BUTTON~ptF08Row~listitem~~~~v
+E     +DIV~~ic~~~~v "🌍"
+E     +DIV~~lbl~~~~v "מדינות לפי ימים"
+E     +SPAN~ptF08RowSub~~~~~v "🇹🇭 · 22 ימים"
+E      DIV~~chev~~~~v "‹"
+E   assert not ['#more differs:\n--- alpha.9\n+++ flag off\n@@ -21,2 +21,7 @@\n SPAN~ptF06MembersSub~pt6-sub~~~~v "N חברים · תפקידים ...~~v\n+DIV~~ic~~~~v "🌍"\n+DIV~~lbl~~~~v "מדינות לפי ימים"\n+SPAN~ptF08RowSub~~~~~v "🇹🇭 · 22 ימים"\n DIV~~chev~~~~v "‹"']
+=========================== short test summary info ============================
+FAILED test_f10b.py::test_c14_flag_off_equals_alpha9 - AssertionError: #more ...
+1 failed, 22 deselected in 10.14s

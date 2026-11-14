@@ -3,7 +3,11 @@
    CHANGE 2026-11-13 F08-A2-01 (conversation 2): what changed from F08-A1-01 (helpers only, not wired): added the screen
    "מדינות לפי ימים" + the range sheet (spec §4.1–§4.2) at the bottom of this file, and attach / mount, which app/index.html
    calls (flag F08_FEATURE, gate hook F08-GATE-01, main-script hook F08-MOUNT-01). The helpers above that section are unchanged.
-   Day edit, flight day and the home clocks (§4.3–§4.4) are conversation 3.
+   CHANGE 2026-11-14 F08-A3-01 (conversation 3): what changed from F08-A2-01: f08IsFlight honours an explicit isFlight:false
+   (the "יום טיסה" switch turned off beats the legacy region test); new section "day edit + clocks" before the export block:
+   f08DayFormState / f08ApplyDayForm / f08DayFormHtml (spec §4.3, pure, Node-tested), paintClocks (§4.4), f08LandingFromRes
+   (landing time from the flight reservation text), mount now also builds the day-edit box and returns fillDay / beforeSave.
+   All helpers of conversations 1–2 are unchanged except that one line of f08IsFlight.
    Everything the helpers need from the app arrives through f08Configure(); in the browser the defaults read the app's own
    globals (tripData, isFlightDay, F08_FEATURE, window.__ptF10), under Node the tests inject them.
    F08_FEATURE === 'off' → every helper returns what alpha.12.1 does (device clock, Asia/Jerusalem at home, 'VN', isFlightDay).
@@ -111,6 +115,7 @@
   function f08IsFlight(d) {
     if (!d) return false;
     if (off()) return legacyFlight(d);
+    if (d.isFlight === false) return false;   /* F08-A3-01: the switch turned off explicitly */
     return d.isFlight === true || legacyFlight(d);
   }
   /* §1 defaults: flight origin = the previous day, destination = the next day (a previous / next flight day contributes its
@@ -341,8 +346,128 @@
     return { ok: true, changed: r.changed };
   }
 
+
+  /* =====================================================================================================================
+     CHANGE 2026-11-14 F08-A3-01 (conversation 3): new section. Spec §4.3 (day edit + flight day) and §4.4 (clocks).
+     ===================================================================================================================== */
+  function sideState(sd) { return { country: sd.country || '', city: sd.city || '', tz: sd.tz || '' }; }
+  /* what the day edit box shows for day d (index i): the day's own values, or the derived ones */
+  function f08DayFormState(d) {
+    const flight = f08IsFlight(d);
+    return {
+      isFlight: flight,
+      country: f08DayCountry(d), city: (d && d.city) || '', tz: f08DayTz(d),
+      from: sideState(f08FlightFrom(d)), to: sideState(f08FlightTo(d)),
+    };
+  }
+  function sameSide(a, b) { return (a.country || '') === (b.country || '') && (a.city || '') === (b.city || '') && (a.tz || '') === (b.tz || ''); }
+  function normSide(x) {
+    const country = validCountry(x && x.country) ? x.country : '';
+    const tz = validTz(x && x.tz) ? x.tz : (tzOfCountry(country) || '');
+    return { country, city: String((x && x.city) || '').trim().slice(0, 60), tz };
+  }
+  /* the day after the box was saved: returns a NEW object, d untouched. f = {isFlight, country, city, tz, from, to} */
+  function f08ApplyDayForm(d, f) {
+    const n = { ...d }, was = f08DayFormState(d);
+    const bare = { ...d }; ['country', 'city', 'tz', 'flightFrom', 'flightTo'].forEach(k => { delete bare[k]; });
+    if (f.isFlight) {
+      n.isFlight = true;
+      const dflt = { from: sideState(f08FlightFrom(bare)), to: sideState(f08FlightTo(bare)) };
+      ['from', 'to'].forEach(w => {
+        const key = w === 'from' ? 'flightFrom' : 'flightTo', v = normSide(f[w]);
+        if (!v.country && !validTz(v.tz)) { delete n[key]; return; }
+        if (!d[key] && sameSide(v, normSide(dflt[w]))) return;      /* nothing saved and unchanged: stay derived */
+        n[key] = v.city ? v : { country: v.country, tz: v.tz };
+      });
+      return n;
+    }
+    if (d.isFlight === true || was.isFlight) { n.isFlight = false; delete n.flightFrom; delete n.flightTo; }
+    const v = normSide(f);
+    if (!v.country) return n;
+    const cur = { country: was.country, city: was.city, tz: was.tz };
+    if (sameSide(v, cur)) return n;                                   /* unchanged: keep exactly what is saved */
+    const dflt = { country: f08DayCountry(bare), city: '', tz: f08DayTz(bare) };
+    if (sameSide(v, dflt)) { ['country', 'city', 'tz'].forEach(k => { delete n[k]; }); return n; }
+    n.country = v.country; n.tz = v.tz; if (v.city) n.city = v.city; else delete n.city;
+    return n;
+  }
+  function countryOptions(sel, extra) {
+    const all = allCountries(), by = {}; all.forEach(x => { by[x.code] = x; });
+    const first = []; [sel].concat(extra || [], env.tripCountries ? env.tripCountries() || [] : [], days().map(x => x && x.country)).forEach(c => { if (by[c] && first.indexOf(c) < 0) first.push(c); });
+    const rest = all.filter(x => first.indexOf(x.code) < 0).sort((a, b) => String(a.he).localeCompare(String(b.he), 'he'));
+    const o = x => '<option value="' + x.code + '"' + (x.code === sel ? ' selected' : '') + '>' + escH((x.flag || '') + ' ' + (x.he || x.code)) + '</option>';
+    let h = sel && !by[sel] ? '<option value="' + escH(sel) + '" selected>' + escH(cName(sel)) + '</option>' : '';
+    h += first.map(c => o(by[c])).join('');
+    if (rest.length) h += '<optgroup label="כל המדינות">' + rest.map(o).join('') + '</optgroup>';
+    return h || '<option value="">—</option>';
+  }
+  function tzSelectHtml(id, country, tz, ms) {
+    const row = country ? countryRow(country) : null, zones = row && Array.isArray(row.tz) ? row.tz.filter(validTz) : [];
+    if (zones.length > 1) return '<select id="' + id + '" class="p08-in" dir="ltr" aria-label="אזור זמן">' + zones.map(z => '<option value="' + escH(z) + '"' + (z === tz ? ' selected' : '') + '>' + escH(z.replace(/_/g, ' ') + ' (' + utcLabel(z, ms) + ')') + '</option>').join('') + '</select>';
+    const z = zones[0] || tz; return z ? '<div class="p08-sub" id="' + id + 'Line" data-tz="' + escH(z) + '">אזור זמן: ' + LTR(z.replace(/_/g, ' ') + ' · ' + utcLabel(z, ms)) + '</div>' : '';
+  }
+  function groupHtml(g, title, st, ms) {
+    return '<div class="p08-dg" data-g="' + g + '"><div class="p08-lbl">' + escH(title) + '</div><select id="ptF08D_' + g + '_c" class="p08-in" aria-label="' + escH(title) + ' – מדינה">' + countryOptions(st.country) + '</select>' +
+      '<input id="ptF08D_' + g + '_city" class="p08-in" type="text" maxlength="60" autocomplete="off" placeholder="עיר (לא חובה)" aria-label="' + escH(title) + ' – עיר" value="' + escH(st.city || '') + '"><div id="ptF08D_' + g + '_tz">' + tzSelectHtml('ptF08D_' + g + '_z', st.country, st.tz, ms) + '</div></div>';
+  }
+  /* the box inside "✎ עריכת יום": switch + (flight: origin and destination | normal day: country, city, zone) */
+  function f08DayFormHtml(st, ms) {
+    return '<div class="p08-tog"><span id="ptF08DTogL">✈ יום טיסה</span><label class="p08-swl"><input id="ptF08DFl" type="checkbox" role="switch" aria-labelledby="ptF08DTogL"' + (st.isFlight ? ' checked' : '') + '><span class="p08-sw" aria-hidden="true"><i></i></span></label></div>' +
+      (st.isFlight
+        ? groupHtml('from', 'מוצא', st.from, ms) + groupHtml('to', 'יעד', st.to, ms) + '<p class="p08-sub" id="ptF08DHint">המוצא ברירת מחדל = היום הקודם, היעד = היום הבא. שעת ההמראה לפי שעון המוצא, הנחיתה לפי שעון היעד.</p>'
+        : groupHtml('n', 'מדינה ביום הזה', st, ms) + '<p class="p08-sub" id="ptF08DHint">מהטווח; שינוי כאן חל רק על היום הזה.</p>');
+  }
+  /* landing time of flight day i from its flight reservation(s): "נחיתה 18:40" / "landing 18:40" / "arrives 18:40" in the text,
+     on the destination clock; no such text → null (the caller falls back to midnight, as decided in conversation 1) */
+  function f08LandingFromRes(reservations, i, d) {
+    const iso = f08DayIso(d); if (!iso || !Array.isArray(reservations)) return null;
+    const to = f08FlightTo(d), from = f08FlightFrom(d);
+    for (const r of reservations) {
+      if (!r || r.type !== 'flight') continue;
+      const txt = [r.title, r.notes, r.provider, r.datetime].join(' ');
+      const at = /(?:נחיתה|נוחת|מגיע|landing|lands|arrives?|arrival)\D{0,12}(\d{1,2}):(\d{2})/i.exec(txt); if (!at) continue;
+      const dm = /(\d{1,2})[./](\d{1,2})/.exec(String(r.datetime || '')); if (dm && dayIsoOf(d) && (+dm[1] !== +iso.slice(8, 10) || +dm[2] !== +iso.slice(5, 7))) continue;
+      const dep = /(\d{1,2}):(\d{2})/.exec(String(r.datetime || ''));
+      const L = localMidnight(iso, to.tz) + (+at[1] * 60 + +at[2]) * MIN;
+      const D = dep ? localMidnight(iso, from.tz) + (+dep[1] * 60 + +dep[2]) * MIN : NaN;
+      return Number.isFinite(D) && L <= D ? L + DAY : L;
+    }
+    return null;
+  }
+  function dayIsoOf(d) { return f08DayIso(d); }
+
+  /* §4.4 – the clocks of the home screen. Called by tickClocks (index.html, F08-CLK-01) after it painted its own values. */
+  function paintClocks(now) {
+    if (off() || typeof document === 'undefined') return;
+    const g = id => document.getElementById(id), t = asMs(now);
+    const homeTz = f08HomeTz(), hereTz = f08HereTz(t), same = hereTz === homeTz;
+    const i = f08TodayIndex(t), d = i >= 0 ? days()[i] : null, flight = !!d && f08IsFlight(d);
+    const side = flight ? f08HereSide(d, t) : null;
+    const hh = tz => { try { return new Date(t).toLocaleTimeString('he-IL', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); } catch (e) { return '--:--'; } };
+    const city = flight ? (side === 'to' ? f08FlightTo(d) : f08FlightFrom(d)).city : (d && d.city) || '';
+    const cityName = (typeof tzCityLabel === 'function' ? tzCityLabel(hereTz) : hereTz);
+    const israel = homeTz === ISRAEL_TZ;
+    [['hv2ClockLocalCity', '📍 '], ['clockLocalCity', '']].forEach(([id, pre]) => { const e = g(id); if (e && city) e.textContent = pre + city; });
+    ['hv2ClockIsraelTime', 'clockIsraelTime'].forEach(id => {
+      const e = g(id), card = e && e.closest('.hv2-clock-card, .clock-box'); if (!card) return;
+      card.style.display = same ? 'none' : '';
+      const lab = card.querySelector('.hv2-clock-label, .clock-label');
+      if (lab && !same) lab.textContent = israel ? (id === 'hv2ClockIsraelTime' ? '🏠 ישראל' : '🏠 שעון ישראל') : '🏠 בבית';
+    });
+    /* flight day: a third clock for the destination until landing (the origin is "כאן") */
+    const panel = g('hv2ClocksPanel');
+    let dest = g('ptF08ClockDest');
+    if (panel && flight && side === 'from') {
+      const to = f08FlightTo(d), zone = to.tz;
+      if (!dest) { dest = document.createElement('div'); dest.id = 'ptF08ClockDest'; dest.className = 'hv2-clock-card'; dest.innerHTML = '<span class="hv2-clock-label"></span><b></b>'; const first = panel.querySelector('.hv2-clock-card'); if (first && first.nextSibling) panel.insertBefore(dest, first.nextSibling); else panel.appendChild(dest); }
+      dest.style.display = zone === hereTz ? 'none' : '';
+      dest.querySelector('.hv2-clock-label').textContent = '✈ יעד · ' + (to.city || (typeof tzCityLabel === 'function' ? tzCityLabel(zone) : zone));
+      dest.querySelector('b').textContent = hh(zone);
+    } else if (dest) dest.style.display = 'none';
+  }
+
   /* ---------------- browser part ---------------- */
-  let gate = null;
+  let gate = null, ui = null;
   function attach(a) { if (!gate && a && typeof a === 'object') gate = a; }
   const CSS = `
 #ptF08Panel .p08-top{position:relative;padding:14px 56px 6px;text-align:center}#ptF08Panel .p08-top h1{margin:0;font-size:17px}
@@ -374,6 +499,12 @@ button.p08-row{cursor:pointer}.p08-row.fl{background:#f1f0ea;border-style:dashed
 .p08-field{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;min-height:48px;padding:0 12px;border:1px solid #d6d9d0;border-radius:12px;background:#fff;font-size:16px;font-weight:700;font-family:inherit;color:#17211b;cursor:pointer;text-align:right}
 .p08-clist{display:flex;flex-direction:column;gap:5px;max-height:38vh;overflow-y:auto;border:1px solid #efeee8;border-radius:12px;padding:6px}
 .p08-2{display:flex;gap:8px}.p08-2>*{flex:1}
+#ptF08DayBox{display:flex;flex-direction:column;gap:8px;margin:10px 0;padding-top:8px;border-top:1px solid #efeee8}
+.p08-dg{display:flex;flex-direction:column;gap:6px}
+.p08-tog{display:flex;align-items:center;justify-content:space-between;min-height:52px;padding:0 12px;border:1px solid #cfe0f2;background:#eef4fb;border-radius:12px;font-size:15px;font-weight:800;color:#1d3f63}
+.p08-swl{position:relative;display:inline-block;min-width:48px;min-height:44px;display:flex;align-items:center}.p08-swl input{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.p08-sw{width:48px;height:28px;border-radius:999px;background:#9aa7b5;position:relative;transition:background .15s}.p08-sw i{position:absolute;top:3px;inset-inline-start:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:inset-inline-start .15s}
+.p08-swl input:checked+.p08-sw{background:#2563a8}.p08-swl input:checked+.p08-sw i{inset-inline-start:23px}
 `;
   function mount(deps) {
     if (off() || typeof document === 'undefined' || !deps || typeof deps.$ !== 'function') return false;
@@ -494,6 +625,43 @@ button.p08-row{cursor:pointer}.p08-row.fl{background:#f1f0ea;border-style:dashed
       paintPanel(); paintMore();
     }
 
+
+    /* CHANGE 2026-11-14 F08-A3-01: day edit box inside "✎ עריכת יום" (spec §4.3). index.html wraps loadForm → fillDay and
+       dayForm.onsubmit → beforeSave (F08-DAY-01 / F08-DAY-02); the original form code is not changed. */
+    let dst = null, dIdx = -1;
+    const form = () => { try { return deps.form ? deps.form() : null; } catch (e) { return null; } };
+    function readDayBox() {
+      if (!dst) return;
+      const v = id => { const e = $(id); return e ? e.value : null; };
+      const fl = $('ptF08DFl'); if (fl) dst.isFlight = fl.checked;
+      const rd = (g, o) => { const c = v('ptF08D_' + g + '_c'); if (c == null) return; o.country = c; o.city = (v('ptF08D_' + g + '_city') || '').trim().slice(0, 60);
+        const z = $('ptF08D_' + g + '_z'), ln = $('ptF08D_' + g + '_zLine'); o.tz = z ? z.value : (ln ? ln.dataset.tz : tzOfCountry(c)); };
+      if (dst.isFlight) { rd('from', dst.from); rd('to', dst.to); } else rd('n', dst);
+    }
+    function paintDayBox() {
+      const f = form(); if (!f || !dst) return;
+      let box = $('ptF08DayBox');
+      if (!box) { box = document.createElement('div'); box.id = 'ptF08DayBox'; const anchor = f.querySelector('button.btn.green') || f.lastElementChild; f.insertBefore(box, anchor); }
+      const d = deps.days()[dIdx]; box.innerHTML = f08DayFormHtml(dst, dayMs(d));
+      const fl = $('ptF08DFl'); if (fl) fl.onchange = () => { readDayBox(); dst.isFlight = fl.checked; paintDayBox(); };
+      ['from', 'to', 'n'].forEach(g => { const c = $('ptF08D_' + g + '_c'); if (c) c.onchange = () => {
+        const o = g === 'n' ? dst : dst[g], city = ($('ptF08D_' + g + '_city') || {}).value || '';
+        o.country = c.value; o.city = city.trim(); o.tz = tzOfCountry(c.value) || ''; paintDayBox(); }; });
+    }
+    function fillDay() {
+      const f = form(), box = $('ptF08DayBox');
+      if (off() || !f || !canEdit()) { if (box) box.remove(); dst = null; return; }
+      dIdx = deps.dayIndex(); const d = deps.days()[dIdx]; if (!d) return;
+      dst = f08DayFormState(d); paintDayBox();
+      const k = dIdx; loadCountries().then(() => { if (dst && dIdx === k && $('ptF08DayBox')) { readDayBox(); paintDayBox(); } });
+    }
+    function beforeSave() {
+      if (off() || !dst || !canEdit() || !$('ptF08DayBox')) return;
+      readDayBox(); const a = deps.days(); if (!a[dIdx]) return;
+      a[dIdx] = f08ApplyDayForm(a[dIdx], dst); clearCaches();
+    }
+    ui = { fillDay, beforeSave, refresh() { paintMore(); if (panelOpen()) paintPanel(); } };
+
     /* boot */
     paintMore();
     try { const host = moreHost(); if (host) new MutationObserver(() => { if (!$('ptF08Row')) paintMore(); }).observe(host, { childList: true }); } catch (e) { }
@@ -503,7 +671,8 @@ button.p08-row{cursor:pointer}.p08-row.fl{background:#f1f0ea;border-style:dashed
   }
 
   const api = { version: VERSION, f08Configure, f08DayIso, f08DayCountry, f08DayTz, f08IsFlight, f08FlightFrom, f08FlightTo, f08TodayIndex, f08HereSide, f08HereTz, f08HereCountry, f08HomeTz, f08SameClock, f08Ranges, f08ApplyRange, f08ClearRange, f08NeedsTzPicker, f08LocalDate: localDate,
-    /* CHANGE 2026-11-13 F08-A2-01: conversation 2 additions */ f08RangesView, f08RangesHtml, f08NewRangeState, f08EditRangeState, f08SheetHtml, f08CountryListHtml, f08UiCommit, attach, mount };
+    /* CHANGE 2026-11-13 F08-A2-01: conversation 2 additions */ f08RangesView, f08RangesHtml, f08NewRangeState, f08EditRangeState, f08SheetHtml, f08CountryListHtml, f08UiCommit, attach, mount,
+    /* CHANGE 2026-11-14 F08-A3-01: conversation 3 additions */ f08DayFormState, f08ApplyDayForm, f08DayFormHtml, f08LandingFromRes, paintClocks, fillDay() { if (ui) ui.fillDay(); }, beforeSave() { if (ui) ui.beforeSave(); } };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else { root.__ptF08 = api; Object.keys(api).forEach(k => { if (k.indexOf('f08') === 0) root[k] = api[k]; }); }
 })(typeof window !== 'undefined' ? window : globalThis);
