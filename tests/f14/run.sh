@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Lonely Planner F14 developer test runner · version 1.1.0
+# Lonely Planner F14 developer test runner · version 1.2.0
+# CHANGE 2026-11-15 F14-QA-04: what changed from 1.1.0: + `app` (step 3: Node tests of app/js/f14.js, then ONE browser pass at 390 px in the real app with a stubbed chat endpoint).
 # CHANGE 2026-11-15 F14-QA-03: what changed from 1.0.0: + `fn` (step 2: Node run of supabase/functions/chat-assistant/test.ts, no Deno binary needed).
 # CHANGE 2026-11-15 F14-QA-02: new file (no previous version).
-# usage: tests/f14/run.sh [--only db|fn|app]    (app is added in step 3)
+# usage: tests/f14/run.sh [--only db|fn|app]
+#   app  tests/f14/f14_test.mjs (Node, no browser) + tests/f14/test_f14_browser.py (Chromium, fake backend, no network)
 #   fn   chat-assistant unit tests (stubbed auth, rpc and Anthropic): validators, history, cap, 401/403/429/503, refunds, logs
 #   db   local PostgreSQL: 0001…0017 (tests/f21/db_test.py --setup-only) + 0022_f14.sql (applied twice: idempotent) → tests/f14/db_test.sql
 set -u
@@ -27,5 +29,14 @@ if want fn; then
   echo "$out" | tail -1 | sed 's/^/fn  /'
   bad=$(echo "$out" | grep -E '^\s+FAIL'); [ -z "$bad" ] || { echo "$bad"; RC=1; }
   echo "$out" | tail -1 | grep -qE '^([0-9]+)/\1 pass' || RC=1
+fi
+if want app; then
+  NODE=${NODE:-node}
+  out=$(cd "$REPO" && "$NODE" --test tests/f14/f14_test.mjs 2>&1)
+  echo "$out" | grep -E '^# (pass|fail)' | tr '\n' ' ' | sed 's/^/app node: /'; echo
+  echo "$out" | grep -E '^not ok' ; echo "$out" | grep -qE '^# fail 0' || RC=1
+  out=$(cd "$HERE" && REPO_DIR="$REPO" APP_DIR="$REPO/app" python3 -m pytest test_f14_browser.py -q -x --tb=short -p no:cacheprovider 2>&1 | tail -30)
+  echo "$out" | tail -3 | sed 's/^/app browser: /'
+  echo "$out" | grep -qE '[0-9]+ passed' && ! echo "$out" | grep -qE 'failed|error' || { echo "$out"; RC=1; }
 fi
 exit $RC

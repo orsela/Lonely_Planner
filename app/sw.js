@@ -24,7 +24,9 @@ const ICONS = ["icon-192.png", "icon-512.png"];
    time zones to save a range offline (AC10). */
 /* CHANGE 2026-11-14 F24-SW-01: was ["js/f08.js", "countries.json"]. js/f24.js (F24, v3.0.0-alpha.14) and airports.json (the origin sheet) added, so the
    flight / lodging cards and the origin search work offline (C9). Nothing else in this file changed. */
-const SHELL_FILES = ["js/f08.js", "js/f24.js", "countries.json", "airports.json"];
+/* CHANGE 2026-11-15 F14-SW-01: was ["js/f08.js", "js/f24.js", "countries.json", "airports.json"]. js/f14.js (F14, v3.0.0-alpha.15, the smart chat's page side) added, so it loads
+   offline like the page itself (LEAN rule 7). Nothing else in this file changed. */
+const SHELL_FILES = ["js/f08.js", "js/f24.js", "js/f14.js", "countries.json", "airports.json"];
 const NAV_TIMEOUT_MS = 6000;
 
 self.addEventListener("install", (e) => {
