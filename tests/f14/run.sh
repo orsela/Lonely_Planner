@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Lonely Planner F14 developer test runner · version 1.0.0
+# Lonely Planner F14 developer test runner · version 1.1.0
+# CHANGE 2026-11-15 F14-QA-03: what changed from 1.0.0: + `fn` (step 2: Node run of supabase/functions/chat-assistant/test.ts, no Deno binary needed).
 # CHANGE 2026-11-15 F14-QA-02: new file (no previous version).
-# usage: tests/f14/run.sh [--only db|fn|app]    (fn and app are added in steps 2 and 3)
+# usage: tests/f14/run.sh [--only db|fn|app]    (app is added in step 3)
+#   fn   chat-assistant unit tests (stubbed auth, rpc and Anthropic): validators, history, cap, 401/403/429/503, refunds, logs
 #   db   local PostgreSQL: 0001…0017 (tests/f21/db_test.py --setup-only) + 0022_f14.sql (applied twice: idempotent) → tests/f14/db_test.sql
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"; REPO="$(cd "$HERE/../.." && pwd)"
@@ -18,5 +20,12 @@ if want db; then
   bad=$(echo "$out" | grep FAIL); [ -z "$bad" ] || { echo "$bad"; RC=1; }
   [ -n "$out" ] || { echo "db  produced no rows"; RC=1; }
   (cd /tmp && sudo -u postgres psql -X -qc "drop database if exists $DB" >/dev/null 2>&1)
+fi
+if want fn; then
+  NODE=${NODE:-node}
+  out=$(cd "$REPO" && "$NODE" --experimental-transform-types --no-warnings --import "$REPO/tests/f05/deno_shim.mjs" scripts/dev/deno_test_node.mjs supabase/functions/chat-assistant/test.ts 2>&1)
+  echo "$out" | tail -1 | sed 's/^/fn  /'
+  bad=$(echo "$out" | grep -E '^\s+FAIL'); [ -z "$bad" ] || { echo "$bad"; RC=1; }
+  echo "$out" | tail -1 | grep -qE '^([0-9]+)/\1 pass' || RC=1
 fi
 exit $RC
