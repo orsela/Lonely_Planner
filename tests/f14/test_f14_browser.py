@@ -61,7 +61,7 @@ def last_texts(page, n=1):
 def test_f14_chat_in_the_real_app(env):
     be = env.backend
     tid = be.fixture("S", role="manager")
-    H.serve_src(env, H.h10.flip_chat(H.app_html(), "on"))   # the page flag is 'soon' again (F14-FLAG-02)
+    H.serve_src(env, H.app_html())   # CHAT_FEATURE is 'on' in the page since F14-FLAG-01
     dev = H.boot(env, tid, role="manager"); page = dev.page
     errs = []; page.on("pageerror", lambda e: errs.append(str(e)))
     P = []
@@ -69,19 +69,14 @@ def test_f14_chat_in_the_real_app(env):
     stub(page, queue, seen)
     page.wait_for_timeout(800)
     ver = page.evaluate("()=>window.__ptF14&&window.__ptF14.version")
-    if ver != "3.0.0-alpha.15.1": P.append("f14 version: %r" % ver)
-    if page.evaluate("()=>window.__PT.version") != "3.0.0-alpha.15.2": P.append("app version: %r" % page.evaluate("()=>window.__PT.version"))
+    if ver != "3.0.0-alpha.15": P.append("f14 version: %r" % ver)
+    if page.evaluate("()=>window.__PT.version") != "3.0.0-alpha.15.3": P.append("app version: %r" % page.evaluate("()=>window.__PT.version"))
     if not page.evaluate("()=>window.__ptF14.enabled()"): P.append("f14 not enabled with CHAT_FEATURE='on'")
     page.wait_for_function("()=>document.getElementById('ptF14Css')", timeout=5000)
     page.wait_for_timeout(1200)   # airports.json / countries.json
 
-    # F14-CHIPS-01 · the suggested questions are gone, also on an empty chat
-    page.click("#chatFab"); page.wait_for_timeout(300)
-    if page.locator("#chatBody .chat-chip, #chatBody .chat-chips").count(): P.append("suggested questions still shown")
-    page.click("#chatCloseBtn"); page.wait_for_timeout(200)
-
     # AC1 · the sheet opens and a plain question goes out with the user's JWT, the trip id and tripInfo; the answer is shown
-    page.click("#chatFab"); page.wait_for_timeout(300)   # (opened again after the chips check)
+    page.click("#chatFab"); page.wait_for_timeout(300)
     if not page.locator("#chatSheet.open").count(): P.append("chat sheet did not open")
     queue.append((200, {"answer": "שלום מהשרת", "action": None}))
     ask(page, "כמה ימים בטיול?")
@@ -163,7 +158,6 @@ def test_f14_chat_in_the_real_app(env):
     p2.wait_for_timeout(1000)
     if p2.evaluate("()=>window.__ptF14.enabled()"): P.append("soon: f14 enabled")
     if p2.locator("#ptF14Css").count(): P.append("soon: styles present")
-    if p2.evaluate("()=>window.__ptF14.suggestions(['x']).length")!=1: P.append("soon: suggestions changed")
     p2.click("#chatFab"); p2.wait_for_timeout(600)
     if p2.locator("#chatSheet.open").count(): P.append("soon: the sheet opened")
     if seen2: P.append("soon: %d requests" % len(seen2))

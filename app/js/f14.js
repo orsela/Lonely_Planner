@@ -1,5 +1,4 @@
-/* Lonely Planner · F14 – smart chat, stage 1: the page side · version 3.0.0-alpha.15.1
-   CHANGE 2026-11-15 F14-CHIPS-01 (alpha.15.1): what changed from alpha.15: new suggestions(list) — the suggested-question chips under the chat are not shown while F14 is on (it returns an empty list). Nothing else changed.
+/* Lonely Planner · F14 – smart chat, stage 1: the page side · version 3.0.0-alpha.15
    CHANGE 2026-11-15 F14-A3-01 (step 3): new file (no alpha.14 equivalent). What changed from alpha.14: until now the chat button (CHAT_FEATURE='soon')
    showed a toast and nothing was sent anywhere; the server function chat-assistant (step 2, alpha.15.1) existed but nobody called it. This file is the
    client for it. With CHAT_FEATURE='on' and STORAGE_BACKEND='cloud' it
@@ -16,7 +15,7 @@
    Spec: claude/Plan_Travel_F14_spec.md (C2, C6–C8), status file overrides it. Everything the helpers need arrives through f14Configure() / attach() / mount(). */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.15.1';
+  const VERSION = '3.0.0-alpha.15';
 
   /* ---- environment (injectable; the page gives it through attach at the gate and mount in the main script) ---- */
   const env = {};   // flag(), backend(), endpoint, client(), tripId(), withTimeout(p,ms), days(), tripName(), currencies() → {home,local}, countries() → {CODE:{en,he}}, home() → {city,airport},
@@ -213,9 +212,6 @@
     return bubble(m.role, text) + '<div class="p14-row"><div class="p14-card" data-p14-kind="' + escH(r.kind) + '">' + f14CardHtml(r, { online: online() }) + '</div></div>';
   }
 
-  /* the chat's suggested questions are switched off while F14 is on (Or, 15/11); the page's own list is ignored */
-  function suggestions(list) { return enabled() ? [] : list; }
-
   /* mount (main script, after the chat code): styles, country names, repaint on connection change. false = nothing to do (flag, backend). */
   function mount(dep) {
     f14Configure(dep);
@@ -229,7 +225,7 @@
     B.mounted = true; return true;
   }
 
-  const api = { version: VERSION, f14Configure, f14ErrorCode, f14ErrorLine, f14TripInfo, f14EnrichTrip, f14Fetch, f14CardHtml, f14MissingLine, f14MessageHtml, attach, mount, send, messageHtml: f14MessageHtml, enabled, suggestions };
+  const api = { version: VERSION, f14Configure, f14ErrorCode, f14ErrorLine, f14TripInfo, f14EnrichTrip, f14Fetch, f14CardHtml, f14MissingLine, f14MessageHtml, attach, mount, send, messageHtml: f14MessageHtml, enabled };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else { root.__ptF14 = api; Object.keys(api).forEach(k => { if (k.indexOf('f14') === 0) root[k] = api[k]; }); }
 })(typeof window !== 'undefined' ? window : globalThis);
