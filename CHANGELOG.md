@@ -1,6 +1,10 @@
 # Plan_Travel – CHANGELOG
 
-## 3.0.0-alpha.15 — F14 · the smart chat (2026-11-15; phone check pending)
+## 3.0.0-alpha.15.2 — F14 chat switched back off (2026-11-15)
+<!-- CHANGE 2026-11-15 F14-DOCS-07: new entry. -->
+- `CHAT_FEATURE='soon'` again (alpha.14 behaviour) after the first phone check: answers did not address the questions. Code and server stay deployed; flip the flag to turn it back on.
+
+## 3.0.0-alpha.15 — F14 · the smart chat (2026-11-15; rolled back in alpha.15.2)
 <!-- CHANGE 2026-11-15 F14-DOCS-06: new entry. Spec claude/Plan_Travel_F14_spec.md (project doc), steps 1–4. -->
 - 💬 opens the chat: questions about the trip (days, budget, expenses, currency, weather, a photo) are answered in Hebrew by Claude through the new
   Edge Function `chat-assistant`, as the signed-in user; any active member (viewers too) can ask. 100 questions per trip per UTC day.

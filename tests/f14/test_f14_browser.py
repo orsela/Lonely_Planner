@@ -61,7 +61,7 @@ def last_texts(page, n=1):
 def test_f14_chat_in_the_real_app(env):
     be = env.backend
     tid = be.fixture("S", role="manager")
-    H.serve_src(env, H.app_html())   # CHAT_FEATURE is 'on' in the page since F14-FLAG-01
+    H.serve_src(env, H.h10.flip_chat(H.app_html(), "on"))   # the page flag is 'soon' again (F14-FLAG-02)
     dev = H.boot(env, tid, role="manager"); page = dev.page
     errs = []; page.on("pageerror", lambda e: errs.append(str(e)))
     P = []
@@ -70,7 +70,7 @@ def test_f14_chat_in_the_real_app(env):
     page.wait_for_timeout(800)
     ver = page.evaluate("()=>window.__ptF14&&window.__ptF14.version")
     if ver != "3.0.0-alpha.15.1": P.append("f14 version: %r" % ver)
-    if page.evaluate("()=>window.__PT.version") != "3.0.0-alpha.15.1": P.append("app version: %r" % page.evaluate("()=>window.__PT.version"))
+    if page.evaluate("()=>window.__PT.version") != "3.0.0-alpha.15.2": P.append("app version: %r" % page.evaluate("()=>window.__PT.version"))
     if not page.evaluate("()=>window.__ptF14.enabled()"): P.append("f14 not enabled with CHAT_FEATURE='on'")
     page.wait_for_function("()=>document.getElementById('ptF14Css')", timeout=5000)
     page.wait_for_timeout(1200)   # airports.json / countries.json
