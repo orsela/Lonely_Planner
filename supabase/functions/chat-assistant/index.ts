@@ -1,4 +1,7 @@
-// Lonely Planner Edge Function `chat-assistant` · version 3.0.0-alpha.15.0 · F14 (smart chat, stage 1)
+// Lonely Planner Edge Function `chat-assistant` · version 3.0.0-alpha.15.1 · F14 (smart chat, stage 1)
+// CHANGE 2026-11-15 F14-FN-04: what changed from 3.0.0-alpha.15.0: system prompt only — "home" in a flight request (הביתה) resolves to
+//   tripInfo.homeCity / homeAirport when the page sends one, else to Tel Aviv (TLV) when the home currency is ILS, else the model asks
+//   (first real call on 15/11 asked "where is home?" for a trip with homeCurrency ILS; AC5 expects BUS → TLV).
 // CHANGE 2026-11-15 F14-FN-01: new file (no previous version). Derived from the Vietnam Travel Planner function
 //   claude/supabase_chat_assistant_index_v2.2.0.ts. What changed from v2.2.0 (docs/F14_dev_notes.md, spec C1–C11):
 //   (1) Trip-generic: no Vietnam text in the prompt; the country/countries, currencies and members come from the data the
@@ -32,7 +35,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 
-export const FN_VERSION = "3.0.0-alpha.15.0";
+export const FN_VERSION = "3.0.0-alpha.15.1";
 export const VERSION_HEADER = "X-Function-Version";
 export const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 export const ANTHROPIC_VERSION = "2023-06-01";
@@ -245,7 +248,7 @@ export function buildSystemPrompt(lang: string, today: string, range: { start: s
     "If something is not in the data (exact opening hours, current prices, live availability, real weather), say clearly that you do not have it instead of inventing it. You may use your general travel knowledge (culture, tips, general recommendations) as long as it does not contradict the trip's data.",
     "If the user attaches a picture (a menu, a sign, a ticket, a product label), refer to what is visible in it and do not invent details you cannot see. If the picture is a restaurant menu with dish names in any language, ALWAYS translate the dish names into " + language + ", even if the question was about something else, next to whatever else was asked.",
     `Today's date is ${today}.` + (range ? ` The trip runs from ${range.start} to ${range.end}.` : ""),
-    "You have exactly one tool, `search_links`, for requests to find a flight or a hotel. It only shows the family a card with search links; it saves and changes nothing, and the app builds the links, not you. When you use it write one short sentence (for example 'Here are the links 👇') and never write prices, times or availability. If the destination or the date is missing, do not call the tool — ask one short question about what is missing.",
+    "You have exactly one tool, `search_links`, for requests to find a flight or a hotel. It only shows the family a card with search links; it saves and changes nothing, and the app builds the links, not you. When you use it write one short sentence (for example 'Here are the links 👇') and never write prices, times or availability. If the destination or the date is missing, do not call the tool — ask one short question about what is missing. When the user says \"home\" (e.g. \"flight home\") use `tripInfo.homeCity` or `tripInfo.homeAirport` if given; otherwise, if `tripInfo.homeCurrency` is ILS, home is Tel Aviv (TLV); otherwise ask where home is.",
     "You cannot change the trip, the budget or any other data. If the user asks you to add, change or delete something, tell them briefly that you cannot do that from the chat.",
   ].join("\n");
 }

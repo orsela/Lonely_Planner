@@ -1,4 +1,4 @@
-// Lonely Planner · chat-assistant unit tests · version 3.0.0-alpha.15.0 · F14
+// Lonely Planner · chat-assistant unit tests · version 3.0.0-alpha.15.1 · F14
 // CHANGE 2026-11-15 F14-FN-03: new file (no previous version). Deno-style tests for docs/F14_dev_notes.md / spec C1–C11 with
 //   stubbed deps (auth, rpc chat_take / chat_refund, Anthropic fetch). No network, no database.
 // Run offline (no Deno binary):
@@ -116,6 +116,7 @@ test("system prompt is trip-generic (C6)", () => {
   assert(!/vietnam|ויטנאם|וייטנאם|VND|Hoi An/i.test(he + en), "no fixed country in the prompt");
   assert(he.includes("Hebrew") && he.includes("2026-11-15") && he.includes("2026-12-01 to 2026-12-10"));
   assert(en.includes("English") && !en.includes("The trip runs"));
+  assert(he.includes("Tel Aviv (TLV)") && he.includes("homeCity"), "home resolves to TLV for ILS trips");
   assert(provider("anything") === "claude");
 });
 test("buildMessages: empty entries, trailing duplicate, user first, alternating roles (v2.2.0 CHAT-FIX)", () => {
