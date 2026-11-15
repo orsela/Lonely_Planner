@@ -38,7 +38,9 @@ if('serviceWorker' in navigator){
                     'on' (F14) = exposes the plan-travel URL/key so the main script's existing CHAT_ENDPOINT points at
                     plan-travel's chat-assistant function (not deployed in F02). */
 const STORAGE_BACKEND='cloud';
-const CHAT_FEATURE='soon';
+/* CHANGE 2026-11-15 F14-FLAG-01: was 'soon'. The smart chat is on (3.0.0-alpha.15): the chat button opens the sheet and questions go to chat-assistant as the signed-in
+   user (app/js/f14.js). Revert: 'soon' = exactly the 3.0.0-alpha.14 behaviour (toast, no request); server kill switch: secret CHAT_FEATURE=off. */
+const CHAT_FEATURE='on';
 /* CHANGE 2026-10-05 F03-FLAG-01: new flag (no alpha.2 equivalent). 'on' = "החשבון שלי" rows in עוד, the #admin screen for
    platform admins and the #invite= landing page (docs/F03_spec.md). 'off' = exactly the 3.0.0-alpha.2 behaviour: the F03 block
    below returns on its first line, so no rows, no admin screen, and #invite= is ignored (normal boot). */

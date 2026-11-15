@@ -1,5 +1,15 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.15 — F14 · the smart chat (2026-11-15; phone check pending)
+<!-- CHANGE 2026-11-15 F14-DOCS-06: new entry. Spec claude/Plan_Travel_F14_spec.md (project doc), steps 1–4. -->
+- 💬 opens the chat: questions about the trip (days, budget, expenses, currency, weather, a photo) are answered in Hebrew by Claude through the new
+  Edge Function `chat-assistant`, as the signed-in user; any active member (viewers too) can ask. 100 questions per trip per UTC day.
+- "Find me a flight home from Batumi on 17/5" / a hotel request → a card with prefilled Google Flights + Skyscanner / Booking + Google Hotels links
+  (F24's builders). No prices, nothing saved, no approve step; a request without a date gets a question back. The chat never changes trip data.
+- Refusals (not signed in, not a member, daily limit, service off, timeout) are one friendly line, never a retry.
+- Flag `CHAT_FEATURE` ('soon' = alpha.14); server kill switch: secret `CHAT_FEATURE=off`. Code: `app/js/f14.js`, `supabase/functions/chat-assistant/`,
+  migration `0022_f14.sql`. Tests: `tests/f14/run.sh` (db 23, fn 36, app: 15 Node + one 390 px browser pass).
+
 ## 3.0.0-alpha.14 — F24 · flight and hotel search links (2026-11-14; branch f24, phone check pending)
 <!-- CHANGE 2026-11-14 F24-DOCS-03: new entry. Spec claude/Plan_Travel_F24_spec.md (project doc), conversations 1–2 of 3 (the chat part, C8, is conversation 3). No server part, no migration. -->
 - Day card under the day's reservations: a flight day with no flight reservation shows "עוד אין טיסה ליום הזה" (origin TLV by default or the previous

@@ -61,7 +61,7 @@ def last_texts(page, n=1):
 def test_f14_chat_in_the_real_app(env):
     be = env.backend
     tid = be.fixture("S", role="manager")
-    H.serve_src(env, H.h10.flip_chat(H.app_html(), "on"))
+    H.serve_src(env, H.app_html())   # CHAT_FEATURE is 'on' in the page since F14-FLAG-01
     dev = H.boot(env, tid, role="manager"); page = dev.page
     errs = []; page.on("pageerror", lambda e: errs.append(str(e)))
     P = []
@@ -151,7 +151,7 @@ def test_f14_chat_in_the_real_app(env):
     if errs: P.append("page errors: %r" % errs)
 
     # AC4 · CHAT_FEATURE='soon' (today's value): no request, no F14 styles; the button is the old toast
-    H.serve_src(env, H.app_html())
+    H.serve_src(env, H.h10.flip_chat(H.app_html(), "soon"))
     seen2 = []; q2 = []
     dev2 = H.boot(env, tid, role="manager", name="B"); p2 = dev2.page
     stub(p2, q2, seen2)
