@@ -10,7 +10,7 @@ Work is split like F08, one conversation = one commit:
 |---|---|---|
 | 1 | `app/js/f24.js` data + link builders (C1–C8 pure part), `app/airports.json`, Node tests | **done 2026-11-14** |
 | 2 | Day cards `FB_DayFlight` / `FB_DayHotel`, origin sheet `FB_Origin`, offline (C9), wiring into `app/index.html` (script tag, `TRAVELSEARCH_FEATURE`, version alpha.14), `sw.js` (`js/f24.js`, `airports.json`), one 390 px browser check, HTML-equality check of a booked day (AC3) | **done 2026-11-14** (link formats not opened: no network here) |
-| 3 | Chat (C8): check R1 first (`chat-assistant` on `plan-travel`); card `FB_Chat`; restore the `/request/` hero line (F23-REQ-19); merge; Or's phone check | open |
+| 3 | Chat (C8): check R1 first (`chat-assistant` on `plan-travel`); card `FB_Chat`; restore the `/request/` hero line (F23-REQ-19); merge; Or's phone check | **partly done 2026-11-15:** R1 checked (no `chat-assistant` on `plan-travel`), hero line restored, merged; chat part (C8, `FB_Chat`) and the phone check are open |
 
 ## Conversation 1 – what exists
 - `app/js/f24.js` (not loaded by the app yet): `f24FlightSearch(i,{origin?})`, `f24LodgingSearch(i)`, `f24ChatSearch(args)` return the
@@ -55,3 +55,15 @@ Work is split like F08, one conversation = one commit:
   To do on Or's phone in conversation 3: one Google Flights, Skyscanner, Booking and Google Hotels link each; record the result here.
 - Phone check (one flight day, one lodging day) – conversation 3. Chat (C8) and the `/request/` hero line – conversation 3.
 - Not run: the full F10 / F10b browser suites (LEAN rule 5); `tests/qa_versions.json` still lists old versions (updated in the QA round before v3.0.0).
+
+## Conversation 3 – what was done (2026-11-15)
+- **R1 checked (Supabase `plan-travel`, edge functions):** invite-manager, create-trip, approve-member, join-trip, manage-members, request-trip, request-trip-f23. **There is no
+  `chat-assistant`.** Per the spec, the chat part (C8 tool `search_links`, card `FB_Chat`) is **not built**: it needs a new server function (Anthropic key already in the
+  project, a Gemini key only for maps / photos) and belongs with F14 (the smart chat). The day cards (C1–C7, C9) are complete and independent of it.
+  `app/js/f24.js` already has `f24ChatSearch(args)` (pure, tested) ready for F14 to call; the card markup can reuse `f24FlightCardHtml` / `f24HotelCardHtml`.
+- `/request/` hero line restored in Hebrew and English (F24-A3-03); `tests/f23/request_page_test.mjs` updated (page 8/8).
+- Card moved under the day strip's weather card (F24-A3-01).
+- Merged `f24` into `main` (fast-forward). Flag `TRAVELSEARCH_FEATURE='off'` returns alpha.13.1 behaviour.
+## Open for Or
+- Phone check: one flight day, one lodging day; open one link of each of the four sites and tell me if any lands on an empty search (formats not checked from here).
+- Decision: build the chat tool now (needs a new `chat-assistant` function on `plan-travel`) or leave it to F14.
