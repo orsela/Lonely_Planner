@@ -1,4 +1,6 @@
 /* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.14
+   CHANGE 2026-11-15 F24-A3-01 (conversation 3): what changed from F24-A2-01: the card is placed under the route screen's weather card (#routeDayWeather) instead of
+   under #dayReservations, so it shows in the map view too (Or's decision 2026-11-15). Nothing else in the file changed in this step.
    CHANGE 2026-11-14 F24-A2-01 (conversation 2): what changed from conversation 1 (same file, same version number alpha.14, which was never loaded
    by the app before): new "browser part" before the export — attach (client / trip id for the member count), mount (styles, the day cards
    FB_DayFlight / FB_DayHotel, the origin sheet FB_Origin, offline rule C9, airports.json / countries.json loading, the last 3 origins in
@@ -314,7 +316,7 @@ button.p24-leg{cursor:pointer}
     if (res) setReservations(res);
     const old = document.getElementById('ptF24Card'); if (old) old.remove();
     if (!B.mounted || off()) return;
-    const i = B.dep && B.dep.dayIndex ? B.dep.dayIndex() : 0, anchor = document.getElementById('dayReservations'); if (!anchor) return;
+    const i = B.dep && B.dep.dayIndex ? B.dep.dayIndex() : 0, anchor = document.getElementById('routeDayWeather') || document.getElementById('dayReservations'); if (!anchor) return;   /* F24-A3-01: route-v2 hides the old day card in the map view, so the card sits under the day strip's weather card (both views) */
     let c = null, html = '', on = onlineNow();
     try {
       c = f24FlightSearch(i, B.over[i] ? { origin: B.over[i] } : undefined);

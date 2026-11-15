@@ -42,8 +42,7 @@ Work is split like F08, one conversation = one commit:
 - Tests: `tests/f24/run.sh` 16 Node; `tests/f24/run_browser.sh` one pass in the real app (390 px): AC1, AC2, AC3 (booked day HTML equals the flag-off page), AC4, AC5, AC7, AC8, AC9.
 
 ## Decisions taken in conversation 2 (for Or's review)
-1. **Where the card shows:** inside the day card (right after "הזמנות מקושרות ליום זה"), as in the mockup. That card is visible in the "ציר זמן" view of
-   "מסלול ומפה"; the map view hides the day card (existing CSS), so there the F24 card is hidden too. Moving it above the map view is a one-line change if Or wants it.
+1. **Where the card shows (changed 2026-11-15 by Or, F24-A3-01):** right after the route screen's weather card (`#routeDayWeather`), under the day strip, so it shows in both the map and the timeline view. Conversation 2 had put it inside the day card, which the map view (the default) hides.
 2. **Member count:** F06 keeps its member list private, so F24 reads `trip_members` (status active) itself, at most once a minute while a card is on screen, and caches
    the number per trip. No cloud / first load before the answer: 1 traveler. A trip in local-only mode: 1.
 3. **One-way chip:** a one-way flight card says "כיוון אחד" instead of "הלוך" (the mockup shows only the round-trip case).

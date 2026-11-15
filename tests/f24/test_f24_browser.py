@@ -74,8 +74,13 @@ def test_f24_cards_in_the_real_app(env):
             if not hrefs[0][0].startswith("https://www.google.com/travel/flights?q="): P.append("google flights href %r" % hrefs[0][0])
             if "/transport/flights/tlv/bkk/270110/" not in hrefs[1][0] or "adultsv2=2" not in hrefs[1][0]: P.append("skyscanner href %r" % hrefs[1][0])
             if any(h[1] != "_blank" or "noopener" not in h[2] for h in hrefs): P.append("links must open in a new tab with noopener: %r" % hrefs)
-    # card sits under the day's reservations, inside the day card
-    if not page.evaluate("()=>{const c=document.getElementById('ptF24Card');return !!c&&c.previousElementSibling&&c.previousElementSibling.id==='dayReservations'}"): P.append("card is not right after #dayReservations")
+    # F24-A3-02 (was: card right after #dayReservations, inside the day card, visible only in the timeline view): the card sits right after the
+    # day strip's weather card and is visible in BOTH views of the route screen
+    if not page.evaluate("()=>{const c=document.getElementById('ptF24Card');return !!c&&c.previousElementSibling&&c.previousElementSibling.id==='routeDayWeather'}"): P.append("card is not right after #routeDayWeather")
+    for view in ("map", "timeline"):
+        page.locator("#routeViewToggle [data-route-view=%s]" % view).click(); page.wait_for_timeout(300)
+        r = page.evaluate("()=>{const c=document.getElementById('ptF24Card');const b=c&&c.getBoundingClientRect();return b?[b.width,b.height]:null}")
+        if not r or r[0] < 200 or r[1] < 60: P.append("card not visible in the %s view: %r" % (view, r))
 
     # AC2 · origin sheet: change to LCA; the card and both links follow; next day's search is still TLV
     card(page).locator("#ptF24Chg").click(); page.wait_for_timeout(400)
