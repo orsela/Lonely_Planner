@@ -119,6 +119,11 @@ const F08_FEATURE='on';
    All the code is in app/js/f24.js (script tag below); this file only has this flag, the gate hook F24-GATE-01 and the main-script hook
    F24-MOUNT-01 (a wrapper of renderDayReservations). 'off' = exactly the 3.0.0-alpha.13.1 behaviour: no card, no new DOM. No server part. */
 const TRAVELSEARCH_FEATURE='on';
+/* CHANGE 2026-11-16 F07-FLAG-01: new flag (no alpha.15.3 equivalent). 'on' = F07 (docs/F07_spec.md): a member who changed phones asks to link the new one
+   ("כבר הייתי בטיול"), and the manager's home card shows it as "מכשיר חדש" with no role picker. The page side is in app/js/f07.js (script tag below); this file has the
+   flag and a few connection points (F07-JOIN-03, F07-HOME-01..03, F07-MOUNT-01). /join/ has its own RELINK_FEATURE. 'off' = exactly the 3.0.0-alpha.15.3 behaviour
+   (conversation 3 adds devices per member, "אני · <שם>" and the login notice under the same flag). Server part: migration 0018, already deployed. */
+const RELINK_FEATURE='off';
 </script>
 <!-- CHANGE 2026-11-13 F08-SCRIPT-01: new tag (no alpha.12.1 equivalent). F08 lives in its own file (LEAN rule 4). If the file
      does not load, window.__ptF08 is absent and both F08 hooks are no-ops. Cached for offline by sw.js (F08-SW-01). -->
@@ -129,6 +134,9 @@ const TRAVELSEARCH_FEATURE='on';
 <!-- CHANGE 2026-11-15 F14-SCRIPT-01: new tag (no alpha.14 equivalent). F14 (smart chat, page side) lives in its own file (LEAN rule 4); it uses f08.js and f24.js when they
      are there. If the file does not load, window.__ptF14 is absent and all F14 hooks are no-ops. Cached for offline by sw.js (F14-SW-01). -->
 <script src="js/f14.js"></script>
+<!-- CHANGE 2026-11-16 F07-SCRIPT-01: new tag (no alpha.15.3 equivalent). F07 (page side) lives in its own file (LEAN rule 4). If the file does not load, window.__ptF07 is absent and
+     every F07 hook is a no-op. Cached for offline by sw.js (F07-SW-01). -->
+<script src="js/f07.js"></script>
 <!-- CHANGE 2026-11-07 F22A-UI-01: NEW block (no 3.0.0-alpha.10 equivalent) — F22a "sign in with Google" (docs/F22a_spec.md,
      rulings C1–C13, mockup row 15 F22_Me / F22_Linked / F22_Gate / F22_Welcome / F22_NoTrips / F22_Conflict). Style + one classic
      script, placed right after the flags script and BEFORE the F03 block, because the OAuth return (token hash / ?code= /
@@ -3875,6 +3883,7 @@ async function joinFromLink(){
  flowHandle=window.LPJoin.mount(host,{
   getClient:async()=>{await api.ensureSession();return api.client()},
   fnUrl:api.endpoint,apiKey:api.key,code:cand,inApp:true,
+  relink:typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on',   /* CHANGE 2026-11-16 F07-JOIN-03: new line (alpha.15.3: none) */
   onEnter:(tripId,role)=>{api.enterTrip(tripId,role)},
   onBack:()=>{try{flowHandle&&flowHandle.destroy()}catch{}flowHandle=null;host.remove();g.classList.remove('pt-f05-joining')}
  });
@@ -3920,11 +3929,13 @@ async function loadMe(){
 }
 async function loadMembers(){
  const t=tripId(),c=api&&api.client();if(!t||!c||!online())return;
- const{data,error}=await api.withTimeout(c.from('trip_members').select('display_name,status,joined_at,id,role').eq('trip_id',t).in('status',['active','pending']).order('joined_at',{ascending:true}),api.timeoutMs);
+ const{data,error}=await api.withTimeout(c.from('trip_members').select('display_name,status,joined_at,id,role'+(typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'?',relink_expires_at':'')).eq('trip_id',t).in('status',['active','pending']).order('joined_at',{ascending:true}),api.timeoutMs);
  if(error||!Array.isArray(data))return;
- const act=data.filter(r=>r.status==='active').map(r=>r.display_name);
+ /* CHANGE 2026-11-16 F07-HOME-01: what changed from 3.0.0-alpha.15.3: with RELINK_FEATURE='on' the select also reads relink_expires_at (with 'off' the query is exactly the old one); a relink request whose 24 h are over is not listed (C5, the server deletes it lazily);
+    a person with two devices is one name in the user list. Rows without relink_expires_at behave exactly as before. */
+ const act=Array.from(new Set(data.filter(r=>r.status==='active').map(r=>r.display_name)));
  if(act.length){setUsers(act);nsSet('pt_members',JSON.stringify(act))}
- pend=data.filter(r=>r.status==='pending').sort((a,b)=>String(b.joined_at||'').localeCompare(String(a.joined_at||'')));
+  pend=data.filter(r=>r.status==='pending'&&!(r.relink_expires_at&&Date.parse(r.relink_expires_at)<=Date.now())).sort((a,b)=>String(b.joined_at||'').localeCompare(String(a.joined_at||'')));
  paintPending();
 }
 /* F05-HOME-01 */
@@ -3950,14 +3961,17 @@ function paintPending(){
  let h='<div class="pt5-ph"><b id="ptF05PTitle">ממתינים לאישור · '+pend.length+'</b><span>רק מנהלים רואים</span></div>';
  pend.forEach((p,i)=>{
   const open=p.id===sel.open,role=sel[p.id]||'editor',col=COLORS[i%COLORS.length];
+  const F7=(p.relink_expires_at&&typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'&&window.__ptF07)||null;   /* CHANGE 2026-11-16 F07-HOME-02: relink request (tag, no role picker) */
   h+='<div class="pt5-req" data-member="'+esc(p.id)+'"><div class="pt5-who"><div class="pt5-av" style="background:'+col+'" aria-hidden="true">'+esc(String(p.display_name||'?').charAt(0))+'</div>'+
-   '<div class="pt5-nm"><b>'+esc(p.display_name)+'</b><small>ביקש/ה להצטרף · '+esc(ago(p.joined_at))+'</small></div>'+
+   '<div class="pt5-nm"><b>'+esc(p.display_name)+'</b>'+(F7?F7.tag():'')+'<small>'+(F7?'ביקש/ה לחבר מכשיר חדש · ':'ביקש/ה להצטרף · ')+esc(ago(p.joined_at))+'</small></div>'+
    (open?'':'<button type="button" class="pt5-btn ghost pt5-open" data-open="'+esc(p.id)+'" aria-label="פתיחת הבקשה של '+esc(p.display_name)+'" style="background:#fff;color:#17211b;border:1px solid #e4e6df">פתיחה</button>')+'</div>';
   if(open){
    if(confirmFor===p.id){
     h+='<p style="margin:0;font-size:13.5px;font-weight:700">לדחות את הבקשה של '+esc(p.display_name)+'?</p><div class="pt5-acts">'+
      '<button type="button" class="pt5-btn danger pt5-grow" data-act="reject-yes"'+(off||busy?' disabled':'')+'>כן, לדחות</button>'+
      '<button type="button" class="pt5-btn ghost" data-act="reject-no">ביטול</button></div>';
+   }else if(F7){
+    h+=F7.mgrOpenHtml({off,busy});   /* CHANGE 2026-11-16 F07-HOME-02: no role picker — the person's current role applies (C6) */
    }else{
     h+='<div class="pt5-seg" role="group" aria-label="תפקיד ל'+esc(p.display_name)+'">'+['viewer','editor','manager'].map(r=>'<button type="button" data-role="'+r+'" aria-pressed="'+(r===role)+'">'+ROLE[r]+'</button>').join('')+'</div>'+
      '<div class="pt5-acts"><button type="button" class="pt5-btn pt5-grow" data-act="approve"'+(off||busy?' disabled':'')+'>אישור כ'+ROLE[role]+'</button>'+
@@ -3981,7 +3995,7 @@ async function decide(memberId,decision){
  const role=sel[memberId]||'editor';
  try{
   const r=await callFn(api.approveEndpoint,decision==='approve'?{member_id:memberId,decision,role}:{member_id:memberId,decision});
-  toast(decision==='approve'?(p.display_name+' הצטרף/ה כ'+(ROLE[r.role]||ROLE[role])):'הבקשה נדחתה',document.body);
+  toast(decision==='approve'?(r&&r.relink?(p.display_name+': המכשיר החדש חובר'):(p.display_name+' הצטרף/ה כ'+(ROLE[r.role]||ROLE[role]))):'הבקשה נדחתה',document.body);   /* CHANGE 2026-11-16 F07-HOME-03: relink toast (was: always the join toast) */
  }catch(e){
   const c=e&&e.code;
   if(c==='not_manager')notMgrHide=true;   /* CHANGE 2026-10-26 FIX-02: hide the card on not_manager (was: toast only) */
@@ -4954,7 +4968,7 @@ html.pt-gate body>*:not(#ptGate){display:none!important}
 (function(){
 'use strict';
 /* CHANGE 2026-10-04 F02-FLAG-01: STORAGE_BACKEND and CHAT_FEATURE are read from the top-level flags script above. */
-const PT_VERSION='3.0.0-alpha.15.3'; /* CHANGE 2026-11-15 F14-VER-08: was '3.0.0-alpha.15.2' (Or: chat back ON with the suggested questions; alpha.15.1 chips removal and alpha.15.2 flag rollback are both undone, so this equals alpha.15 in behaviour) */ /* CHANGE 2026-11-15 F14-VER-02: was '3.0.0-alpha.14' (F14: the smart chat's page side; CHAT_FEATURE stays 'soon') */ /* CHANGE 2026-11-14 F24-VER-02: was '3.0.0-alpha.13.1' (F24: flight and hotel search links) */ /* CHANGE 2026-11-14 F08-VER-02: was '3.0.0-alpha.13' (F08 stage B) */ /* CHANGE 2026-11-14 F08-VER-01: was '3.0.0-alpha.12.1' (F08 stage A) */ /* CHANGE 2026-11-13 F23-VER-04: was '3.0.0-alpha.12' (F23-WZ-01) */ /* CHANGE 2026-11-13 F23-VER-02: was '3.0.0-alpha.11' (F23) */ /* CHANGE 2026-11-07 F22A-VER-02: was '3.0.0-alpha.10' (F22a: sign in with Google) */ /* CHANGE 2026-11-07 F10B-VER-02: was '3.0.0-alpha.9' (F10b: trip currencies screen) */ /* CHANGE 2026-11-07 F10-VER-02: was '3.0.0-alpha.8' (F10: every trip converts in its own currencies) */ /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
+const PT_VERSION='3.0.0-alpha.16'; /* CHANGE 2026-11-16 F07-VER-02: was '3.0.0-alpha.15.3' (F07 page side; RELINK_FEATURE='off') */ /* CHANGE 2026-11-15 F14-VER-08: was '3.0.0-alpha.15.2' (Or: chat back ON with the suggested questions; alpha.15.1 chips removal and alpha.15.2 flag rollback are both undone, so this equals alpha.15 in behaviour) */ /* CHANGE 2026-11-15 F14-VER-02: was '3.0.0-alpha.14' (F14: the smart chat's page side; CHAT_FEATURE stays 'soon') */ /* CHANGE 2026-11-14 F24-VER-02: was '3.0.0-alpha.13.1' (F24: flight and hotel search links) */ /* CHANGE 2026-11-14 F08-VER-02: was '3.0.0-alpha.13' (F08 stage B) */ /* CHANGE 2026-11-14 F08-VER-01: was '3.0.0-alpha.12.1' (F08 stage A) */ /* CHANGE 2026-11-13 F23-VER-04: was '3.0.0-alpha.12' (F23-WZ-01) */ /* CHANGE 2026-11-13 F23-VER-02: was '3.0.0-alpha.11' (F23) */ /* CHANGE 2026-11-07 F22A-VER-02: was '3.0.0-alpha.10' (F22a: sign in with Google) */ /* CHANGE 2026-11-07 F10B-VER-02: was '3.0.0-alpha.9' (F10b: trip currencies screen) */ /* CHANGE 2026-11-07 F10-VER-02: was '3.0.0-alpha.8' (F10: every trip converts in its own currencies) */ /* CHANGE 2026-10-27 F21-VER-02: was '3.0.0-alpha.7.2' (F21: trip requests in admin, chooser badge, wizard pre-fill) */ /* CHANGE 2026-10-26 FIX-VER-02: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) */ /* CHANGE 2026-10-26 F04H-VER-02: was '3.0.0-alpha.7' (F04-HOME: install + code-screen resume + gate "כניסה עם המייל") */ /* CHANGE 2026-10-22 F06-VER-02: was '3.0.0-alpha.6' (F06 members, link reset, viewer guard) */ /* CHANGE 2026-10-19 F05-VER-02: was '3.0.0-alpha.5.1' (F05 join from the group link) */ /* CHANGE 2026-10-17 F20-D7-04: was '3.0.0-alpha.5' (D7: no admin entry inside a trip) */ /* CHANGE 2026-10-13 F20-VER-02: was '3.0.0-alpha.4.2' (F20 super-admin chooser + trip switcher) */ /* CHANGE 2026-10-12 F04-NAME-01: was '3.0.0-alpha.4.1' (display name Lonely Planner) */ /* CHANGE 2026-10-12 F04-VER-04: was '3.0.0-alpha.4' (F04-HOME-04 tappable first steps) */ /* CHANGE 2026-10-12 F04-VER-03: was '3.0.0-alpha.3.4' (F04 wizard) */ /* CHANGE 2026-10-09 F03-LAND-04: was '3.0.0-alpha.3.3'; F03-LAND-03: was '3.0.0-alpha.3.2'; F03-LAND-02: was '3.0.0-alpha.3.1'; F03-LINK-02: was '3.0.0-alpha.3' */   /* CHANGE 2026-10-05 F03-VER-03: was '3.0.0-alpha.2' (window.__PT.version reports the app version) */
 const PT_SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
 const PT_SUPABASE_KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';
 const PT_AUTH_KEY_PREFIX='sb-zwufpxnioqaweobnvffs-';   /* supabase-js default storageKey = sb-<ref>-auth-token */
@@ -9851,7 +9865,7 @@ if($('importExcelInput')){
       documents are marked as unavailable offline. A "גרסה חדשה זמינה · רענון" card appears when a newer version is
       published while the app is open (checked every 10 minutes and when the app comes back to the foreground).
    Revert: VAULT_IDB='off' (localStorage again), APP_UPDATE_CHECK='off'. */
-const APP_VERSION='3.0.0-alpha.15.3';/* CHANGE 2026-11-15 F14-VER-07: was '3.0.0-alpha.15.2' (chat on again, chips back) *//* CHANGE 2026-11-15 F14-VER-01: was '3.0.0-alpha.14' (F14) *//* CHANGE 2026-11-14 F24-VER-01: was '3.0.0-alpha.13.1' (F24) *//* CHANGE 2026-11-14 F08-VER-02: was '3.0.0-alpha.13' (F08 stage B) *//* CHANGE 2026-11-14 F08-VER-01: was '3.0.0-alpha.12.1' (F08 stage A) *//* CHANGE 2026-11-13 F23-VER-03: was '3.0.0-alpha.12' (wizard calendar opens on the requested month) *//* CHANGE 2026-11-13 F23-VER-01: was '3.0.0-alpha.11' (F23: requests history + AI counter in the admin screen) *//* CHANGE 2026-11-07 F22A-VER-01: was '3.0.0-alpha.10' (F22a) *//* CHANGE 2026-11-07 F10B-VER-01: was '3.0.0-alpha.9' (F10b) *//* CHANGE 2026-11-07 F10-VER-01: was '3.0.0-alpha.8' (F10) *//* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
+const APP_VERSION='3.0.0-alpha.16';/* CHANGE 2026-11-16 F07-VER-01: was '3.0.0-alpha.15.3' (F07 page side; RELINK_FEATURE='off') */ /* CHANGE 2026-11-15 F14-VER-07: was '3.0.0-alpha.15.2' (chat on again, chips back) *//* CHANGE 2026-11-15 F14-VER-01: was '3.0.0-alpha.14' (F14) *//* CHANGE 2026-11-14 F24-VER-01: was '3.0.0-alpha.13.1' (F24) *//* CHANGE 2026-11-14 F08-VER-02: was '3.0.0-alpha.13' (F08 stage B) *//* CHANGE 2026-11-14 F08-VER-01: was '3.0.0-alpha.12.1' (F08 stage A) *//* CHANGE 2026-11-13 F23-VER-03: was '3.0.0-alpha.12' (wizard calendar opens on the requested month) *//* CHANGE 2026-11-13 F23-VER-01: was '3.0.0-alpha.11' (F23: requests history + AI counter in the admin screen) *//* CHANGE 2026-11-07 F22A-VER-01: was '3.0.0-alpha.10' (F22a) *//* CHANGE 2026-11-07 F10B-VER-01: was '3.0.0-alpha.9' (F10b) *//* CHANGE 2026-11-07 F10-VER-01: was '3.0.0-alpha.8' (F10) *//* CHANGE 2026-10-27 F21-VER-01: was '3.0.0-alpha.7.2' (F21) *//* CHANGE 2026-10-26 FIX-VER-01: was '3.0.0-alpha.7.1' (bug fixes QA-DEBT-BUG-01..03) *//* CHANGE 2026-10-26 F04H-VER-01: was '3.0.0-alpha.7' (F04-HOME) */ /* CHANGE 2026-10-22 F06-VER-01: was '3.0.0-alpha.6' (F06) */ /* CHANGE 2026-10-19 F05-VER-01: was '3.0.0-alpha.5.1' (F05) */ /* CHANGE 2026-10-17 F20-D7-04: bumped 3.0.0-alpha.5 -> 3.0.0-alpha.5.1 (D7: admin only from the start chooser; switcher lists trips only, avatar only with ≥2 trips). */ /* CHANGE 2026-10-13 F20-VER-01: bumped 3.0.0-alpha.4.2 -> 3.0.0-alpha.5 (Plan_Travel F20: super-admin start chooser, standalone admin screen, in-trip trip/admin switcher). */ /* CHANGE 2026-10-12 F04-NAME-01: bumped 3.0.0-alpha.4.1 -> 3.0.0-alpha.4.2 (app display name Lonely Planner). */ /* CHANGE 2026-10-12 F04-VER-04: bumped 3.0.0-alpha.4 -> 3.0.0-alpha.4.1 (F04-HOME-04: first-steps rows tappable, "הוספת נקודה" button). */ /* CHANGE 2026-10-12 F04-VER-01: bumped 3.0.0-alpha.3.4 -> 3.0.0-alpha.4 (Plan_Travel F04: trip-setup wizard). */ /* CHANGE 2026-10-09 F03-LAND-04: bumped 3.0.0-alpha.3.3 -> 3.0.0-alpha.3.4 (launch handler). */ /* CHANGE 2026-10-09 F03-LAND-03: bumped 3.0.0-alpha.3.2 -> 3.0.0-alpha.3.3 (robust invite link). */ /* CHANGE 2026-10-09 F03-LAND-02: bumped 3.0.0-alpha.3.1 -> 3.0.0-alpha.3.2 (invite link opened while the app is already open). */ /* CHANGE 2026-10-09 F03-LINK-02: bumped 3.0.0-alpha.3 -> 3.0.0-alpha.3.1 (link-email error message fix). */ /* CHANGE 2026-10-05 F03-VER-01: bumped 3.0.0-alpha.2 -> 3.0.0-alpha.3 (Plan_Travel F03). */ /* CHANGE 2026-10-04 F02-VER-01: bumped 2.15.2 -> 3.0.0-alpha.2 (Plan_Travel F02; the update check now fetches this app's own path). */ /* CHANGE 2026-09-30 v2.13.0: bumped with QUICK-EXP-01/HOME-MIN-01 (drives the new-version card). CHANGE 2026-10-01 v2.14.0: bumped with UI-KIT-01/FLIGHT-CARD-01. CHANGE 2026-10-02 v2.15.0: bumped with DAY-PICKER-01/EDIT-MENU-01. CHANGE 2026-10-02 v2.15.1: bumped with HOME-EDIT-01. CHANGE 2026-10-04 v2.15.2: bumped with DAY-TODAY-01 */
 const VAULT_IDB='on';
 const APP_UPDATE_CHECK='on';
 const _vxOrigGetDocuments=getDocuments,_vxOrigSaveDocuments=saveDocuments;
@@ -11261,6 +11275,11 @@ if(typeof TRAVELSEARCH_FEATURE!=='undefined'&&TRAVELSEARCH_FEATURE==='on'&&windo
    renderDayReservations=async function(){const r=await f24Rd.apply(this,arguments);try{window.__ptF24.paintDay(await getReservations())}catch(e){}return r};
   }
  }catch(e){console.warn('[pt] f24 mount failed',e)}
+}
+/* CHANGE 2026-11-16 F07-MOUNT-01: new lines (no alpha.15.3 equivalent), additive. After a relink was approved on this device (flag set by /join/), one toast says that documents and changes
+   saved only on the old phone do not move (spec §3). RELINK_FEATURE='off', local-only or f07.js missing: none of this runs. */
+if(typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'&&STORAGE_BACKEND==='cloud'&&window.__ptF07&&typeof window.__ptF07.mountApp==='function'){
+ try{window.__ptF07.mountApp({toast:m=>{try{ciToast(m)}catch{}}})}catch(e){console.warn('[pt] f07 mount failed',e)}
 }
 /* CHANGE 2026-11-15 F14-MOUNT-01: new lines (no alpha.14 equivalent), additive. Starts app/js/f14.js and wraps sendChatMessage (one question at a time; while it runs, the request
    to chat-assistant goes out with trip_id, tripInfo and the user's JWT, and a refusal comes back as one friendly line) and chatMessageHtml (a 'search_links' action becomes the

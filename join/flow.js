@@ -1,4 +1,8 @@
-/* Lonely Planner · join flow · version 3.0.0-alpha.7 · F05
+/* Lonely Planner · join flow · version 3.0.0-alpha.16 · F07
+   CHANGE 2026-11-16 F07-JOIN-01: what changed from 3.0.0-alpha.7: new option opts.relink (set by the page from RELINK_FEATURE='on'; needs app/js/f07.js =
+   window.__ptF07). With it, six small hooks call f07.js: the "אני חדש/ה" / "כבר הייתי" switch and name list on the form, the relink pending screen,
+   the expired screen, the note on the approved screen. Without it (default, or f07.js missing) nothing here changes from alpha.7.
+   Lonely Planner · join flow · version 3.0.0-alpha.7 · F05
    CHANGE 2026-10-22 F06-JOIN-02: version only (VERSION 'alpha.6' → 'alpha.7'); no logic change. With the F06 server (D2) a
    removed identity gets me=null / a new pending row, so the 'removed' screen below is no longer reached (kept for alpha.6).
    CHANGE 2026-10-19 F05-JOIN-02: new file (no previous version). The member-join screens of docs/F05_spec.md §1.1–1.3 and
@@ -21,7 +25,7 @@
 (function(){
 'use strict';
 if(window.LPJoin)return;
-const VERSION='3.0.0-alpha.7'; /* CHANGE 2026-10-22 F06-JOIN-02: was '3.0.0-alpha.6' */
+const VERSION='3.0.0-alpha.16'; /* CHANGE 2026-11-16 F07-JOIN-01: was '3.0.0-alpha.7' */ /* CHANGE 2026-10-22 F06-JOIN-02: was '3.0.0-alpha.6' */
 const POLL_MS=20000,CALL_TIMEOUT_MS=15000;
 const ROLE={manager:'מנהל',editor:'עורך',viewer:'צופה'};
 const TX={
@@ -138,6 +142,9 @@ function mount(root,opts){
   return j;
  }
  function errText(e){const c=e&&e.code;return c==='offline'?TX.offline:c==='rate_limited'?TX.rate:TX.generic}
+ /* CHANGE 2026-11-16 F07-JOIN-01: new — the F07 hooks (null unless opts.relink and f07.js loaded) */
+ function f7(){return(o.relink&&window.__ptF07&&window.__ptF07.ok)?window.__ptF07:null}
+ function f7ctx(){return{el,$,paint,esc,st,fn,toast,hero,back,route,load,showForm,cancel,watch,errText,online,ROLE,inApp:o.inApp}}
 
  function hero(small){
   const t=st.trip||{};
@@ -192,6 +199,7 @@ function mount(root,opts){
   $('lpjSubmit').onclick=submit;
   inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();submit()}};
   if(!err&&!prefill)setTimeout(()=>{try{inp.focus()}catch{}},50);
+  const F=f7();if(F){try{F.form(f7ctx())}catch(e){console.warn('[lpj] f07 form',e)}}   /* CHANGE 2026-11-16 F07-JOIN-01 */
  }
  function showPending(){
   const t=st.trip||{},me=st.me||{};
@@ -224,6 +232,7 @@ function mount(root,opts){
   paint('approved',hero(true)+'<div class="lpj-body"><div class="lpj-center" style="padding-top:18px"><span class="lpj-ring" style="width:68px;height:68px;background:#edf8f3">'+ICON.bigCheck+'</span>'+
    '<h2 id="lpjTitle">הבקשה אושרה – ברוכים הבאים, '+esc(me.display_name||st.name)+'!</h2>'+
    '<p>הצטרפת לטיול בתפקיד '+esc(ROLE[me.role]||me.role||'')+'.</p></div>'+
+   (f7()&&st.relinkInfo?f7().approvedNote():'')+   /* CHANGE 2026-11-16 F07-JOIN-01: relink note (nothing from the old phone's local data moves) */
    (transfer?'<section class="lpj-card" style="border-color:#cfe1d7" id="lpjTransfer"><b style="display:block;font-size:14.5px;margin-bottom:4px">מוסיפים את האפליקציה למסך הבית</b>'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:#5f6861;line-height:1.5">באייפון, האפליקציה ממסך הבית לא מכירה את מה שקרה בספארי. הקוד הזה מעביר אליה את החברות שלך.</p>'+
     '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">'+
@@ -237,7 +246,7 @@ function mount(root,opts){
    :'<button type="button" class="lpj-btn" id="lpjOpen">פתיחת הטיול</button>'+
     (o.inApp?'':'<p style="margin:0;text-align:center;font-size:12px;color:#5f6861">אפשר גם להתקין את האפליקציה – היא תמשיך עם אותה זהות.</p>'))+
    '</div>');
-  $('lpjOpen').onclick=()=>{stop();try{o.onEnter(t.trip_id,me.role,me.display_name||st.name)}catch(e){console.warn('[lpj] enter failed',e)}};
+  $('lpjOpen').onclick=()=>{stop();if(f7()&&st.relinkInfo)f7().markNotice();try{o.onEnter(t.trip_id,me.role,me.display_name||st.name)}catch(e){console.warn('[lpj] enter failed',e)}};
   if(transfer){
    try{
     const r=await fn({action:'issue_transfer',trip_id:t.trip_id});
@@ -254,7 +263,7 @@ function mount(root,opts){
   st.me=me||null;
   if(!me){showForm(st.name);return}
   if(me.status==='active'){showApproved();return}
-  if(me.status==='pending'){showPending();return}
+  if(me.status==='pending'){const F=f7();if(F&&st.relinkInfo){F.pending(f7ctx());return}showPending();return}   /* CHANGE 2026-11-16 F07-JOIN-01: relink pending screen */
   if(me.status==='removed'){showRemoved();return}
   showForm(st.name);
  }
@@ -264,7 +273,11 @@ function mount(root,opts){
   showLoading();
   try{
    const p=await fn({action:'preview',code:st.code});
-   st.trip=p;route(p.me);
+   st.trip=p;
+   /* CHANGE 2026-11-16 F07-JOIN-01: relink state of this identity (pending → its screen; expired → reported once by the server, D5) */
+   st.relinkInfo=(p.relink&&p.relink.status==='pending')?p.relink:null;
+   const F=f7();if(F&&p.relink&&p.relink.status==='expired'&&!p.me){F.expired(f7ctx(),p.relink);return}
+   route(p.me);
   }catch(e){
    if(e.code==='code_invalid'){showInvalid();return}
    showError(errText(e),load);
@@ -293,7 +306,7 @@ function mount(root,opts){
   if(st.busy)return;
   if(!online()){toast(TX.offline);return}
   st.busy=true;
-  try{await fn({action:'cancel',trip_id:st.trip.trip_id});showForm(st.name||(st.me&&st.me.display_name)||'')}
+  try{await fn({action:'cancel',trip_id:st.trip.trip_id});st.relinkInfo=null;showForm(st.name||(st.me&&st.me.display_name)||'')}
   catch(e){if(e.code==='not_pending'){await check()}else toast(errText(e))}
   finally{st.busy=false}
  }
