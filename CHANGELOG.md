@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.16.4 — F24 · country-only flight side → the country's main airport (2026-11-16)
+- `f24FlightSearch`: a side with only a country gets the first airport of that country in airports.json (AE→DXB, GR→ATH); never the same airport on both sides; card note "ניחוש לפי המדינה". The Google Flights link now always names origin, destination, date and "one way". Node test FIX-04.
+
 ## 3.0.0-alpha.16.3 — F24 · change control for the flight destination (2026-11-16)
 - The "אל" leg of the flight card is a button with "שינוי" (same airport sheet, title "טסים אל…"); applies to this search only. `f24FlightSearch(i,{dest})`. Node test FIX-03.
 

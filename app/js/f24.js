@@ -1,4 +1,6 @@
-/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.16.3
+/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.16.4
+   CHANGE 2026-11-16 F24-FIX-06: what changed from alpha.16.3 (Or's choice, Google Flights opened "from Haifa" round trip): a flight side that is only a country now gets that country's main airport (the first one in
+   airports.json: AE→DXB, GR→ATH…), marked guessFrom/guessTo and shown as "ניחוש לפי המדינה" on the card, so the link always names origin, destination, date and "one way". A side with a city or code is untouched.
    CHANGE 2026-11-16 F24-FIX-05: what changed from alpha.16.2 (Or's phone check, day 9): the destination leg of the flight card is now a button with a "שינוי" control, like the origin. It opens the same airport sheet
    (title "טסים אל…"); the choice applies only to this search (B.overTo, per day). f24FlightSearch takes opt.dest; the card shows "נבחר ידנית" under a manual destination. Origin behaviour is unchanged.
    CHANGE 2026-11-16 F24-FIX-04: what changed from alpha.16.1 (Or's choice C after the day-9 phone check): f24FlightSearch — on the LAST day of the trip, a flight whose
@@ -145,13 +147,17 @@
     if (first && !(sideFrom.country && sideFrom.country !== HOME_CC && i > 0)) from = placeOfSide({});
     const o = opt && opt.origin ? f24Airport(opt.origin) : null; if (o) from = place(o);
     const dd = opt && opt.dest ? f24Airport(opt.dest) : null; if (dd) to = place(dd);   /* F24-FIX-05: manual destination */
+    /* F24-FIX-06: a side with only a country → that country's main airport (first in airports.json); flagged so the card can say it is a guess */
+    const guess = p => { if (!isVague(p) || !p.country || p.country === HOME_CC) return null; const ap = airports().find(x => x && x.cc === p.country && /^[A-Z]{3}$/.test(x.iata || '')); return ap ? place(ap) : null; };
+    let gf = guess(from), gt = guess(to); if (gf && gt && gf.iata === gt.iata) gt = null;   /* never the same airport on both sides */
+    if (gf) from = gf; if (gt) to = gt;
     /* C5: round trip only on the first flight day, when a later flight day flies back to Israel */
     let returnDate = '';
     if (first && isHomePlace(from) && !isHomePlace(to)) {
       for (let k = fl.length - 1; k > 0; k--) { const b = a[fl[k]], bd = dayIso(b); if (bd && bd > date && isHomePlace(placeOfSide(f.f08FlightTo(b)))) { returnDate = bd; break; } }
     }
     const q = { from, to, date, returnDate, adults: f24Travelers() };
-    return { i, kind: 'flight', from, to, date, returnDate, roundTrip: !!returnDate, adults: q.adults, links: { googleFlights: f24GoogleFlightsUrl(q), skyscanner: f24SkyscannerUrl(q) } };
+    return { i, kind: 'flight', guessFrom: !!gf, guessTo: !!gt, from, to, date, returnDate, roundTrip: !!returnDate, adults: q.adults, links: { googleFlights: f24GoogleFlightsUrl(q), skyscanner: f24SkyscannerUrl(q) } };
   }
 
   /* ---- C2: the lodging search of day i: only on the first night of a run of non-flight, not-booked nights in one city ---- */
@@ -270,12 +276,12 @@ button.p24-leg{cursor:pointer}
   /* pure: the card HTML of a flight / lodging search (the objects of f24FlightSearch / f24LodgingSearch). origin: {manual:boolean, dayNo:number} */
   function f24FlightCardHtml(c, o) {
     o = o || {}; const on = o.online !== false, d = days()[c.i] || {};
-    const fromNote = o.manual ? 'נבחר ידנית' : (c.from.iata === HOME_IATA && c.from.country === HOME_CC ? 'ברירת מחדל' : 'מהמסלול · יום ' + (o.fromDay || ''));
+    const fromNote = o.manual ? 'נבחר ידנית' : c.guessFrom ? 'ניחוש לפי המדינה' : (c.from.iata === HOME_IATA && c.from.country === HOME_CC ? 'ברירת מחדל' : 'מהמסלול · יום ' + (o.fromDay || ''));
     const link = (u, cls, label) => on ? '<a class="p24-go ' + cls + '" href="' + escH(u) + '" target="_blank" rel="noopener">' + escH(label) + ' <span aria-hidden="true">↗</span></a>'
       : '<span class="p24-go ' + cls + ' dis" role="link" aria-disabled="true">' + escH(label) + ' <span aria-hidden="true">↗</span></span>';
     return '<b class="t">עוד אין טיסה ליום הזה</b>' +
       '<button type="button" class="p24-leg" id="ptF24Chg" aria-label="שינוי נקודת מוצא"><span>מ: <b>' + escH(f24PlaceLabel(c.from)) + '</b><small>' + escH(fromNote) + '</small></span><span class="p24-chg">שינוי</span></button>' +
-      '<button type="button" class="p24-leg" id="ptF24ChgTo" aria-label="שינוי יעד"><span>אל: <b>' + escH(f24PlaceLabel(c.to)) + '</b><small>' + (o.manualTo ? 'נבחר ידנית' : 'מהמסלול · יום ' + escH(d.day || c.i + 1)) + '</small></span><span class="p24-chg">שינוי</span></button>' +
+      '<button type="button" class="p24-leg" id="ptF24ChgTo" aria-label="שינוי יעד"><span>אל: <b>' + escH(f24PlaceLabel(c.to)) + '</b><small>' + (o.manualTo ? 'נבחר ידנית' : c.guessTo ? 'ניחוש לפי המדינה' : 'מהמסלול · יום ' + escH(d.day || c.i + 1)) + '</small></span><span class="p24-chg">שינוי</span></button>' +
       '<div class="p24-meta"><span>' + dm(c.date) + (c.roundTrip ? ' · הלוך' : ' · כיוון אחד') + '</span>' + (c.roundTrip ? '<span>חזור ' + dm(c.returnDate) + '</span>' : '') + '<span>' + escH(travelersLabel(c.adults, false)) + '</span></div>' +
       link(c.links.googleFlights, 'p', 'חיפוש ב-Google Flights') + link(c.links.skyscanner, 's', 'חיפוש ב-Skyscanner') +
       (on ? '' : '<p class="p24-off" role="status">' + OFFLINE_LINE + '</p>') +

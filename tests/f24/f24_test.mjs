@@ -216,7 +216,7 @@ test("FIX-02 · last day, country-only sides: destination TLV, origin = the prev
   // not the last day: untouched (still country-only, no guess)
   const e = d.slice(); e.push(land("10/01/2027", "AE", "Abu Dhabi"));
   setup(e); const t = F.f24FlightSearch(8);
-  assert.equal(t.to.iata, ""); assert.equal(t.from.iata, "");
+  assert.equal(t.to.iata, ""); assert.equal(t.from.iata, "DXB"); assert.equal(t.guessFrom, true);   // CHANGE 2026-11-16 F24-FIX-11: was from "" — now the country's main airport (F24-FIX-06)
 });
 
 // CHANGE 2026-11-16 F24-FIX-10: what changed from the previous version: new test for the manual destination (F24-FIX-05).
@@ -229,4 +229,19 @@ test("FIX-03 · manual destination: opt.dest overrides the destination; the card
   assert.match(h, /id="ptF24ChgTo"/); assert.match(h, /נבחר ידנית/);
   assert.match(F.f24OriginSheetHtml({ sel: "ATH", q: "", side: "to" }, []), /טסים אל…/);
   assert.match(F.f24OriginSheetHtml({ sel: "TLV", q: "" }, []), /טסים מ…/);
+});
+
+// CHANGE 2026-11-16 F24-FIX-12: what changed from the previous version: new test for the country → main-airport guess (F24-FIX-06).
+test("FIX-04 · a country-only origin gets the country's main airport; the Google link always names both sides and 'one way'", () => {
+  COUNTRIES.AE = COUNTRIES.AE || { en: "United Arab Emirates", he: "איחוד האמירויות", tz: ["Asia/Dubai"] };
+  COUNTRIES.GR = COUNTRIES.GR || { en: "Greece", he: "יוון", tz: ["Europe/Athens"] };
+  const d = [fl("01/01/2027", "IL", "AE", "", "Dubai")];
+  for (let k = 2; k <= 5; k++) d.push(land(`0${k}/01/2027`, "AE", "Dubai"));
+  d.push({ date: "06/01/2027", isFlight: true, flightFrom: { country: "AE", tz: "Asia/Dubai", city: "" }, flightTo: { country: "GR", tz: "Europe/Athens", city: "" }, city: "Athens" });
+  d.push(land("07/01/2027", "GR", "Athens"));
+  setup(d);
+  const s = F.f24FlightSearch(5);
+  assert.equal(s.from.iata, "DXB"); assert.equal(s.to.iata, "ATH"); assert.ok(s.guessFrom && s.guessTo);
+  assert.match(decodeURIComponent(s.links.googleFlights), /from DXB to ATH on 2027-01-06 one way/);
+  assert.match(F.f24FlightCardHtml(s, { online: true }), /ניחוש לפי המדינה/);
 });
