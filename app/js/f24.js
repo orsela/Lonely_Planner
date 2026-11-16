@@ -1,4 +1,6 @@
-/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.16.2
+/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.16.3
+   CHANGE 2026-11-16 F24-FIX-05: what changed from alpha.16.2 (Or's phone check, day 9): the destination leg of the flight card is now a button with a "שינוי" control, like the origin. It opens the same airport sheet
+   (title "טסים אל…"); the choice applies only to this search (B.overTo, per day). f24FlightSearch takes opt.dest; the card shows "נבחר ידנית" under a manual destination. Origin behaviour is unchanged.
    CHANGE 2026-11-16 F24-FIX-04: what changed from alpha.16.1 (Or's choice C after the day-9 phone check): f24FlightSearch — on the LAST day of the trip, a flight whose
    destination is only a country (no code, no city) goes to Tel Aviv (TLV); and an origin that is only a country becomes the airport of the previous day's city
    (else this day's city) when that city is in airports.json and in the same country. Nothing else changes; flights on other days are untouched.
@@ -142,6 +144,7 @@
     const sideFrom = f.f08FlightFrom(d);
     if (first && !(sideFrom.country && sideFrom.country !== HOME_CC && i > 0)) from = placeOfSide({});
     const o = opt && opt.origin ? f24Airport(opt.origin) : null; if (o) from = place(o);
+    const dd = opt && opt.dest ? f24Airport(opt.dest) : null; if (dd) to = place(dd);   /* F24-FIX-05: manual destination */
     /* C5: round trip only on the first flight day, when a later flight day flies back to Israel */
     let returnDate = '';
     if (first && isHomePlace(from) && !isHomePlace(to)) {
@@ -272,7 +275,7 @@ button.p24-leg{cursor:pointer}
       : '<span class="p24-go ' + cls + ' dis" role="link" aria-disabled="true">' + escH(label) + ' <span aria-hidden="true">↗</span></span>';
     return '<b class="t">עוד אין טיסה ליום הזה</b>' +
       '<button type="button" class="p24-leg" id="ptF24Chg" aria-label="שינוי נקודת מוצא"><span>מ: <b>' + escH(f24PlaceLabel(c.from)) + '</b><small>' + escH(fromNote) + '</small></span><span class="p24-chg">שינוי</span></button>' +
-      '<div class="p24-leg st"><span>אל: <b>' + escH(f24PlaceLabel(c.to)) + '</b><small>מהמסלול · יום ' + escH(d.day || c.i + 1) + '</small></span></div>' +
+      '<button type="button" class="p24-leg" id="ptF24ChgTo" aria-label="שינוי יעד"><span>אל: <b>' + escH(f24PlaceLabel(c.to)) + '</b><small>' + (o.manualTo ? 'נבחר ידנית' : 'מהמסלול · יום ' + escH(d.day || c.i + 1)) + '</small></span><span class="p24-chg">שינוי</span></button>' +
       '<div class="p24-meta"><span>' + dm(c.date) + (c.roundTrip ? ' · הלוך' : ' · כיוון אחד') + '</span>' + (c.roundTrip ? '<span>חזור ' + dm(c.returnDate) + '</span>' : '') + '<span>' + escH(travelersLabel(c.adults, false)) + '</span></div>' +
       link(c.links.googleFlights, 'p', 'חיפוש ב-Google Flights') + link(c.links.skyscanner, 's', 'חיפוש ב-Skyscanner') +
       (on ? '' : '<p class="p24-off" role="status">' + OFFLINE_LINE + '</p>') +
@@ -293,16 +296,16 @@ button.p24-leg{cursor:pointer}
   function f24OriginSheetHtml(s, recents) {
     const r = f24AirportSearch(s.q, recents), row = (a, sub) => '<button type="button" class="p24-ap' + (a.iata === s.sel ? ' on' : '') + '" data-p24-ap="' + a.iata + '" aria-pressed="' + (a.iata === s.sel ? 'true' : 'false') + '"><span class="p24-code">' + a.iata + '</span><span style="flex-grow:1"><b>' + escH(a.he) + '</b><small>' + escH(sub) + '</small></span>' + (a.iata === s.sel ? '<span aria-hidden="true">✓</span>' : '') + '</button>';
     const sub = a => a.iata === 'TLV' ? 'ברירת מחדל' : a.iata === 'ETM' ? 'שדה נוסף בישראל' : (r.recent.indexOf(a) >= 0 ? 'חיפשתם מכאן קודם' : (countryHe(a.cc) || a.en));
-    let h = '<div class="p24-grab"></div><div class="p24-hd"><h2>טסים מ…</h2><button type="button" class="p24-x" data-p24-close aria-label="סגירה">×</button></div>' +
+    let h = '<div class="p24-grab"></div><div class="p24-hd"><h2>' + (s.side === 'to' ? 'טסים אל…' : 'טסים מ…') + '</h2><button type="button" class="p24-x" data-p24-close aria-label="סגירה">×</button></div>' +
       '<label class="p24-lbl" for="ptF24Q" style="margin-top:0">עיר או שדה תעופה</label><input id="ptF24Q" class="p24-in" placeholder="למשל: אתונה, LCA" value="' + escH(s.q) + '" autocomplete="off">';
     if (!s.q.trim()) h += '<div class="p24-lbl">מוצעים</div><div class="p24-list">' + r.pinned.concat(r.recent).map(a => row(a, sub(a))).join('') + '</div>';
     else h += '<div class="p24-list">' + (r.results.length ? r.results.map(a => row(a, sub(a))).join('') : '<p class="p24-hint">לא נמצא שדה תעופה. אפשר לנסות שם עיר באנגלית או קוד של שלוש אותיות.</p>') + '</div>';
     if (!r.pinned.length) h += '<p class="p24-hint">אין חיבור לרשימת שדות התעופה – נסו שוב כשיש רשת.</p>';
-    h += '<p class="p24-hint">השינוי חל רק על החיפוש הזה. ביום טיסה באמצע הטיול, המוצא הוא העיר של היום הקודם.</p><button type="button" class="p24-save" id="ptF24Save">שמירה</button>';
+    h += '<p class="p24-hint">השינוי חל רק על החיפוש הזה.' + (s.side === 'to' ? '' : ' ביום טיסה באמצע הטיול, המוצא הוא העיר של היום הקודם.') + '</p><button type="button" class="p24-save" id="ptF24Save">שמירה</button>';
     return h;
   }
 
-  const B = { dep: null, res: [], members: 0, over: {}, sheet: null, mounted: false, airports: null, countries: null, busy: false };
+  const B = { dep: null, res: [], members: 0, over: {}, overTo: {}, sheet: null, mounted: false, airports: null, countries: null, busy: false };
   const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { } };
   function tid() { try { return B.dep && B.dep.tripId ? (B.dep.tripId() || '') : ''; } catch (e) { return ''; } }
@@ -331,9 +334,9 @@ button.p24-leg{cursor:pointer}
     l.querySelectorAll('[data-p24-close]').forEach(x => { x.onclick = closeSheet; });
     l.querySelectorAll('[data-p24-ap]').forEach(b => { b.onclick = () => { s.sel = b.dataset.p24Ap; paintSheet(); }; });
     const q = document.getElementById('ptF24Q'); if (q) { q.oninput = () => { s.q = q.value; paintSheet(true); }; if (keepFocus) { q.focus(); try { q.setSelectionRange(q.value.length, q.value.length); } catch (e) { } } }
-    document.getElementById('ptF24Save').onclick = () => { if (s.sel) { B.over[s.i] = s.sel; saveRecent(s.sel); } closeSheet(); repaint(); };
+    document.getElementById('ptF24Save').onclick = () => { if (s.sel) { (s.side === 'to' ? B.overTo : B.over)[s.i] = s.sel; saveRecent(s.sel); } closeSheet(); repaint(); };
   }
-  function openSheet(i, cur) { B.sheet = { i, sel: cur, q: '' }; paintSheet(); }
+  function openSheet(i, cur, side) { B.sheet = { i, sel: cur, q: '', side: side || 'from' }; paintSheet(); }
 
   /* paintDay(reservations?) — called after the day's reservations are drawn. A day with no search card gets no node at all (D3 / C3: byte-identical). */
   function paintDay(res) {
@@ -343,14 +346,15 @@ button.p24-leg{cursor:pointer}
     const i = B.dep && B.dep.dayIndex ? B.dep.dayIndex() : 0, anchor = document.getElementById('routeDayWeather') || document.getElementById('dayReservations'); if (!anchor) return;   /* F24-A3-01: route-v2 hides the old day card in the map view, so the card sits under the day strip's weather card (both views) */
     let c = null, html = '', on = onlineNow();
     try {
-      c = f24FlightSearch(i, B.over[i] ? { origin: B.over[i] } : undefined);
-      if (c) { const prev = days()[i - 1]; html = f24FlightCardHtml(c, { online: on, manual: !!B.over[i], fromDay: prev ? (prev.day || i) : '' }); }
+      c = f24FlightSearch(i, (B.over[i] || B.overTo[i]) ? { origin: B.over[i], dest: B.overTo[i] } : undefined);
+      if (c) { const prev = days()[i - 1]; html = f24FlightCardHtml(c, { online: on, manual: !!B.over[i], manualTo: !!B.overTo[i], fromDay: prev ? (prev.day || i) : '' }); }
       else { c = f24LodgingSearch(i); if (c) html = f24HotelCardHtml(c, { online: on }); }
     } catch (e) { c = null; }
     if (!c) return;
     const el = document.createElement('div'); el.id = 'ptF24Card'; el.className = 'p24-find'; el.setAttribute('data-kind', c.kind); el.innerHTML = html;
     anchor.insertAdjacentElement('afterend', el);
     const chg = document.getElementById('ptF24Chg'); if (chg) chg.onclick = () => openSheet(i, c.from.iata || HOME_IATA);
+    const chgTo = document.getElementById('ptF24ChgTo'); if (chgTo) chgTo.onclick = () => openSheet(i, c.to.iata || HOME_IATA, 'to');
     refreshMembers();
   }
   function repaint() { try { paintDay(); } catch (e) { } }

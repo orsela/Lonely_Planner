@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.16.3 — F24 · change control for the flight destination (2026-11-16)
+- The "אל" leg of the flight card is a button with "שינוי" (same airport sheet, title "טסים אל…"); applies to this search only. `f24FlightSearch(i,{dest})`. Node test FIX-03.
+
 ## 3.0.0-alpha.16.2 — F24 · last-day flight with country-only sides (2026-11-16)
 - `f24FlightSearch` (app/js/f24.js): on the last day of the trip, a flight whose destination is only a country goes to Tel Aviv (TLV); an origin that is only a country becomes the airport of the previous day's city (else this day's city) when it is in airports.json and in the same country. Or's choice C after the day-9 phone check. Node test FIX-02.
 

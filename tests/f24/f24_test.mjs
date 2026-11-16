@@ -218,3 +218,15 @@ test("FIX-02 · last day, country-only sides: destination TLV, origin = the prev
   setup(e); const t = F.f24FlightSearch(8);
   assert.equal(t.to.iata, ""); assert.equal(t.from.iata, "");
 });
+
+// CHANGE 2026-11-16 F24-FIX-10: what changed from the previous version: new test for the manual destination (F24-FIX-05).
+test("FIX-03 · manual destination: opt.dest overrides the destination; the card has a change control for it", () => {
+  setup(georgia());
+  const i = 0, s = F.f24FlightSearch(i, { dest: "ATH" });
+  assert.equal(s.to.iata, "ATH");
+  assert.match(decodeURIComponent(s.links.googleFlights), /from TLV to ATH/);
+  const h = F.f24FlightCardHtml(s, { online: true, manualTo: true });
+  assert.match(h, /id="ptF24ChgTo"/); assert.match(h, /נבחר ידנית/);
+  assert.match(F.f24OriginSheetHtml({ sel: "ATH", q: "", side: "to" }, []), /טסים אל…/);
+  assert.match(F.f24OriginSheetHtml({ sel: "TLV", q: "" }, []), /טסים מ…/);
+});
