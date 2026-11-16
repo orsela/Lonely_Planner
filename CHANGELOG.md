@@ -15,6 +15,9 @@
 - Edge Functions `join-trip`, `approve-member`, `manage-members` → 3.0.0-alpha.16.0 (backward compatible with the alpha.15.x app).
 - Tests: `tests/f07/run.sh` (functions 35 + `qa.f07_run()` 46/46 on a local PostgreSQL).
 
+## 3.0.0-alpha.15.4 — F14 · chat bubbles show bold, not raw asterisks (2026-11-16)
+- `chatBubbleHtml` (app/index.html): assistant text is escaped, then `**x**` becomes `<strong>x</strong>`. User bubbles unchanged. Found in Or's phone check (screenshot 16/11). No server change.
+
 ## 3.0.0-alpha.15 — F14 · the smart chat (2026-11-15; phone check pending)
 <!-- CHANGE 2026-11-15 F14-DOCS-06: new entry. Spec claude/Plan_Travel_F14_spec.md (project doc), steps 1–4. -->
 - 💬 opens the chat: questions about the trip (days, budget, expenses, currency, weather, a photo) are answered in Hebrew by Claude through the new
