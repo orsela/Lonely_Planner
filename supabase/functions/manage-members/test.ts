@@ -1,4 +1,6 @@
-// Lonely Planner · manage-members unit tests · version 3.0.0-alpha.7.0 · F06
+// Lonely Planner · manage-members unit tests · version 3.0.0-alpha.16.0 · F06 (+F07)
+// CHANGE 2026-11-16 F07-FN-06: version pin alpha.7 → alpha.16; touch now sends p_session / p_label / p_via; new tests for devices,
+//   disconnect_device, ack_device_notice, device_revoked / last_device, the JWT session id, the provider and the device label.
 // CHANGE 2026-10-22 F06-FN-05: new file (no previous version). Dev self-tests for docs/F06_spec.md §3.1 (mocked deps).
 //
 // Run with Deno:      deno test --allow-env --no-check --import-map=supabase/functions/manage-members/test_import_map.json \
@@ -44,7 +46,7 @@ function mock(out: unknown | ((name: string) => unknown)) {
 }
 
 Deno.test("version: constant, body field and header on every response", async () => {
-  eq(FN_VERSION, "3.0.0-alpha.7.0");
+  eq(FN_VERSION, "3.0.0-alpha.16.0");
   mock({ ok: true, touched: true });
   const ok = await call({ action: "touch", trip_id: TRIP });
   eq([ok.status, ok.j.version, ok.h.get(VERSION_HEADER)], [200, FN_VERSION, FN_VERSION]);
@@ -95,7 +97,7 @@ Deno.test("each action → its SQL function with the caller's uid", async () => 
       { ok: true, trip_id: TRIP, member_id: MEMBER }, { trip_id: TRIP, member_id: MEMBER }],
     [{ action: "rotate_link", trip_id: TRIP }, "rotate_join_code", { p_user: MGR.id, p_trip: TRIP },
       { code: "K7M2Q9XA", link_version: 2 }, { code: "K7M2Q9XA", link_version: 2 }],
-    [{ action: "touch", trip_id: TRIP }, "member_touch", { p_user: MGR.id, p_trip: TRIP },
+    [{ action: "touch", trip_id: TRIP }, "member_touch", { p_user: MGR.id, p_trip: TRIP, p_session: null, p_label: null, p_via: "anon" },
       { ok: true, touched: false }, { touched: false }],
   ];
   for (const [body, fn, args, out, expect] of cases) {
@@ -156,4 +158,103 @@ Deno.test("logs: one JSON line, no JWT, ids, codes or names", async () => {
     eq(o.fn, "manage-members");
     for (const bad of ["jwt-ok", MEMBER, TRIP, MGR.id, "איתי", "K7M2Q9XA"]) assert(!l.includes(bad), "log leaks " + bad + ": " + l);
   }
+});
+
+// CHANGE 2026-11-16 F07-FN-06: new tests (no previous version) — docs/F07_spec.md §2.2 (C3, C4, C8, D4).
+import { deviceLabel, jwtSessionId, viaOf } from "./index.ts";
+const SESSION = "44444444-4444-4444-8444-444444444444";
+function fakeJwt(claims: Record<string, unknown>): string {
+  const b64 = (o: unknown) => btoa(JSON.stringify(o)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${b64({ alg: "HS256" })}.${b64(claims)}.sig`;
+}
+function mockUser(user: { id: string; via?: string }, out: unknown | ((name: string) => unknown)) {
+  resetDeps();
+  const calls: { name: string; args: Record<string, unknown> }[] = [];
+  setDeps({
+    getUser: () => Promise.resolve(user),
+    rpc: (name, args) => {
+      calls.push({ name, args });
+      return Promise.resolve({ data: typeof out === "function" ? (out as (n: string) => unknown)(name) : out, error: null });
+    },
+  });
+  return calls;
+}
+async function callUA(body: unknown, jwt: string, ua: string | null) {
+  const h: Record<string, string> = { "content-type": "application/json", origin: "https://orsela.github.io", authorization: `Bearer ${jwt}` };
+  if (ua) h["user-agent"] = ua;
+  const r = await handler(new Request("http://x/functions/v1/manage-members", { method: "POST", headers: h, body: JSON.stringify(body) }));
+  return { status: r.status, j: await r.json() as Record<string, unknown> };
+}
+
+Deno.test("F07 jwtSessionId: the session_id claim, only when it is a uuid", () => {
+  eq(jwtSessionId(fakeJwt({ session_id: SESSION, sub: "x" })), SESSION);
+  eq(jwtSessionId(fakeJwt({ session_id: "nope" })), null);
+  eq(jwtSessionId(fakeJwt({ sub: "x" })), null);
+  eq(jwtSessionId("garbage"), null);
+  eq(jwtSessionId("a.%%%.c"), null);
+});
+
+Deno.test("F07 viaOf: anon, provider, linked identities, safe names", () => {
+  eq(viaOf({ id: "u", is_anonymous: true }), "anon");
+  eq(viaOf({ id: "u", app_metadata: { provider: "email" } }), "email");
+  eq(viaOf({ id: "u", app_metadata: { provider: "google" } }), "google");
+  eq(viaOf({ id: "u", app_metadata: { provider: "anonymous" }, identities: [{ provider: "email" }] }), "email");
+  eq(viaOf({ id: "u", app_metadata: { provider: "Sign-In With X!" } }), "sign_in_with_x_");
+  eq(viaOf({ id: "u" }), "email");
+});
+
+Deno.test("F07 deviceLabel: readable, never the raw User-Agent", () => {
+  eq(deviceLabel("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36"), "Android · Chrome");
+  eq(deviceLabel("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1"), "iPhone · Safari");
+  eq(deviceLabel("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36 Edg/126.0"), "Windows · Edge");
+  eq(deviceLabel("curl/8.0"), null);
+  eq(deviceLabel(null), null);
+});
+
+Deno.test("F07 touch sends the device's session, label and sign-in kind to the database", async () => {
+  const calls = mockUser({ id: MGR.id, via: "google" }, { ok: true, touched: true });
+  const r = await callUA({ action: "touch", trip_id: TRIP }, fakeJwt({ session_id: SESSION }),
+    "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/126.0 Safari/537.36");
+  eq(r.status, 200);
+  eq(calls[0].args, { p_user: MGR.id, p_trip: TRIP, p_session: SESSION, p_label: "Windows · Chrome", p_via: "google" });
+});
+
+Deno.test("F07 touch: device_revoked → 403; the status map has the new codes", async () => {
+  mockUser({ id: MGR.id, via: "email" }, { error: "device_revoked" });
+  const r = await callUA({ action: "touch", trip_id: TRIP }, fakeJwt({ session_id: SESSION }), null);
+  eq([r.status, r.j.error, r.j.version], [403, "device_revoked", FN_VERSION]);
+  eq([statusFor("device_revoked"), statusFor("last_device")], [403, 409]);
+});
+
+Deno.test("F07 devices: arrays pass through, current_session is the caller's own", async () => {
+  const persons = [{ person_id: "p1", display_name: "דנה", role: "manager", devices: [{ member_id: MEMBER, session_id: SESSION, via: "anon" }] }];
+  const calls = mockUser({ id: MGR.id, via: "anon" }, { persons, notices: [{ session_id: SESSION }], is_manager: true, my_person_id: "p1", secret: 1 });
+  const r = await callUA({ action: "devices", trip_id: TRIP }, fakeJwt({ session_id: SESSION }), null);
+  eq(r.status, 200);
+  eq([r.j.persons, r.j.is_manager, r.j.my_person_id, r.j.current_session, "secret" in r.j], [persons, true, "p1", SESSION, false]);
+  eq([calls[0].name, calls[0].args], ["device_list", { p_user: MGR.id, p_trip: TRIP }]);
+  eq((await callUA({ action: "devices" }, fakeJwt({}), null)).j.error, "invalid_request");
+});
+
+Deno.test("F07 disconnect_device and ack_device_notice: validation, arguments, refusals", async () => {
+  let calls = mockUser({ id: MGR.id, via: "anon" }, { ok: true, kind: "session", member_id: MEMBER, session_id: SESSION, auth_session_deleted: true });
+  let r = await callUA({ action: "disconnect_device", trip_id: TRIP, member_id: MEMBER, session_id: SESSION }, fakeJwt({}), null);
+  eq([r.status, r.j.kind, r.j.auth_session_deleted], [200, "session", true]);
+  eq(calls[0].args, { p_user: MGR.id, p_trip: TRIP, p_member: MEMBER, p_session: SESSION });
+  r = await callUA({ action: "disconnect_device", trip_id: TRIP, member_id: MEMBER }, fakeJwt({}), null);
+  eq(calls[1].args.p_session, null);
+  for (const bad of [{ trip_id: "x", member_id: MEMBER }, { trip_id: TRIP }, { trip_id: TRIP, member_id: MEMBER, session_id: "x" }]) {
+    r = await callUA({ action: "disconnect_device", ...bad }, fakeJwt({}), null);
+    eq([r.status, r.j.error], [400, "invalid_request"]);
+  }
+  for (const [code, st] of [["last_device", 409], ["not_manager", 403], ["not_active", 409], ["not_member", 403]] as const) {
+    mockUser({ id: MGR.id }, { error: code });
+    r = await callUA({ action: "disconnect_device", trip_id: TRIP, member_id: MEMBER }, fakeJwt({}), null);
+    eq([r.status, r.j.error], [st, code]);
+  }
+  calls = mockUser({ id: MGR.id }, { ok: true, acked: true });
+  r = await callUA({ action: "ack_device_notice", trip_id: TRIP, session_id: SESSION }, fakeJwt({}), null);
+  eq([r.status, r.j.acked, calls[0].name, calls[0].args], [200, true, "device_notice_ack", { p_user: MGR.id, p_trip: TRIP, p_session: SESSION }]);
+  r = await callUA({ action: "ack_device_notice", trip_id: TRIP }, fakeJwt({}), null);
+  eq([r.status, r.j.error], [400, "invalid_request"]);
 });

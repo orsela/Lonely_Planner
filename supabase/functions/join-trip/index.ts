@@ -1,4 +1,9 @@
-// Lonely Planner (Plan_Travel) Edge Function `join-trip` · version 3.0.0-alpha.7.0 · F05 (+F06)
+// Lonely Planner (Plan_Travel) Edge Function `join-trip` · version 3.0.0-alpha.16.0 · F05 (+F06, +F07)
+// CHANGE 2026-11-16 F07-FN-01: what changed from 3.0.0-alpha.7.0: (1) `preview` also returns `people` (active persons: names only,
+//   no roles, D2) and `relink` (the caller's own relink request: pending | expired); `members` now counts persons.
+//   (2) `request` takes an optional `person` (uuid of a person from `people`) = "כבר הייתי בטיול" (docs/F07_spec.md C5): then
+//   display_name is not needed, the DB copies the person's name + role; the answer also carries `relink`, `person_id`,
+//   `expires_at`. (3) new error code person_invalid (409). Everything else, and every other action, is unchanged.
 // CHANGE 2026-10-22 F06-FN-07: what changed from 3.0.0-alpha.6.0: version only (FN_VERSION) plus the response header
 //   `X-Function-Version` (closes F05 QA finding D1). No logic change: F06 D2 (a removed member may ask again) comes from the
 //   SQL in 0014_f06.sql — `member_removed` stays in the code list but the database no longer produces it.
@@ -8,8 +13,10 @@
 //   auth.getUser(jwt). Any signed-in identity is accepted, anonymous included (no email needed, by design).
 //
 // Actions (POST body {action, …}, every action needs `Authorization: Bearer <user JWT>`):
-//   preview        {code}               → rpc join_preview   → {trip_id, name, start_date, end_date, days, members, manager, me}
-//   request        {code, display_name} → rpc join_request   → {trip_id, member_id, status, role, display_name, created}
+//   preview        {code}               → rpc join_preview   → {trip_id, name, start_date, end_date, days, members, manager, me,
+//                                                              people:[{person_id, display_name}], relink}   (F07)
+//   request        {code, display_name} → rpc join_request   → {trip_id, member_id, status, role, display_name, created, relink, person_id, expires_at}
+//   request        {code, person}       → same, as a relink request of an existing person (F07)
 //   cancel         {trip_id}            → rpc join_cancel    → {ok:true}
 //   issue_transfer {trip_id}            → rpc issue_transfer → {code, expires_at}
 //   claim_transfer {code}               → rpc claim_transfer → {trip_id, member_id, role, display_name}
@@ -25,18 +32,18 @@
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 
-export const FN_VERSION = "3.0.0-alpha.7.0"; // CHANGE 2026-10-22 F06-FN-07: was "3.0.0-alpha.6.0"
+export const FN_VERSION = "3.0.0-alpha.16.0"; // CHANGE 2026-11-16 F07-FN-01: was "3.0.0-alpha.7.0"
 export const ACTIONS = ["preview", "request", "cancel", "issue_transfer", "claim_transfer"] as const;
 export type Action = typeof ACTIONS[number];
 
 export type ErrorCode =
   | "unauthorized" | "invalid_request" | "code_invalid" | "name_invalid" | "name_taken" | "rate_limited"
-  | "member_removed" | "not_pending" | "not_member" | "transfer_invalid" | "already_member" | "method_not_allowed"
-  | "server_error";
+  | "member_removed" | "not_pending" | "not_member" | "transfer_invalid" | "already_member" | "person_invalid"
+  | "method_not_allowed" | "server_error";
 
 const STATUS: Record<ErrorCode, number> = {
   unauthorized: 401, invalid_request: 400, name_invalid: 400, code_invalid: 404, name_taken: 409, not_pending: 409,
-  transfer_invalid: 409, already_member: 409, member_removed: 403, not_member: 403, rate_limited: 429,
+  transfer_invalid: 409, already_member: 409, person_invalid: 409, member_removed: 403, not_member: 403, rate_limited: 429,
   method_not_allowed: 405, server_error: 500,
 };
 export function statusFor(code: string): number {
@@ -212,17 +219,29 @@ async function act(action: Action, user: AuthUser, body: Record<string, unknown>
       if (!code) throw fail("code_invalid");
       const d = await call("join_preview", { p_user: user.id, p_code: code, p_ip: ip });
       const me = asObject(d.me);
+      const relink = asObject(d.relink);
+      const people = Array.isArray(d.people)
+        ? d.people.map(asObject).filter((x): x is Record<string, unknown> => !!x).map((x) => pick(x, ["person_id", "display_name"]))
+        : [];
       return {
         ...pick(d, ["trip_id", "name", "start_date", "end_date", "days", "members", "manager"]),
         me: me ? pick(me, ["member_id", "status", "role", "display_name"]) : null,
+        people, // CHANGE 2026-11-16 F07-FN-01: new (names only, no roles)
+        relink: relink ? pick(relink, ["status", "display_name", "role", "expires_at"]) : null, // CHANGE 2026-11-16 F07-FN-01: new
       };
     }
     case "request": {
       const code = normJoinCode(body.code);
       if (!code) throw fail("code_invalid");
-      if (typeof body.display_name !== "string") throw fail("name_invalid");
-      const d = await call("join_request", { p_user: user.id, p_code: code, p_name: body.display_name.slice(0, 200), p_ip: ip });
-      return pick(d, ["trip_id", "member_id", "status", "role", "display_name", "created"]);
+      // CHANGE 2026-11-16 F07-FN-01: `person` = a relink request (the database copies the person's name and role)
+      let person: string | null = null;
+      if (body.person != null) {
+        if (!isUuid(body.person)) throw fail("person_invalid");
+        person = body.person;
+      } else if (typeof body.display_name !== "string") throw fail("name_invalid");
+      const name = typeof body.display_name === "string" ? body.display_name.slice(0, 200) : null;
+      const d = await call("join_request", { p_user: user.id, p_code: code, p_name: person ? null : name, p_ip: ip, p_person: person });
+      return pick(d, ["trip_id", "member_id", "status", "role", "display_name", "created", "relink", "person_id", "expires_at"]);
     }
     case "cancel": {
       if (!isUuid(body.trip_id)) throw fail("invalid_request");

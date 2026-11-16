@@ -1,5 +1,11 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.16 — F07 · a member who changed phones gets back into the trip (conversation 1 of 3: server only, 2026-11-16)
+<!-- CHANGE 2026-11-16 F07-DOCS-05: new entry. Spec docs/F07_spec.md, notes docs/F07_dev_notes_server.md. Nothing visible in the app yet; the app/join pages are not bumped until conversation 2. -->
+- Server, not yet applied to the database: migration `0018_f07.sql` (+ QA harness `0019`): one **person** can have several devices (`person_id`); a "כבר הייתי בטיול" request (`join_request` with a person, 24 h) approved by a manager takes the person's current role and name; role / name / removal / leave apply to every device; the last-manager rule counts persons; per-device sessions (`member_sessions`) with disconnect (`device_disconnect`) and a login notice for managers (`device_list` / `device_notice_ack`).
+- Edge Functions `join-trip`, `approve-member`, `manage-members` → 3.0.0-alpha.16.0 (backward compatible with the alpha.15.x app).
+- Tests: `tests/f07/run.sh` (functions 35 + `qa.f07_run()` 46/46 on a local PostgreSQL).
+
 ## 3.0.0-alpha.15 — F14 · the smart chat (2026-11-15; phone check pending)
 <!-- CHANGE 2026-11-15 F14-DOCS-06: new entry. Spec claude/Plan_Travel_F14_spec.md (project doc), steps 1–4. -->
 - 💬 opens the chat: questions about the trip (days, budget, expenses, currency, weather, a photo) are answered in Hebrew by Claude through the new

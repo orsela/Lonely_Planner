@@ -1,4 +1,6 @@
-// Lonely Planner · join-trip unit tests · version 3.0.0-alpha.7.0 · F05
+// Lonely Planner · join-trip unit tests · version 3.0.0-alpha.16.0 · F05 (+F07)
+// CHANGE 2026-11-16 F07-FN-04: version pin alpha.7 → alpha.16; the preview whitelist now has people + relink; new tests for the relink
+//   request (`person`), person_invalid and the people / relink pass-through.
 // CHANGE 2026-10-22 F06-FN-08: version pin alpha.6 → alpha.7 and the X-Function-Version header check (was: alpha.6 pin only).
 // CHANGE 2026-10-19 F05-FN-05: new file (no previous version). Dev self-tests for docs/F05_spec.md §3 with mocked
 //   getUser / rpc through setDeps() (no network, no database). The QA team's own suite is separate (tests/f05/).
@@ -51,7 +53,7 @@ function mock(out: unknown, user: unknown = ANON) {
 }
 
 Deno.test("version + status map", () => {
-  assert(/^3\.0\.0-alpha\.7/.test(FN_VERSION)); // CHANGE 2026-10-22 F06-FN-08: was the alpha.6 pin
+  assert(/^3\.0\.0-alpha\.16/.test(FN_VERSION)); // CHANGE 2026-11-16 F07-FN-04: was the alpha.7 pin
   eq([statusFor("code_invalid"), statusFor("name_taken"), statusFor("rate_limited"), statusFor("member_removed"), statusFor("x")],
     [404, 409, 429, 403, 500]);
 });
@@ -94,7 +96,7 @@ Deno.test("preview: anonymous user ok, args, output whitelisted", async () => {
     manager: "דנה", me: null, secret: "x" });
   const r = await call({ action: "preview", code: "#code=x7k2m9qp" }, { ip: "203.0.113.7" });
   eq(r.status, 200);
-  eq(Object.keys(r.j).sort(), ["days", "end_date", "manager", "me", "members", "name", "start_date", "trip_id"]);
+  eq(Object.keys(r.j).sort(), ["days", "end_date", "manager", "me", "members", "name", "people", "relink", "start_date", "trip_id"]); // CHANGE 2026-11-16 F07-FN-04: + people, relink
   eq(calls[0].name, "join_preview");
   eq(calls[0].args.p_code, "X7K2M9QP");
   eq(calls[0].args.p_user, ANON.id);
@@ -164,10 +166,49 @@ Deno.test("claim_transfer", async () => {
 });
 
 // CHANGE 2026-10-22 F06-FN-08: new test (no previous version) — the X-Function-Version header on success and on errors.
-Deno.test("X-Function-Version header (alpha.7.0)", async () => {
+Deno.test("X-Function-Version header (alpha.16.0)", async () => {
   mock({ trip_id: TRIP, name: "t", me: null });
   const ok = await call({ action: "preview", code: "X7K2M9QP" });
   eq(ok.r.headers.get("X-Function-Version"), FN_VERSION);
   const bad = await call({ action: "preview", code: "x" }, { jwt: null });
   eq([bad.status, bad.r.headers.get("X-Function-Version")], [401, FN_VERSION]);
+});
+
+// CHANGE 2026-11-16 F07-FN-04: new tests (no previous version) — docs/F07_spec.md §2.2 / C5.
+const PERSON = "f0700000-0000-4000-8000-0000000000aa";
+Deno.test("F07 preview: people (names only, no roles) and relink are passed through, junk is dropped", async () => {
+  mock({ trip_id: TRIP, name: "t", members: 2, manager: "דנה", me: null,
+    people: [{ person_id: PERSON, display_name: "עדן", role: "manager", email: "x@y.z" }, "junk", null],
+    relink: { status: "pending", display_name: "עדן", role: "editor", expires_at: "2027-01-01T00:00:00Z", secret: 1 } });
+  const r = await call({ action: "preview", code: "X7K2M9QP" });
+  eq(r.j.people, [{ person_id: PERSON, display_name: "עדן" }]);
+  eq(r.j.relink, { status: "pending", display_name: "עדן", role: "editor", expires_at: "2027-01-01T00:00:00Z" });
+  mock({ trip_id: TRIP, name: "t", me: null });
+  const r2 = await call({ action: "preview", code: "X7K2M9QP" });
+  eq([r2.j.people, r2.j.relink], [[], null]);
+});
+
+Deno.test("F07 request with `person`: the name is not needed, p_person goes to the database, relink fields come back", async () => {
+  const calls = mock({ trip_id: TRIP, member_id: "m1", status: "pending", role: "editor", display_name: "עדן", created: true,
+    relink: true, person_id: PERSON, expires_at: "2027-01-01T00:00:00Z", extra: 1 });
+  const r = await call({ action: "request", code: "X7K2M9QP", person: PERSON, display_name: "ignored" }, { ip: "203.0.113.7" });
+  eq([r.status, r.j.relink, r.j.person_id, r.j.expires_at, "extra" in r.j], [200, true, PERSON, "2027-01-01T00:00:00Z", false]);
+  eq([calls[0].name, calls[0].args.p_person, calls[0].args.p_name, calls[0].args.p_user], ["join_request", PERSON, null, ANON.id]);
+  const c2 = mock({ trip_id: TRIP, member_id: "m1", status: "pending", role: "editor", display_name: "נועה", created: true, relink: false });
+  await call({ action: "request", code: "X7K2M9QP", display_name: "נועה" });
+  eq([c2[0].args.p_person, c2[0].args.p_name], [null, "נועה"]);
+});
+
+Deno.test("F07 request: a malformed person → 409 person_invalid with no database call; no person and no name → name_invalid", async () => {
+  const calls = mock({});
+  let r = await call({ action: "request", code: "X7K2M9QP", person: "not-a-uuid" });
+  eq([r.status, r.j.error, calls.length], [409, "person_invalid", 0]);
+  r = await call({ action: "request", code: "X7K2M9QP" });
+  eq([r.status, r.j.error, calls.length], [400, "name_invalid", 0]);
+  mock({ error: "person_invalid" });
+  r = await call({ action: "request", code: "X7K2M9QP", person: PERSON });
+  eq([r.status, r.j.error], [409, "person_invalid"]);
+  mock({ error: "already_member" });
+  r = await call({ action: "request", code: "X7K2M9QP", person: PERSON });
+  eq([r.status, r.j.error], [409, "already_member"]);
 });

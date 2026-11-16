@@ -26,7 +26,7 @@
 type Any = any;
 const MM: Any = await import(new URL("../../supabase/functions/manage-members/index.ts", import.meta.url).href);
 
-const VERSION = "3.0.0-alpha.7.0";
+const VERSION = "3.0.0-alpha.16.0"; // CHANGE 2026-11-16 F07-QA-02: was "3.0.0-alpha.7.0" (F07 bumped manage-members)
 const LOGS: string[] = [];
 const C: Any = console;
 // (re)installed at the start of each test that reads logs: the Node runner swaps console.log per test
@@ -95,11 +95,11 @@ const ACTIONS: [string, Record<string, Any>, string, Record<string, Any>, Any][]
   ["remove", { action: "remove", member_id: MEMBER }, "member_remove", { p_member: MEMBER }, { ok: true, member_id: MEMBER }],
   ["leave", { action: "leave", trip_id: TRIP }, "member_leave", { p_trip: TRIP }, { ok: true }],
   ["rotate_link", { action: "rotate_link", trip_id: TRIP }, "rotate_join_code", { p_trip: TRIP }, { code: JCODE, version: 2 }],
-  ["touch", { action: "touch", trip_id: TRIP }, "member_touch", { p_trip: TRIP }, { ok: true }],
+  ["touch", { action: "touch", trip_id: TRIP }, "member_touch", { p_trip: TRIP, p_session: null, p_label: null, p_via: "anon" }, { ok: true }], // CHANGE 2026-11-16 F07-QA-02: + p_session / p_label / p_via (F07 C3)
 ];
 
 // ---------------------------------------------------------------------------------------------------------------
-T("F6-FN-01 §3.1 FN_VERSION = 3.0.0-alpha.7.0", () => {
+T("F6-FN-01 §3.1 FN_VERSION = 3.0.0-alpha.16.0", () => {
   eq(String(MM.FN_VERSION), VERSION, "FN_VERSION");
 });
 
@@ -215,7 +215,7 @@ T("F6-FN-09 rename: the name reaches the SQL function unchanged (cleaning is §2
   ok(r.status === 400 && ["name_invalid", "invalid_request"].includes(errCode(r)), "missing display_name: " + r.status + " " + errCode(r));
 });
 
-T("F6-FN-10 §3.1 version: success responses carry a header with value 3.0.0-alpha.7.0 and body.version = 3.0.0-alpha.7.0", async () => {
+T("F6-FN-10 §3.1 version: success responses carry a header with value 3.0.0-alpha.16.0 and body.version = 3.0.0-alpha.16.0", async () => {
   for (const [act, body, , , out] of ACTIONS) {
     mock(out);
     const r = await call(body);

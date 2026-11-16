@@ -1,4 +1,11 @@
-// Lonely Planner (Plan_Travel) Edge Function `manage-members` · version 3.0.0-alpha.7.0 · F06
+// Lonely Planner (Plan_Travel) Edge Function `manage-members` · version 3.0.0-alpha.16.0 · F06 (+F07)
+// CHANGE 2026-11-16 F07-FN-03: what changed from 3.0.0-alpha.7.0 (docs/F07_spec.md §2.2): (1) `touch` also records THIS device's
+//   auth session: session_id from the verified JWT, via = anon | the sign-in provider (email, google, …), label from the
+//   User-Agent ("Android · Chrome"); it can answer device_revoked (403). (2) three new actions — `devices`, `disconnect_device`,
+//   `ack_device_notice`. (3) new error codes last_device (409) and device_revoked (403). Spec C4 deviation: the auth.sessions row is
+//   deleted by the database function (one transaction), not by this function; if that delete is refused the session is still
+//   marked revoked and the next `touch` of that device answers device_revoked. set_role / rename / remove / leave / rotate_link
+//   are unchanged here (the SQL now applies them to the whole person).
 // CHANGE 2026-10-22 F06-FN-01: new file (no previous version). A manager changes a member's role or name, removes a member,
 //   resets the trip's join link; any member leaves the trip or records "last seen" (docs/F06_spec.md §3.1, D13: one function
 //   with several actions instead of `update-member` + `rotate-join-link`). Runs with the service role; verify_jwt is OFF —
@@ -12,11 +19,17 @@
 //   leave       {trip_id}                  → rpc member_leave     → {ok:true, trip_id, member_id}
 //   rotate_link {trip_id}                  → rpc rotate_join_code → {code, link_version}  (spec clarification C4: the
 //                                                                   body field `version` is FN_VERSION)
-//   touch       {trip_id}                  → rpc member_touch     → {ok:true, touched}
+//   touch       {trip_id}                  → rpc member_touch     → {ok:true, touched}     (or 403 device_revoked)
+//   devices     {trip_id}                  → rpc device_list      → {ok, persons:[{person_id, display_name, role, devices:[…]}],
+//                                                                   notices:[…], is_manager, my_person_id, current_session}
+//   disconnect_device {trip_id, member_id, session_id?} → rpc device_disconnect → {ok, kind:'session'|'row', member_id, session_id,
+//                                                                   auth_session_deleted}
+//   ack_device_notice {trip_id, session_id}  → rpc device_notice_ack → {ok, acked}
 // Every success body also carries `version` (= FN_VERSION) and every response the header `X-Function-Version`
 // (closes F05 QA finding D1 for this function).
 // Errors: {error:<code>, version} — 401 unauthorized · 400 invalid_request / role_invalid / name_invalid ·
-//   403 not_manager / not_member · 409 not_active / name_taken / last_manager · 405 method_not_allowed · 500 server_error.
+//   403 not_manager / not_member / device_revoked · 409 not_active / name_taken / last_manager / last_device · 405 method_not_allowed ·
+//   500 server_error.
 //
 // Testability (same contract as approve-member): importable without a server (main.ts calls startServer());
 //   setDeps({getUser?, rpc?}) / resetDeps(); handler(req); statusFor(code).
@@ -24,17 +37,17 @@
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 
-export const FN_VERSION = "3.0.0-alpha.7.0";
+export const FN_VERSION = "3.0.0-alpha.16.0"; // CHANGE 2026-11-16 F07-FN-03: was "3.0.0-alpha.7.0"
 export const VERSION_HEADER = "X-Function-Version";
-export const ACTIONS = ["set_role", "rename", "remove", "leave", "rotate_link", "touch"] as const;
+export const ACTIONS = ["set_role", "rename", "remove", "leave", "rotate_link", "touch", "devices", "disconnect_device", "ack_device_notice"] as const;
 export type Action = typeof ACTIONS[number];
 
 export type ErrorCode =
   | "unauthorized" | "invalid_request" | "role_invalid" | "name_invalid" | "not_manager" | "not_member" | "not_active"
-  | "name_taken" | "last_manager" | "method_not_allowed" | "server_error";
+  | "name_taken" | "last_manager" | "last_device" | "device_revoked" | "method_not_allowed" | "server_error";
 const STATUS: Record<ErrorCode, number> = {
   unauthorized: 401, invalid_request: 400, role_invalid: 400, name_invalid: 400, not_manager: 403, not_member: 403,
-  not_active: 409, name_taken: 409, last_manager: 409, method_not_allowed: 405, server_error: 500,
+  not_active: 409, name_taken: 409, last_manager: 409, last_device: 409, device_revoked: 403, method_not_allowed: 405, server_error: 500,
 };
 export function statusFor(code: string): number {
   return (STATUS as Record<string, number>)[code] ?? 500;
@@ -42,6 +55,8 @@ export function statusFor(code: string): number {
 
 export interface AuthUser {
   id: string;
+  /** F07: 'anon' for an anonymous identity, else the sign-in provider (email, google, …) */
+  via?: string;
 }
 export interface RpcResult {
   data: unknown;
@@ -74,6 +89,49 @@ export function isUuid(v: unknown): v is string {
   return typeof v === "string" && UUID_RE.test(v);
 }
 
+// -----------------------------------------------------------------------------------------------------
+// F07 helpers (exported for tests): the session of this device, its sign-in kind and a readable label
+// -----------------------------------------------------------------------------------------------------
+export interface SupaUser {
+  id: string;
+  is_anonymous?: boolean;
+  app_metadata?: { provider?: string; providers?: string[] };
+  identities?: { provider?: string }[] | null;
+}
+/** 'anon' for an anonymous user; otherwise the provider name in the database's format ([a-z][a-z0-9_]{1,29}), default 'email'. */
+export function viaOf(u: SupaUser): string {
+  if (u.is_anonymous) return "anon";
+  const cand = [u.app_metadata?.provider, ...(u.identities || []).map((i) => i?.provider), ...(u.app_metadata?.providers || [])];
+  for (const c of cand) {
+    if (typeof c !== "string") continue;
+    const v = c.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+    if (/^[a-z][a-z0-9_]{1,29}$/.test(v) && v !== "anonymous") return v;
+  }
+  return "email";
+}
+/** `session_id` claim of a JWT the caller has ALREADY verified with auth.getUser (the payload is not re-verified); null if absent. */
+export function jwtSessionId(jwt: string): string | null {
+  try {
+    const part = jwt.split(".")[1];
+    if (!part) return null;
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (part.length % 4)) % 4);
+    const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))));
+    return isUuid(claims?.session_id) ? String(claims.session_id).toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+/** "<system> · <browser>" from a User-Agent, e.g. "Android · Chrome"; null when nothing is recognised. Never stored raw. */
+export function deviceLabel(ua: string | null): string | null {
+  if (!ua) return null;
+  const os = /iPhone/i.test(ua) ? "iPhone" : /iPad/i.test(ua) ? "iPad" : /Android/i.test(ua) ? "Android" : /Windows/i.test(ua) ? "Windows"
+    : /Mac OS X|Macintosh/i.test(ua) ? "Mac" : /CrOS/i.test(ua) ? "Chromebook" : /Linux/i.test(ua) ? "Linux" : null;
+  const br = /Edg(e|A|iOS)?\//i.test(ua) ? "Edge" : /SamsungBrowser/i.test(ua) ? "Samsung Internet" : /(OPR|Opera)\//i.test(ua) ? "Opera"
+    : /(CriOS|Chrome)\//i.test(ua) ? "Chrome" : /(FxiOS|Firefox)\//i.test(ua) ? "Firefox" : /Safari\//i.test(ua) ? "Safari" : null;
+  const label = [os, br].filter(Boolean).join(" · ");
+  return label || null;
+}
+
 class HttpError extends Error {
   status: number;
   code: ErrorCode;
@@ -98,7 +156,7 @@ const DEFAULT_DEPS: Deps = {
   async getUser(jwt) {
     const { data, error } = await db().auth.getUser(jwt);
     if (error || !data?.user) return null;
-    return { id: (data.user as unknown as AuthUser).id };
+    return { id: (data.user as unknown as AuthUser).id, via: viaOf(data.user as unknown as SupaUser) };
   },
   async rpc(name, args) {
     const { data, error } = await db().rpc(name, args);
@@ -155,7 +213,15 @@ async function call(name: string, args: Record<string, unknown>): Promise<Record
   return d;
 }
 
-async function act(action: Action, uid: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+interface Caller {
+  id: string;
+  via: string;
+  session: string | null;
+  label: string | null;
+}
+
+async function act(action: Action, caller: Caller, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const uid = caller.id;
   switch (action) {
     case "set_role": {
       // C6: missing / null → invalid_request; any other value outside the lower-case list → role_invalid
@@ -189,8 +255,36 @@ async function act(action: Action, uid: string, body: Record<string, unknown>): 
     }
     case "touch": {
       if (!isUuid(body.trip_id)) throw new HttpError("invalid_request");
-      const d = await call("member_touch", { p_user: uid, p_trip: body.trip_id });
+      // CHANGE 2026-11-16 F07-FN-03: + this device's session (C3); device_revoked comes back as an error
+      const d = await call("member_touch", {
+        p_user: uid, p_trip: body.trip_id, p_session: caller.session, p_label: caller.label, p_via: caller.via,
+      });
       return { ok: true, touched: !!d.touched };
+    }
+    case "devices": {
+      if (!isUuid(body.trip_id)) throw new HttpError("invalid_request");
+      const d = await call("device_list", { p_user: uid, p_trip: body.trip_id });
+      return {
+        ok: true,
+        persons: Array.isArray(d.persons) ? d.persons : [],
+        notices: Array.isArray(d.notices) ? d.notices : [],
+        is_manager: d.is_manager === true,
+        my_person_id: d.my_person_id ?? null,
+        current_session: caller.session,
+      };
+    }
+    case "disconnect_device": {
+      if (!isUuid(body.trip_id) || !isUuid(body.member_id)) throw new HttpError("invalid_request");
+      if (body.session_id != null && !isUuid(body.session_id)) throw new HttpError("invalid_request");
+      const d = await call("device_disconnect", {
+        p_user: uid, p_trip: body.trip_id, p_member: body.member_id, p_session: body.session_id ?? null,
+      });
+      return { ok: true, ...pick(d, ["kind", "member_id", "session_id", "auth_session_deleted"]) };
+    }
+    case "ack_device_notice": {
+      if (!isUuid(body.trip_id) || !isUuid(body.session_id)) throw new HttpError("invalid_request");
+      const d = await call("device_notice_ack", { p_user: uid, p_trip: body.trip_id, p_session: body.session_id });
+      return { ok: true, acked: !!d.acked };
     }
   }
 }
@@ -219,7 +313,13 @@ export async function handler(req: Request): Promise<Response> {
     const user = await deps.getUser(m[1]); // a thrown error (auth server down) → 500 server_error, not 401
     if (!user || !user.id) throw new HttpError("unauthorized");
     if (!(ACTIONS as readonly string[]).includes(action)) throw new HttpError("invalid_request");
-    const out = await act(action as Action, user.id, body);
+    const caller: Caller = {
+      id: user.id,
+      via: user.via || "anon",
+      session: jwtSessionId(m[1]),
+      label: deviceLabel(req.headers.get("user-agent")),
+    };
+    const out = await act(action as Action, caller, body);
     log({ action, status: 200 });
     return json(origin, 200, out);
   } catch (e) {

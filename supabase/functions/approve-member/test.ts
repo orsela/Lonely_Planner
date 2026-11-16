@@ -1,4 +1,5 @@
-// Lonely Planner · approve-member unit tests · version 3.0.0-alpha.6.0 · F05
+// Lonely Planner · approve-member unit tests · version 3.0.0-alpha.16.0 · F05 (+F07)
+// CHANGE 2026-11-16 F07-FN-05: version pin alpha.6 → alpha.16; new tests: `relink` flag in the answer, person_invalid.
 // CHANGE 2026-10-19 F05-FN-06: new file (no previous version). Dev self-tests for docs/F05_spec.md §3 (mocked deps).
 //
 // Run with Deno:      deno test --allow-env --no-check --import-map=supabase/functions/approve-member/test_import_map.json \
@@ -42,7 +43,7 @@ function mock(out: unknown) {
   return calls;
 }
 
-Deno.test("version", () => assert(/^3\.0\.0-alpha\.6/.test(FN_VERSION)));
+Deno.test("version", () => assert(/^3\.0\.0-alpha\.16/.test(FN_VERSION)));
 
 Deno.test("auth + validation", async () => {
   const calls = mock({});
@@ -75,4 +76,23 @@ Deno.test("database refusals", async () => {
     const r = await call({ member_id: MEMBER, decision: "approve", role: "editor" });
     eq([r.status, r.j.error], [st, code === "weird" ? "server_error" : code], code);
   }
+});
+
+// CHANGE 2026-11-16 F07-FN-05: new tests (no previous version) — docs/F07_spec.md C6.
+Deno.test("F07 approve: `relink` flag in the answer (true for a new device of a person, false otherwise)", async () => {
+  mock({ status: "active", member_id: MEMBER, role: "manager", display_name: "דנה", trip_id: "t", relink: true });
+  let r = await call({ member_id: MEMBER, decision: "approve", role: "viewer" });
+  eq([r.status, r.j.relink, r.j.role], [200, true, "manager"]);
+  mock({ status: "active", member_id: MEMBER, role: "viewer", display_name: "נועה", trip_id: "t", relink: false });
+  r = await call({ member_id: MEMBER, decision: "approve", role: "viewer" });
+  eq(r.j.relink, false);
+  mock({ status: "active", member_id: MEMBER, role: "viewer", display_name: "נועה", trip_id: "t" });
+  r = await call({ member_id: MEMBER, decision: "approve" });
+  eq(r.j.relink, false);
+});
+
+Deno.test("F07 approve: person_invalid → 409 (the person was removed meanwhile)", async () => {
+  mock({ error: "person_invalid" });
+  const r = await call({ member_id: MEMBER, decision: "approve" });
+  eq([r.status, r.j.error], [409, "person_invalid"]);
 });

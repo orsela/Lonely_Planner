@@ -1,11 +1,14 @@
-// Lonely Planner (Plan_Travel) Edge Function `approve-member` · version 3.0.0-alpha.6.0 · F05
+// Lonely Planner (Plan_Travel) Edge Function `approve-member` · version 3.0.0-alpha.16.0 · F05 (+F07)
+// CHANGE 2026-11-16 F07-FN-02: what changed from 3.0.0-alpha.6.0: (1) an approved answer carries `relink` (true = a "מכשיר חדש"
+//   request of an existing person: the database ignores `role` and uses the person's CURRENT role + name, spec C6); (2) new error
+//   code person_invalid (409: the person was removed before the approval; the request row is deleted). Request shape unchanged.
 // CHANGE 2026-10-19 F05-FN-02: new file (no previous version). An active manager approves a pending member with a role
 //   (D3: viewer / editor / manager; none → the trip's default role) or rejects the request (the pending row is deleted,
 //   D6). docs/F05_spec.md §3. Runs with the service role; verify_jwt is OFF — the caller's JWT is verified here with
 //   auth.getUser(jwt); the manager check itself is done by the database function approve_member (0012_f05.sql).
 //
 // POST {member_id, decision:'approve'|'reject', role?}  →  rpc approve_member
-//   200 {status:'active', member_id, role, display_name, trip_id}  |  200 {status:'rejected', member_id, display_name}
+//   200 {status:'active', member_id, role, display_name, trip_id, relink}  |  200 {status:'rejected', member_id, display_name}
 // Errors: {error:<code>} — 401 unauthorized · 400 invalid_request / role_invalid · 403 not_manager · 409 not_pending ·
 //   405 method_not_allowed · 500 server_error.
 //
@@ -14,13 +17,13 @@
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 
-export const FN_VERSION = "3.0.0-alpha.6.0";
+export const FN_VERSION = "3.0.0-alpha.16.0"; // CHANGE 2026-11-16 F07-FN-02: was "3.0.0-alpha.6.0"
 
 export type ErrorCode =
-  | "unauthorized" | "invalid_request" | "role_invalid" | "not_manager" | "not_pending" | "method_not_allowed"
-  | "server_error";
+  | "unauthorized" | "invalid_request" | "role_invalid" | "not_manager" | "not_pending" | "person_invalid"
+  | "method_not_allowed" | "server_error";
 const STATUS: Record<ErrorCode, number> = {
-  unauthorized: 401, invalid_request: 400, role_invalid: 400, not_manager: 403, not_pending: 409,
+  unauthorized: 401, invalid_request: 400, role_invalid: 400, not_manager: 403, not_pending: 409, person_invalid: 409,
   method_not_allowed: 405, server_error: 500,
 };
 export function statusFor(code: string): number {
@@ -152,7 +155,7 @@ export async function handler(req: Request): Promise<Response> {
       throw new HttpError(code in STATUS && code !== "server_error" ? code : "server_error");
     }
     const out = d.status === "active"
-      ? { status: "active", member_id: d.member_id ?? null, role: d.role ?? null, display_name: d.display_name ?? null, trip_id: d.trip_id ?? null }
+      ? { status: "active", member_id: d.member_id ?? null, role: d.role ?? null, display_name: d.display_name ?? null, trip_id: d.trip_id ?? null, relink: d.relink === true }
       : { status: "rejected", member_id: d.member_id ?? null, display_name: d.display_name ?? null };
     log({ status: 200, decision });
     return json(origin, 200, out);
