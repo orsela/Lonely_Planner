@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.15.4 — F14 · chat bubbles show bold, not raw asterisks (2026-11-16)
+- `chatBubbleHtml` (app/index.html): assistant text is escaped, then `**x**` becomes `<strong>x</strong>`. User bubbles unchanged. Found in Or's phone check (screenshot 16/11). No server change.
+
 ## 3.0.0-alpha.15 — F14 · the smart chat (2026-11-15; phone check pending)
 <!-- CHANGE 2026-11-15 F14-DOCS-06: new entry. Spec claude/Plan_Travel_F14_spec.md (project doc), steps 1–4. -->
 - 💬 opens the chat: questions about the trip (days, budget, expenses, currency, weather, a photo) are answered in Hebrew by Claude through the new

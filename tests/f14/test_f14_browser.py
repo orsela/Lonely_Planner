@@ -70,7 +70,7 @@ def test_f14_chat_in_the_real_app(env):
     page.wait_for_timeout(800)
     ver = page.evaluate("()=>window.__ptF14&&window.__ptF14.version")
     if ver != "3.0.0-alpha.15": P.append("f14 version: %r" % ver)
-    if page.evaluate("()=>window.__PT.version") != "3.0.0-alpha.15.3": P.append("app version: %r" % page.evaluate("()=>window.__PT.version"))
+    if page.evaluate("()=>window.__PT.version") != "3.0.0-alpha.15.4": P.append("app version: %r" % page.evaluate("()=>window.__PT.version"))
     if not page.evaluate("()=>window.__ptF14.enabled()"): P.append("f14 not enabled with CHAT_FEATURE='on'")
     page.wait_for_function("()=>document.getElementById('ptF14Css')", timeout=5000)
     page.wait_for_timeout(1200)   # airports.json / countries.json
