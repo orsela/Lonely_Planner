@@ -1,4 +1,8 @@
-/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.14
+/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.16.1
+   CHANGE 2026-11-16 F24-FIX-01: what changed from alpha.14 (Or's phone check 16/11: day 9 flight with only a country on both sides opened Google Flights with empty
+   fields): f24GoogleFlightsUrl — when a side has only a country (no airport code, no city) and the date is valid, the sentence names only the known side
+   ("Flights to X on date" / "Flights from X on date") or, with no known side, the plain page; before it was "from <country> to <country>", which Google cannot
+   parse. f24FlightCardHtml — a one-line hint under the links when a side is country-only. Skyscanner links and every other function unchanged.
    CHANGE 2026-11-15 F24-A3-01 (conversation 3): what changed from F24-A2-01: the card is placed under the route screen's weather card (#routeDayWeather) instead of
    under #dayReservations, so it shows in the map view too (Or's decision 2026-11-15). Nothing else in the file changed in this step.
    CHANGE 2026-11-14 F24-A2-01 (conversation 2): what changed from conversation 1 (same file, same version number alpha.14, which was never loaded
@@ -67,6 +71,8 @@
   function isHomePlace(p) { return !!p && p.country === HOME_CC; }
   /* what the Google Flights sentence names: the code, else the city, else the country */
   function gfName(p) { return p.iata || (p.city ? p.city + (countryEn(p.country) ? ', ' + countryEn(p.country) : '') : countryEn(p.country) || p.country || ''); }
+  /* F24-FIX-01: a place with neither an airport code nor a city (only a country, or nothing) */
+  function isVague(p) { return !!p && !p.iata && !p.city; }
   function skyCode(p) { return (p.iata || p.country || '').toLowerCase(); }
   function f24PlaceLabel(p) { return p ? (p.iata ? p.iata + ' · ' + (p.cityHe || p.city) : (p.cityHe || p.city || countryHe(p.country) || '')) : ''; }
 
@@ -153,6 +159,12 @@
   const enc = encodeURIComponent;
   function f24GoogleFlightsUrl(q) {
     const base = 'https://www.google.com/travel/flights', to = q && q.to ? gfName(q.to) : '', from = q && q.from ? gfName(q.from) : '';
+    /* F24-FIX-01: a side with only a country cannot be parsed by Google Flights; name only the side that has a code or a city */
+    if (isIso(q && q.date) && (isVague(q.from) || isVague(q.to))) {
+      if (q.to && !isVague(q.to)) return base + '?q=' + enc('Flights to ' + to + ' on ' + q.date);
+      if (q.from && !isVague(q.from)) return base + '?q=' + enc('Flights from ' + from + ' on ' + q.date);
+      return base;
+    }
     if (!to || !from || !isIso(q.date)) return base + (to ? '?q=' + enc('Flights to ' + to) : '');
     const back = isIso(q.returnDate) && q.returnDate > q.date;
     return base + '?q=' + enc('Flights from ' + from + ' to ' + to + ' on ' + q.date + (back ? ' through ' + q.returnDate : ' one way') + ', ' + adultsOf(q.adults) + (adultsOf(q.adults) === 1 ? ' adult' : ' adults'));
@@ -253,6 +265,7 @@ button.p24-leg{cursor:pointer}
       '<div class="p24-meta"><span>' + dm(c.date) + (c.roundTrip ? ' · הלוך' : ' · כיוון אחד') + '</span>' + (c.roundTrip ? '<span>חזור ' + dm(c.returnDate) + '</span>' : '') + '<span>' + escH(travelersLabel(c.adults, false)) + '</span></div>' +
       link(c.links.googleFlights, 'p', 'חיפוש ב-Google Flights') + link(c.links.skyscanner, 's', 'חיפוש ב-Skyscanner') +
       (on ? '' : '<p class="p24-off" role="status">' + OFFLINE_LINE + '</p>') +
+      (isVague(c.from) || isVague(c.to) ? '<p class="p24-hint">בהזמנה חסר שדה תעופה או עיר, אז החיפוש כללי יותר. אפשר לדייק ב"שינוי" או בפרטי הטיסה.</p>' : '') +
       '<p class="p24-hint">הפרטים כבר ממולאים. באתר אפשר למיין לפי הכי זול, הכי מהיר או הכי משתלם. כשמזמינים, מעלים את הכרטיס לכספת והכרטיס הזה מתחלף בפרטי הטיסה.</p>';
   }
   function f24HotelCardHtml(c, o) {

@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.16.1 — F24 · Google Flights link when a flight side has only a country (2026-11-16)
+- `f24GoogleFlightsUrl` (app/js/f24.js): a side with no airport code and no city is no longer written as "from <country> to <country>" (Google left the fields empty, Or's phone check on day 9). The link names the known side only, or opens the plain page. The flight card shows a one-line hint in that case. Skyscanner unchanged. Node test FIX-01.
+
 ## 3.0.0-alpha.16 — F07 · conversations 2 + 3 (page side, app side, flag ON; 2026-11-16; phone check pending)
 <!-- CHANGE 2026-11-16 F07-DOCS-07: new entry on top of the conversation-1 entry below (same version 3.0.0-alpha.16: f07-build was never released before this merge). Notes: docs/F07_dev_notes_page.md (conversation 2), docs/F07_dev_notes_app.md (conversation 3). -->
 - `RELINK_FEATURE='on'` in the app and in `/join/`: a member on a new phone opens the join link, picks "כבר הייתי בטיול" and their name; the manager approves ("מכשיר חדש", no role picker); same name, role and records, one person with two devices.

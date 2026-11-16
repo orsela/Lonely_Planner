@@ -187,3 +187,16 @@ test("A2 · card HTML escapes city names from the trip", () => {
   const s = F.f24FlightSearch(0), html = F.f24FlightCardHtml(s, { online: true });
   assert.ok(!/<img/.test(html));
 });
+
+// CHANGE 2026-11-16 F24-FIX-02: what changed from the previous version: new test for F24-FIX-01 (Or's phone check 16/11: a flight with only a country on both sides).
+test("FIX-01 · a country-only side never becomes 'from <country> to <country>' in the Google Flights link", () => {
+  setup(georgia());
+  const ae = { iata: "", city: "", country: "AE" }, tlv = { iata: "TLV", city: "Tel Aviv", country: "IL" }, auh = { iata: "AUH", city: "Abu Dhabi", country: "AE" };
+  const g = q => decodeURIComponent(F.f24GoogleFlightsUrl(q));
+  assert.equal(F.f24GoogleFlightsUrl({ from: ae, to: ae, date: "2027-01-09" }), "https://www.google.com/travel/flights");
+  assert.equal(g({ from: ae, to: tlv, date: "2027-01-09" }), "https://www.google.com/travel/flights?q=Flights to TLV on 2027-01-09");
+  assert.equal(g({ from: auh, to: ae, date: "2027-01-09" }), "https://www.google.com/travel/flights?q=Flights from AUH on 2027-01-09");
+  assert.equal(g({ from: auh, to: tlv, date: "2027-01-09", adults: 1 }), "https://www.google.com/travel/flights?q=Flights from AUH to TLV on 2027-01-09 one way, 1 adult");
+  const html = F.f24FlightCardHtml({ i: 0, from: ae, to: ae, date: "2027-01-09", roundTrip: false, adults: 1, links: { googleFlights: "https://x/", skyscanner: "https://y/" } }, { online: true });
+  assert.match(html, /בהזמנה חסר שדה תעופה או עיר/);
+});
