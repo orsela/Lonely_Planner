@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.16.5 — app version shown in "עוד" (2026-11-16)
+- A line "גרסה 3.0.0-alpha.16.5" under "סנכרון בענן פעיל" in the More screen (`#moreVer`, filled from APP_VERSION), so a phone stuck on a cached build is visible.
+
 ## 3.0.0-alpha.16.4 — F24 · country-only flight side → the country's main airport (2026-11-16)
 - `f24FlightSearch`: a side with only a country gets the first airport of that country in airports.json (AE→DXB, GR→ATH); never the same airport on both sides; card note "ניחוש לפי המדינה". The Google Flights link now always names origin, destination, date and "one way". Node test FIX-04.
 
