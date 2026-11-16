@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.16.2 — F24 · last-day flight with country-only sides (2026-11-16)
+- `f24FlightSearch` (app/js/f24.js): on the last day of the trip, a flight whose destination is only a country goes to Tel Aviv (TLV); an origin that is only a country becomes the airport of the previous day's city (else this day's city) when it is in airports.json and in the same country. Or's choice C after the day-9 phone check. Node test FIX-02.
+
 ## 3.0.0-alpha.16.1 — F24 · Google Flights link when a flight side has only a country (2026-11-16)
 - `f24GoogleFlightsUrl` (app/js/f24.js): a side with no airport code and no city is no longer written as "from <country> to <country>" (Google left the fields empty, Or's phone check on day 9). The link names the known side only, or opens the plain page. The flight card shows a one-line hint in that case. Skyscanner unchanged. Node test FIX-01.
 

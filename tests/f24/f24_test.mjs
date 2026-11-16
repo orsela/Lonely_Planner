@@ -200,3 +200,21 @@ test("FIX-01 · a country-only side never becomes 'from <country> to <country>' 
   const html = F.f24FlightCardHtml({ i: 0, from: ae, to: ae, date: "2027-01-09", roundTrip: false, adults: 1, links: { googleFlights: "https://x/", skyscanner: "https://y/" } }, { online: true });
   assert.match(html, /בהזמנה חסר שדה תעופה או עיר/);
 });
+
+// CHANGE 2026-11-16 F24-FIX-07: what changed from the previous version: new test for F24-FIX-04 (last-day flight with country-only sides, Or's day 9).
+test("FIX-02 · last day, country-only sides: destination TLV, origin = the previous day's city airport", () => {
+  COUNTRIES.AE = { en: "United Arab Emirates", he: "איחוד האמירויות", tz: ["Asia/Dubai"] };
+  const d = [fl("01/01/2027", "IL", "AE", "", "Abu Dhabi")];
+  for (let k = 2; k <= 8; k++) d.push(land(`0${k}/01/2027`, "AE", "Abu Dhabi"));
+  d.push({ date: "09/01/2027", isFlight: true, flightFrom: { country: "AE", tz: "Asia/Dubai", city: "" }, flightTo: { country: "AE", tz: "Asia/Dubai", city: "" }, city: "Abu Dhabi" });
+  setup(d);
+  const s = F.f24FlightSearch(d.length - 1);
+  assert.ok(s); assert.equal(s.to.iata, "TLV"); assert.equal(s.from.iata, "AUH");
+  assert.match(decodeURIComponent(s.links.googleFlights), /from AUH to TLV on 2027-01-09 one way/);
+  assert.match(s.links.skyscanner, /\/flights\/auh\/tlv\/270109\//);
+  assert.ok(!/p24-hint">בהזמנה חסר/.test(F.f24FlightCardHtml(s, { online: true })));
+  // not the last day: untouched (still country-only, no guess)
+  const e = d.slice(); e.push(land("10/01/2027", "AE", "Abu Dhabi"));
+  setup(e); const t = F.f24FlightSearch(8);
+  assert.equal(t.to.iata, ""); assert.equal(t.from.iata, "");
+});

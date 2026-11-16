@@ -1,4 +1,7 @@
-/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.16.1
+/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.16.2
+   CHANGE 2026-11-16 F24-FIX-04: what changed from alpha.16.1 (Or's choice C after the day-9 phone check): f24FlightSearch — on the LAST day of the trip, a flight whose
+   destination is only a country (no code, no city) goes to Tel Aviv (TLV); and an origin that is only a country becomes the airport of the previous day's city
+   (else this day's city) when that city is in airports.json and in the same country. Nothing else changes; flights on other days are untouched.
    CHANGE 2026-11-16 F24-FIX-01: what changed from alpha.14 (Or's phone check 16/11: day 9 flight with only a country on both sides opened Google Flights with empty
    fields): f24GoogleFlightsUrl — when a side has only a country (no airport code, no city) and the date is valid, the sentence names only the known side
    ("Flights to X on date" / "Flights from X on date") or, with no known side, the plain page; before it was "from <country> to <country>", which Google cannot
@@ -127,6 +130,14 @@
     if (!d || !date || !f.f08IsFlight(d) || f24FlightBooked(i)) return null;
     const fl = flightIdx(), first = fl[0] === i;
     let to = placeOfSide(f.f08FlightTo(d)), from = placeOfSide(f.f08FlightFrom(d));
+    /* F24-FIX-04: the last day of the trip, destination only a country → home (TLV); origin only a country → the airport of the previous day's city, else this day's city */
+    if (i === a.length - 1 && isVague(to)) {
+      to = placeOfSide({});
+      if (isVague(from)) {
+        const byCity = c => { const ap = c ? f24AirportByName(String(c).trim()) : null; return ap && (!from.country || ap.cc === from.country) && ap.cc !== HOME_CC ? place(ap) : null; };
+        const p = byCity(a[i - 1] && a[i - 1].city) || byCity(d.city); if (p) from = p;
+      }
+    }
     /* C4: the first flight of the trip leaves from TLV, unless the trip already spent days abroad before it */
     const sideFrom = f.f08FlightFrom(d);
     if (first && !(sideFrom.country && sideFrom.country !== HOME_CC && i > 0)) from = placeOfSide({});
