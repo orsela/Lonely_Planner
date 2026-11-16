@@ -123,7 +123,7 @@ const TRAVELSEARCH_FEATURE='on';
    ("כבר הייתי בטיול"), and the manager's home card shows it as "מכשיר חדש" with no role picker. The page side is in app/js/f07.js (script tag below); this file has the
    flag and a few connection points (F07-JOIN-03, F07-HOME-01..03, F07-MOUNT-01). /join/ has its own RELINK_FEATURE. 'off' = exactly the 3.0.0-alpha.15.3 behaviour
    (conversation 3 adds devices per member, "אני · <שם>" and the login notice under the same flag). Server part: migration 0018, already deployed. */
-const RELINK_FEATURE='off';
+const RELINK_FEATURE='on';   /* CHANGE 2026-11-16 F07-FLAG-02: was 'off' (F07 conversation 3 done: devices per member, "אני · <שם>" → "המכשירים שלי", login notice; same version 3.0.0-alpha.16). Back to 'off' = exactly 3.0.0-alpha.15.3 */
 </script>
 <!-- CHANGE 2026-11-13 F08-SCRIPT-01: new tag (no alpha.12.1 equivalent). F08 lives in its own file (LEAN rule 4). If the file
      does not load, window.__ptF08 is absent and both F08 hooks are no-ops. Cached for offline by sw.js (F08-SW-01). -->
@@ -700,6 +700,8 @@ function paintMe(){
  const x=$('ptF22Unlink');if(x)x.onclick=()=>unlinkSheet(u,w);
  const s=$('ptF22Sync');if(s){const go=()=>{try{switchPanel('backup')}catch{}};s.onclick=go;s.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();go()}}}
  netPaint();
+ /* CHANGE 2026-11-16 F07-ME-01: new line (alpha.15.3: none) — the "המכשירים שלי" card under the account card (F07, RELINK_FEATURE='on') */
+ try{if(typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'&&window.__ptF07)window.__ptF07.meCard()}catch{}
 }
 /* "קוד למייל": the F04 code screen (updateUser({email}) + verifyOtp email_change, F04-HOME resume) via window.__ptF04.openEntry */
 function emailWay(u,w){
@@ -4240,8 +4242,11 @@ function errText(e){const c=e&&e.code;return c==='offline'?TX.offlineAct:c==='la
 let members=null,pendingN=0,joinCode=null,tripNameNow='',started=false,chanTrip=null,chanMe=null,watchT=null,lastTouch=0;
 function cacheLoad(){try{const m=JSON.parse(nsGet('pt6_members')||'null');if(m&&Array.isArray(m.a)){members=m.a;pendingN=Number(m.p)||0}}catch{}}
 function myMember(){const u=api&&api.uid();return(members||[]).find(m=>m.user_id===u)||null}
-function managers(){return(members||[]).filter(m=>m.role==='manager')}
-function onlyManager(){const me=myMember();return isManager()&&!!me&&managers().filter(m=>m.id!==me.id).length===0}
+/* CHANGE 2026-11-16 F07-MEM-01: what changed from 3.0.0-alpha.15.3: managers() counts PERSONS (a manager with two devices is one manager) and onlyManager() ignores the caller's other device rows (C2, AC6). Rows without person_id (flag off) fall back to the row id = exactly the old behaviour. */
+function pid(m){return m.person_id||m.id}
+function managers(){const seen=new Set();return(members||[]).filter(m=>{if(m.role!=='manager'||seen.has(pid(m)))return false;seen.add(pid(m));return true})}
+function onlyManager(){const me=myMember();return isManager()&&!!me&&managers().filter(m=>pid(m)!==pid(me)).length===0}
+function personCount(){return new Set((members||[]).map(pid)).size}   /* CHANGE 2026-11-16 F07-MEM-02: "N חברים" counts persons (was: rows) */
 function sorted(){
  const u=api&&api.uid();
  return(members||[]).slice().sort((a,b)=>(b.user_id===u)-(a.user_id===u)||(b.role==='manager')-(a.role==='manager')||String(a.joined_at||'').localeCompare(String(b.joined_at||'')));
@@ -4250,11 +4255,13 @@ function colorOf(m){const i=(members||[]).slice().sort((a,b)=>String(a.joined_at
 async function loadMembers(){
  const t=tripId(),c=api&&api.client();if(!t||!c||!online())return false;
  try{
-  const{data,error}=await api.withTimeout(c.from('trip_members').select('id,user_id,display_name,role,status,joined_at,last_seen_at').eq('trip_id',t).in('status',['active','pending']),api.timeoutMs);
+  const{data,error}=await api.withTimeout(c.from('trip_members').select('id,user_id,display_name,role,status,joined_at,last_seen_at'+(typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'?',person_id':'')).eq('trip_id',t).in('status',['active','pending']),api.timeoutMs);
   if(error||!Array.isArray(data))return false;
   members=data.filter(r=>r.status==='active');pendingN=data.filter(r=>r.status==='pending').length;
   nsSet('pt6_members',JSON.stringify({a:members,p:pendingN}));
-  paintAll();return true;
+  paintAll();
+  try{if(typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'&&window.__ptF07)window.__ptF07.refresh()}catch{}   /* CHANGE 2026-11-16 F07-MEM-06: new line (alpha.15.3: none) — devices + login notices follow every members refresh (realtime, visible, opening the screen) */
+  return true;
  }catch{return false}
 }
 async function loadCode(){
@@ -4285,7 +4292,7 @@ function paintMore(){
    else{const s=document.createElement('div');s.className='pt6-sec';s.id='ptF06TripSec';s.textContent='הטיול';host.insertBefore(s,host.firstChild);host.insertBefore(row,s.nextSibling)}
    row.onclick=openMembers;
   }
-  const n=(members||[]).length;
+  const n=personCount();
   row.innerHTML='<div class="ic" style="background:#edf8f3" aria-hidden="true">👥</div><div class="lbl">חברים וקישור<span class="pt6-sub" id="ptF06MembersSub">'+(n?n+' חברים · ':'')+'תפקידים · קישור הצטרפות</span></div>'+
    (pendingN>0?'<span class="pt6-badge warn" id="ptF06PendingBadge">'+pendingN+' ממתינים</span>':'')+'<div class="chev">‹</div>';
  }
@@ -4339,7 +4346,7 @@ function paintMembers(){
  if(!isManager()){if(panelOpen()){toast(TX.notManager);go('more')}return}
  const off=!online(),dis=off?' disabled':'';
  $('ptF06Sub').textContent=(tripNameNow?tripNameNow+' · ':'')+'מנהלים בלבד';
- const list=sorted(),u=api&&api.uid(),nm=managers().length,url=joinUrl();
+ const u=api&&api.uid(),F7=(typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'&&window.__ptF07)||null,list=F7?F7.people(sorted(),u):sorted(),nm=managers().length,url=joinUrl();   /* CHANGE 2026-11-16 F07-MEM-03: with RELINK_FEATURE='on' one row per PERSON, devices under it (was: sorted() rows) */
  let h='<section class="pt6-card" id="ptF06Link" aria-labelledby="ptF06LinkTitle"><div class="pt6-card-h"><b id="ptF06LinkTitle">קישור הצטרפות</b><span class="pt6-muted">מי שפותח – ממתין לאישורך</span></div>'+
   '<div id="ptF06Url">'+(url?esc(url):(off?'—':'טוען…'))+'</div>'+
   '<div class="pt6-btns"><a class="pt6-btn pt6-grow" id="ptF06Wa" href="'+(url?esc(waUrl(tripNameNow||'',url)):'#')+'" target="_blank" rel="noopener noreferrer"'+(url&&!off?'':' aria-disabled="true"')+'>שליחה בווטסאפ</a>'+
@@ -4352,9 +4359,9 @@ function paintMembers(){
   h+='<div class="pt6-mrow" data-member="'+esc(m.id)+'"><div class="pt5-av" style="background:'+colorOf(m)+'" aria-hidden="true">'+esc(letter(m.display_name))+'</div>'+
    '<div class="pt6-nm"><b>'+esc(m.display_name)+(me?' <span class="pt6-me">(את/ה)</span>':'')+'</b><span class="pt6-muted">'+(me?'המכשיר הזה':esc(seen(m.last_seen_at)))+'</span></div>'+
    '<span class="pt6-badge '+(m.role==='manager'?'mgr':'role')+'">'+esc(ROLE[m.role]||m.role)+'</span>'+
-   '<button type="button" class="pt6-more" id="ptF06Act-'+esc(m.id)+'" data-act="'+esc(m.id)+'" aria-label="פעולות על '+esc(m.display_name)+'"'+dis+'><svg width="20" height="20" viewBox="0 0 24 24" fill="#6b746d" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>';
+   '<button type="button" class="pt6-more" id="ptF06Act-'+esc(m.id)+'" data-act="'+esc(m.id)+'" aria-label="פעולות על '+esc(m.display_name)+'"'+dis+'><svg width="20" height="20" viewBox="0 0 24 24" fill="#6b746d" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>'+(F7?F7.devsHtml(m):'');   /* CHANGE 2026-11-16 F07-MEM-04: + the person's devices (was: nothing after the row) */
  });
- h+='</div></section><p class="pt6-foot">שינוי תפקיד או הסרה נכנסים לתוקף מיד, גם בטלפון של החבר.</p>';
+ h+='</div></section><p class="pt6-foot">שינוי תפקיד או הסרה נכנסים לתוקף מיד, גם בטלפון של החבר.</p>'+(F7?F7.foot():'');   /* CHANGE 2026-11-16 F07-MEM-05: + "ניתוק מכשיר ≠ הסרה" line */
  if(off)h+='<p class="pt6-off" role="status" id="ptF06Offline">'+TX.offlineAct+'</p>';
  $('ptF06Body').innerHTML=h;
  const wa=$('ptF06Wa');wa.addEventListener('click',e=>{if(!joinUrl()||!online()){e.preventDefault();toast(online()?TX.linkLoad:TX.offlineAct)}});
@@ -4480,7 +4487,7 @@ function openRemove(m){
 }
 function openRotate(){
  if(!online()){toast(TX.offlineAct);return}
- const n=(members||[]).length;
+ const n=personCount();
  openLayer('alert','ptF06RotateT','<h2 id="ptF06RotateT">לאפס את קישור ההצטרפות?</h2><div class="pt6-pts">'+
   '<div class="pt6-pt">הקישור הנוכחי מפסיק לעבוד מיד. מי שיפתח אותו יראה "הקישור כבר לא פעיל".</div>'+
   '<div class="pt6-pt">'+(n===1?'החבר היחיד בטיול לא מושפע.':n+' החברים בטיול לא מושפעים.')+'</div>'+
@@ -4735,7 +4742,7 @@ let touchBusy=false;
 function touch(){
  if(!online()||touchBusy||!tripId())return;
  touchBusy=true;lastTouch=Date.now();
- callFn({action:'touch',trip_id:tripId()}).catch(()=>{}).finally(()=>{touchBusy=false});
+ callFn({action:'touch',trip_id:tripId()}).catch(e=>{try{if(typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'&&window.__ptF07)window.__ptF07.onTouchError(e)}catch{}}).finally(()=>{touchBusy=false});   /* CHANGE 2026-11-16 F07-TOUCH-01: was .catch(()=>{}) — device_revoked / a dead session signs this device out (C4) */
 }
 function onStarted(){
  if(started||!api||!api.started())return;
@@ -4757,7 +4764,8 @@ function onStarted(){
   else if(myRole())nsSet('pt6_role_seen',myRole());
   await fetchMyMembership();
   touch();
-  watchT=setInterval(()=>{if(document.visibilityState==='visible')fetchMyMembership()},WATCH_MS);
+  try{if(typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'&&window.__ptF07)window.__ptF07.start()}catch{}   /* CHANGE 2026-11-16 F07-START-01: new line (alpha.15.3: none) */
+  watchT=setInterval(()=>{if(document.visibilityState==='visible'){fetchMyMembership();if(typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on')touch()}},WATCH_MS);   /* CHANGE 2026-11-16 F07-TOUCH-02: + touch() every 60 s with the flag on, so a disconnected account session is caught within a minute (AC8; was: fetchMyMembership only) */
  },0);
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){fetchMyMembership();touch();loadMembers()}});
  window.addEventListener('online',()=>{fetchMyMembership();loadMembers()});
@@ -4790,6 +4798,8 @@ function keepJoinCode(){
 function attach(a){
  if(api||!a||typeof a!=='object')return;
  api=a;
+ /* CHANGE 2026-11-16 F07-ATTACH-01: new lines (alpha.15.3: none) — F07 gets the same manage-members client and four callbacks (repaint / reload the list, own row id, the F06 toast) */
+ try{if(typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'&&window.__ptF07)window.__ptF07.attach(a,{repaintMembers:()=>{if(panelOpen())paintMembers()},reloadMembers:()=>loadMembers(),myMemberId:()=>{const m=myMember();return m&&m.id},toast:m=>toast(m)})}catch{}
  let cached=null;try{cached=api.cached()}catch{}
  bootCheck(cached).catch(()=>{});
 }

@@ -213,3 +213,25 @@ def test_f07_flag_off_is_the_old_page(env):
     c = T5.card_rows(mgr.page)
     if not c or "מכשיר חדש" in c[0]["text"] or not c[0]["roles"]: P.append("flag off: manager card is not the alpha.15.3 one (with role picker): %r" % c)
     assert not P, "\n".join(P)
+
+
+def test_f07_c11_iphone_safari_relink_shows_transfer(env):
+    """C11: an approved relink in iPhone Safari shows the F05 transfer card (add to home screen + code) next to the 'documents do not move' note."""
+    be = env.backend; emulate_f07_server(be); serve(env, "on")
+    tid, code = T5.new_trip(env)
+    people = {r["display_name"]: r["id"] for r in be.members(tid, "active")}
+    dev = env.new_device("I", ua=H.IPHONE_UA, standalone=False)
+    assert T5.open_join(dev, code) == "form"; pg = dev.page; P = []
+    pg.locator("#lpjModeBack").click(); pg.wait_for_timeout(300)
+    pg.locator('#lpjPeople label:has-text("Editor Q")').click(); pg.locator("#lpjRelink").click()
+    assert H.wait_screen(pg, "pending", 8) == "pending"
+    mgr = T5.boot_member(env, tid, "M", "דנה"); mgr.page.wait_for_timeout(1500)
+    mgr.page.locator("#ptF05Pending [data-act=approve]").click()
+    if H.wait_screen(pg, "approved", 10) != "approved": pytest.fail("no approved screen on the iPhone")
+    pg.wait_for_timeout(800)
+    if not pg.locator("#lpjTransfer").is_visible(): P.append("C11: no transfer card for iPhone Safari after the relink approval")
+    if "לא עוברים" not in H.btext(pg): P.append("C11: note about the old phone's data missing")
+    if [r for r in be.members(tid, "active") if r["display_name"] == "Editor Q"].__len__() != 2: P.append("expected 2 active Editor Q rows")
+    m = metrics(pg)
+    if m["sw"] > m["iw"] or m["small"]: P.append("approved iPhone layout: %r" % m)
+    assert not P, "\n".join(P)

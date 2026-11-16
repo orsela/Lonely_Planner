@@ -1,4 +1,9 @@
 /* Lonely Planner · F07 (a member who changed phones gets back into the trip) · page side · version 3.0.0-alpha.16
+   CHANGE 2026-11-16 F07-UI-02: what changed from conversation 2 (same version 3.0.0-alpha.16, f07-build 2f3243b): the APP side was added at the end of this file
+   (spec §3, mockup row 13 screens 4, 5, 6): devices per person in "חברים וקישור" (grouped by person, "ניתוק" per device, never on the current device or a
+   person's last device), the "המכשירים שלי" card in "אני · <שם>" (F22a screen), the manager's login-notice card (C8, "הבנתי" / ניתוק), the device_revoked
+   sign-out (C4), offline states (buttons disabled + the offline line), a 60 s refresh. New exports: attach, start, refresh, people, devsHtml, foot, meCard,
+   onTouchError (+ pure helpers under t). Nothing of conversation 2 changed. Everything is a no-op unless RELINK_FEATURE='on' (and cloud mode).
    CHANGE 2026-11-16 F07-UI-01: new file (no previous version). Conversation 2 of 3 (docs/F07_spec.md §3, mockup row 13 screens 1, 2, 3, 7):
    - the /join/ side (used by join/flow.js, which calls these hooks only when RELINK_FEATURE='on' and this file is loaded): the switch
      "אני חדש/ה בטיול" / "כבר הייתי בטיול" (D1), the name list as radio buttons (D2), the pending screen with "בתוקף עד" and a WhatsApp button
@@ -39,6 +44,31 @@ const CSS=`
 .lpj-body a.lpj-link{display:inline-flex;align-items:center;justify-content:center}
 .pt7-tag{display:inline-block;margin-inline-start:6px;background:#e3eefb;color:#1a4c8b;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;vertical-align:middle}
 .pt7-warn{margin:0;font-size:12.5px;line-height:1.5;color:#6b3d03;background:#fef3e2;border-radius:10px;padding:8px 10px}
+.pt7-devs{display:flex;flex-direction:column;gap:2px;margin:0 0 6px;padding-inline-start:46px}
+.pt7-dev{display:flex;align-items:center;gap:8px;min-height:44px}
+.pt7-dev .pt7-dnm{flex:1;min-width:0}
+.pt7-dev .pt7-dnm b{display:block;font-size:12.5px;font-weight:700;overflow-wrap:anywhere}
+.pt7-sub{display:block;font-size:11.5px;color:#6b746d}
+.pt7-dbtn{min-width:64px;min-height:44px;border:1px solid #e4e6df;border-radius:12px;background:#fff;color:#b42318;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;padding:0 10px}
+.pt7-dbtn.arm{background:#b42318;color:#fff;border-color:#b42318}
+.pt7-dbtn[disabled]{opacity:.5;cursor:default}
+.pt7-foot{margin:4px 2px 0;font-size:11.5px;color:#6b746d;line-height:1.5}
+.pt7-card{background:#fff;border:1.5px solid #cfe0f5;border-radius:18px;padding:12px 14px;margin:0 0 10px;display:flex;flex-direction:column;gap:10px}
+.pt7-nh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pt7-nh b{font-size:14.5px}
+.pt7-n{display:flex;flex-direction:column;gap:6px;border-top:1px solid #e9eef6;padding-top:8px}
+.pt7-n:first-of-type{border-top:0;padding-top:0}
+.pt7-n p{margin:0;font-size:13.5px;line-height:1.5}
+.pt7-nacts{display:flex;gap:8px;flex-wrap:wrap}
+.pt7-nacts button{min-height:44px;border-radius:12px;border:1px solid #e4e6df;background:#fff;color:#17211b;font:inherit;font-size:13px;font-weight:700;padding:0 14px;cursor:pointer}
+.pt7-nacts button.ok{background:#0f6b4f;color:#fff;border-color:#0f6b4f}
+.pt7-nacts button.arm{background:#b42318;color:#fff;border-color:#b42318}
+.pt7-nacts button[disabled]{opacity:.5;cursor:default}
+.pt7-off{margin:0;font-size:12px;color:#8a4a03}
+#pt7Rev{position:fixed;inset:0;z-index:5000;background:#fff;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+#pt7Rev .in{max-width:380px;display:flex;flex-direction:column;gap:14px}
+#pt7Rev h2{margin:0;font-size:20px}#pt7Rev p{margin:0;font-size:14px;line-height:1.6;color:#3a443d}
+#pt7Rev button{min-height:48px;border:0;border-radius:12px;background:#0f6b4f;color:#fff;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
 `;
 function css(){
  if(document.getElementById('pt7Css'))return;
@@ -151,6 +181,257 @@ function mountApp(o){
  }catch(e){return false}
 }
 
-try{Object.defineProperty(window,'__ptF07',{value:Object.freeze({ok:true,version:VERSION,form,pending,expired,approvedNote,markNotice,tag,mgrOpenHtml,mountApp}),writable:false,configurable:false})}
-catch(e){window.__ptF07={ok:true,version:VERSION,form,pending,expired,approvedNote,markNotice,tag,mgrOpenHtml,mountApp}}
+
+/* ---------- app side (conversation 3): devices per person, "המכשירים שלי", login notice (C8), device_revoked ---------- */
+const AX={
+ offline:'אין חיבור – אפשר לנתק כשהרשת תחזור.',
+ thisDev:'המכשיר הזה',
+ dis:'ניתוק',disArm:'לנתק? לחצו שוב',
+ gone:'המכשיר נותק',
+ lastDev:'זה המכשיר היחיד של החבר – אי אפשר לנתק אותו',
+ notMgr:'רק מנהלים יכולים לנתק מכשיר של חבר אחר',
+ fail:'משהו השתבש. נסו שוב.',
+ footMgr:'ניתוק מכשיר לא מסיר את החבר מהטיול. שינוי תפקיד או הסרה חלים על כל המכשירים.',
+ mineT:'המכשירים שלי',
+ mineOne:'זה המכשיר היחיד שלך בטיול. אפשר לחבר מכשיר נוסף דרך קישור ההצטרפות ("כבר הייתי בטיול") או דרך חשבון כניסה.',
+ mineFoot:'ניתוק מכשיר לא מסיר אותך מהטיול. מסמכים שנשמרו רק במכשיר שמנותק לא יועברו.',
+ noticeT:'כניסה ממכשיר חדש',noticeSub:'רק מנהלים רואים',
+ ack:'הבנתי',notMe:'זה לא הוא/היא · ניתוק',
+ revT:'המכשיר הזה נותק מהטיול',
+ revP:'המכשיר נותק – על ידי מנהל הטיול או על ידי החבר עצמו מטלפון אחר. כדי לחזור לטיול אפשר להיכנס שוב עם החשבון, או לבקש חיבור מחדש מהקישור.',
+ revBtn:'המשך',
+ loading:'טוען…'
+};
+const DKEY='pt7_devices';
+const S={persons:[],notices:[],current:null,my:null,isMgr:false,loaded:false,busy:false,at:0,rv:false,armed:null,armT:null,started:false,again:null};
+let A=null,H={};
+const $=id=>document.getElementById(id);
+function esc(x){return String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
+function flagOn(){
+ try{return typeof RELINK_FEATURE!=='undefined'&&RELINK_FEATURE==='on'&&typeof STORAGE_BACKEND!=='undefined'&&STORAGE_BACKEND==='cloud'}catch(e){return false}
+}
+function isOn(){return flagOn()&&!!A}
+function netOk(){return navigator.onLine!==false}
+function tripNow(){try{const t=A&&A.tripId();return t&&t!=='local'?t:null}catch(e){return null}}
+function ago(iso){
+ if(!iso)return'עוד לא נכנס/ה';
+ const d=new Date(iso);if(!isFinite(d.getTime()))return'עוד לא נכנס/ה';
+ const a=new Date();a.setHours(0,0,0,0);const b=new Date(d);b.setHours(0,0,0,0);
+ const n=Math.round((a-b)/86400000);
+ return n<=0?'פעיל/ה היום':n===1?'פעיל/ה אתמול':'לפני '+n+' ימים';
+}
+function viaName(v){
+ const m={email:'קוד למייל',google:'Google',facebook:'Facebook',twitter:'X',x:'X',whatsapp:'WhatsApp'};
+ const k=String(v||'').toLowerCase();
+ if(!k||k==='anon')return'';
+ return m[k]||(k.charAt(0).toUpperCase()+k.slice(1));
+}
+function devTitle(d){return(d&&d.label)||(d&&d.via&&d.via!=='anon'?'מכשיר · '+viaName(d.via):'טלפון')}
+function isCurrent(d){
+ if(!d)return false;
+ if(d.session_id&&S.current)return d.session_id===S.current;
+ try{return!!(H.myMemberId&&d.member_id===H.myMemberId())}catch(e){return false}
+}
+function devSub(d){
+ const v=viaName(d.via);
+ return(isCurrent(d)?AX.thisDev:ago(d.last_seen_at))+(v?' · '+v:'');
+}
+/* one representative row per person (the viewer's own row first), keeps the order of the list */
+function people(list,uid){
+ const out=[],at=new Map();
+ (list||[]).forEach(m=>{
+  const k=m.person_id||m.id,i=at.get(k);
+  if(i==null){at.set(k,out.length);out.push(m)}
+  else if(m.user_id===uid&&out[i].user_id!==uid)out[i]=m;
+ });
+ return out;
+}
+function personOf(m){const k=m&&(m.person_id||m.id);return S.persons.find(p=>p.person_id===k)||null}
+function keyOf(a,m,s){return a+':'+m+':'+(s||'')}
+function devRow(d,canCut,off,who){
+ const k=keyOf('dis',d.member_id,d.session_id),arm=S.armed===k;
+ return'<div class="pt7-dev" data-pt7-dev="'+esc(d.member_id)+'"><span aria-hidden="true">'+(d.via&&d.via!=='anon'?'🔑':'📱')+'</span>'+
+  '<div class="pt7-dnm"><b>'+esc(devTitle(d))+'</b><span class="pt7-sub">'+esc(devSub(d))+'</span></div>'+
+  (canCut?'<button type="button" class="pt7-dbtn'+(arm?' arm':'')+'" data-pt7="dis" data-m="'+esc(d.member_id)+'" data-s="'+esc(d.session_id||'')+'"'+(off?' disabled':'')+
+   ' aria-label="ניתוק המכשיר '+esc(devTitle(d))+(who?' של '+esc(who):'')+'">'+(arm?AX.disArm:AX.dis)+'</button>':'')+'</div>';
+}
+/* under a person's row in "חברים וקישור" (F06 paintMembers) */
+function devsHtml(m){
+ if(!isOn())return'';
+ const p=personOf(m);if(!p||!Array.isArray(p.devices)||!p.devices.length)return'';
+ const off=!netOk(),many=p.devices.length>1;
+ return'<div class="pt7-devs" data-pt7-person="'+esc(p.person_id)+'">'+p.devices.map(d=>devRow(d,many&&!isCurrent(d),off,p.display_name)).join('')+'</div>';
+}
+function foot(){return isOn()?'<p class="pt7-foot" id="pt7Foot">'+AX.footMgr+'</p>':''}
+/* "אני · <שם>" → "המכשירים שלי" (F22a screen, after the account card) */
+function mineHtml(){
+ const off=!netOk(),p=S.persons.find(x=>x.person_id===S.my)||null;
+ let h='<div class="pt22-head"><b id="pt7MineT">'+AX.mineT+'</b></div>';
+ if(!p){h+='<p class="pt22-small" id="pt7MineWait">'+(S.loaded||!netOk()?AX.offline.replace('לנתק','לראות'):AX.loading)+'</p>';return h}
+ const many=p.devices.length>1;
+ h+='<div class="pt7-devs" style="padding-inline-start:0" id="pt7MineList">'+p.devices.map(d=>devRow(d,many&&!isCurrent(d),off,'')).join('')+'</div>';
+ h+='<p class="pt7-foot" id="pt7MineFoot">'+(many?AX.mineFoot:AX.mineOne)+'</p>';
+ if(off)h+='<p class="pt7-off" role="status" id="pt7MineOff">'+AX.offline+'</p>';
+ return h;
+}
+function paintMine(){
+ if(!flagOn()||!A)return;
+ const body=$('ptF22MeBody'),acct=$('ptF22Acct');
+ if(!body||!acct)return;
+ let sec=$('pt7Mine');
+ if(!sec){sec=document.createElement('section');sec.id='pt7Mine';sec.className='pt22-card';sec.setAttribute('aria-labelledby','pt7MineT');acct.parentNode.insertBefore(sec,acct.nextSibling)}
+ sec.innerHTML=mineHtml();
+}
+function meCard(){
+ if(!isOn())return;
+ paintMine();
+ if(Date.now()-S.at>20000)refresh(true);
+}
+/* the managers' login notice (C8) on home */
+function homePanel(){try{return(typeof HOME_LAYOUT!=='undefined'&&HOME_LAYOUT==='v2')?$('homeV2'):$('home')}catch(e){return null}}
+function noticeHtml(){
+ const off=!netOk();
+ let h='<div class="pt7-nh"><b id="pt7NoticeT">'+AX.noticeT+'</b><span class="pt7-sub">'+AX.noticeSub+'</span></div>';
+ S.notices.forEach(n=>{
+  const kd=keyOf('nodis',n.member_id,n.session_id),arm=S.armed===kd,v=viaName(n.via);
+  h+='<div class="pt7-n" data-pt7-notice="'+esc(n.session_id)+'"><p><b>'+esc(n.display_name)+'</b> נכנס/ה ממכשיר חדש'+(v?' · '+esc(v):'')+'</p>'+
+   '<span class="pt7-sub">'+esc(n.label||'מכשיר')+' · '+esc(ago(n.created_at))+'</span>'+
+   '<div class="pt7-nacts"><button type="button" class="ok" data-pt7="ack" data-s="'+esc(n.session_id)+'"'+(off?' disabled':'')+'>'+AX.ack+'</button>'+
+   '<button type="button"'+(arm?' class="arm"':'')+' data-pt7="nodis" data-m="'+esc(n.member_id)+'" data-s="'+esc(n.session_id)+'"'+(off?' disabled':'')+'>'+(arm?AX.disArm:AX.notMe)+'</button></div></div>';
+ });
+ if(off)h+='<p class="pt7-off" role="status">'+AX.offline.replace('לנתק','לאשר או לנתק')+'</p>';
+ return h;
+}
+function paintNotices(){
+ let card=$('pt7Notice');
+ if(!flagOn()||!A||!S.isMgr||!S.notices.length){if(card)card.remove();return}
+ const panel=homePanel();if(!panel)return;
+ const p5=$('ptF05Pending');
+ if(!card){
+  card=document.createElement('section');card.id='pt7Notice';card.className='pt7-card';card.setAttribute('aria-labelledby','pt7NoticeT');
+  const fs=$('ptFirstSteps');
+  const anchor=(p5&&p5.parentNode===panel)?p5.nextSibling:((fs&&fs.parentNode===panel)?fs:(panel.querySelector('.hv2-map-hero')||(panel.querySelector('.topbar')&&panel.querySelector('.topbar').nextSibling)||panel.firstChild));
+  panel.insertBefore(card,anchor);
+ }else if(p5&&p5.parentNode===panel&&p5.nextSibling!==card)panel.insertBefore(card,p5.nextSibling);   /* requests first, notices under them */
+ const html=noticeHtml();
+ if(card.innerHTML!==html)card.innerHTML=html;
+}
+/* ---- network ---- */
+async function callFn(body){
+ const c=A&&A.client();if(!c)throw Object.assign(new Error('no client'),{code:'offline'});
+ if(!netOk())throw Object.assign(new Error('offline'),{code:'offline'});
+ const g=await c.auth.getSession();const tok=g&&g.data&&g.data.session&&g.data.session.access_token;
+ if(!tok)throw Object.assign(new Error('no session'),{code:'unauthorized'});
+ const ac=typeof AbortController!=='undefined'?new AbortController():null;
+ const t=setTimeout(()=>{try{ac&&ac.abort()}catch(e){}},15000);
+ let r;
+ try{r=await fetch(A.endpoint,{method:'POST',headers:{'content-type':'application/json',apikey:A.key,authorization:'Bearer '+tok},body:JSON.stringify(body),signal:ac?ac.signal:undefined})}
+ catch(e){throw Object.assign(new Error('network'),{code:netOk()?'network':'offline'})}
+ finally{clearTimeout(t)}
+ let j={};try{j=await r.json()}catch(e){}
+ if(!r.ok||j.error)throw Object.assign(new Error(j.error||'http_'+r.status),{code:j.error||'http_'+r.status});
+ return j;
+}
+function repaint(){
+ paintNotices();paintMine();
+ try{H.repaintMembers&&H.repaintMembers()}catch(e){}
+}
+function cacheSave(){try{localStorage.setItem(DKEY,JSON.stringify({persons:S.persons,notices:S.notices,current:S.current,my:S.my,isMgr:S.isMgr}))}catch(e){}}
+function cacheLoad(){
+ try{
+  const c=JSON.parse(localStorage.getItem(DKEY)||'null');
+  if(c&&Array.isArray(c.persons)){S.persons=c.persons;S.notices=Array.isArray(c.notices)?c.notices:[];S.current=c.current||null;S.my=c.my||null;S.isMgr=!!c.isMgr;S.loaded=true}
+ }catch(e){}
+}
+async function refresh(force){
+ if(!isOn()||S.busy||S.rv)return;
+ const t=tripNow();if(!t||!netOk())return;
+ if(!force&&Date.now()-S.at<1500){            /* a burst of members events = one call, and the last one always runs */
+  if(!S.again)S.again=setTimeout(()=>{S.again=null;refresh(true)},1600);
+  return;
+ }
+ S.busy=true;
+ try{
+  const r=await callFn({action:'devices',trip_id:t});
+  S.persons=Array.isArray(r.persons)?r.persons:[];S.notices=Array.isArray(r.notices)?r.notices:[];
+  S.current=r.current_session||null;S.my=r.my_person_id||null;S.isMgr=r.is_manager===true;S.loaded=true;S.at=Date.now();
+  cacheSave();
+ }catch(e){onTouchError(e)}
+ finally{S.busy=false}
+ repaint();
+}
+function arm(k){
+ S.armed=k;clearTimeout(S.armT);
+ S.armT=setTimeout(()=>{S.armed=null;repaint()},4000);
+ repaint();
+}
+async function disconnect(m,s){
+ const t=tripNow();if(!t)return;
+ if(!netOk()){say(AX.offline);return}
+ try{
+  await callFn({action:'disconnect_device',trip_id:t,member_id:m,session_id:s||null});
+  say(AX.gone);
+ }catch(e){
+  const c=e&&e.code;
+  say(c==='offline'?AX.offline:c==='last_device'?AX.lastDev:c==='not_manager'?AX.notMgr:AX.fail);
+ }
+ S.armed=null;
+ await refresh(true);
+ try{H.reloadMembers&&H.reloadMembers()}catch(e){}
+}
+async function ackNotice(s){
+ const t=tripNow();if(!t)return;
+ if(!netOk()){say(AX.offline);return}
+ try{await callFn({action:'ack_device_notice',trip_id:t,session_id:s})}catch(e){say((e&&e.code)==='offline'?AX.offline:AX.fail)}
+ await refresh(true);
+}
+function say(m){try{H.toast&&H.toast(m)}catch(e){}}
+function onClick(ev){
+ const b=ev.target&&ev.target.closest&&ev.target.closest('[data-pt7]');
+ if(!b||b.disabled)return;
+ const a=b.getAttribute('data-pt7'),m=b.getAttribute('data-m'),s=b.getAttribute('data-s')||null;
+ if(a==='ack'){ackNotice(s);return}
+ const k=keyOf(a,m,s);
+ if(S.armed!==k){arm(k);return}
+ clearTimeout(S.armT);
+ disconnect(m,s);
+}
+/* ---- device_revoked / dead session (C4): the next touch tells a disconnected device to sign out ---- */
+function revoked(){
+ if(S.rv)return;S.rv=true;
+ try{const c=A&&A.client();if(c&&c.auth&&c.auth.signOut)c.auth.signOut({scope:'local'}).catch(()=>{})}catch(e){}
+ css();
+ const o=document.createElement('div');o.id='pt7Rev';o.setAttribute('role','alertdialog');o.setAttribute('aria-modal','true');o.setAttribute('aria-labelledby','pt7RevT');o.setAttribute('dir','rtl');
+ o.innerHTML='<div class="in"><h2 id="pt7RevT">'+AX.revT+'</h2><p>'+AX.revP+'</p><button type="button" id="pt7RevBtn">'+AX.revBtn+'</button></div>';
+ document.body.appendChild(o);
+ const btn=$('pt7RevBtn');if(btn){btn.onclick=()=>{try{location.reload()}catch(e){}};try{btn.focus()}catch(e){}}
+}
+async function onTouchError(e){
+ if(!flagOn()||!A||S.rv)return;
+ const c=e&&e.code;
+ if(c==='device_revoked'){revoked();return}
+ if(c==='unauthorized'||c==='http_401'){
+  try{                                                /* a plain 401 can also be a refresh hiccup: only a dead session signs out */
+   const r=await A.client().auth.getUser(),er=r&&r.error;
+   if(er&&(er.status===401||er.status===403||/session|jwt|token/i.test(String(er.message||''))))revoked();
+  }catch(x){}
+ }
+}
+function attach(a,h){
+ if(A||!a||typeof a!=='object')return;
+ A=a;H=h&&typeof h==='object'?h:{};
+}
+function start(){
+ if(!isOn()||S.started)return;
+ S.started=true;css();cacheLoad();
+ document.addEventListener('click',onClick);
+ window.addEventListener('online',()=>refresh(true));
+ window.addEventListener('offline',repaint);
+ setInterval(()=>{if(document.visibilityState==='visible'&&S.isMgr)refresh(true)},60000);
+ try{const p=homePanel();if(p)new MutationObserver(()=>{if(S.notices.length&&S.isMgr&&!$('pt7Notice'))paintNotices()}).observe(p,{childList:true})}catch(e){}
+ refresh(true);
+}
+
+try{Object.defineProperty(window,'__ptF07',{value:Object.freeze({ok:true,version:VERSION,form,pending,expired,approvedNote,markNotice,tag,mgrOpenHtml,mountApp,attach,start,refresh,people,devsHtml,foot,meCard,onTouchError,t:{viaName,devTitle,isCurrent,devSub,ago,_S:S,_AX:AX}}),writable:false,configurable:false})}
+catch(e){window.__ptF07={ok:true,version:VERSION,form,pending,expired,approvedNote,markNotice,tag,mgrOpenHtml,mountApp,attach,start,refresh,people,devsHtml,foot,meCard,onTouchError,t:{viaName,devTitle,isCurrent,devSub,ago,_S:S,_AX:AX}}}
 })();

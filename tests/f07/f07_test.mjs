@@ -66,3 +66,44 @@ test("AC2 · manager card body: no role picker, warning line, approve / reject, 
   assert.match(F.mgrOpenHtml({ off: false, busy: true }), /data-act="approve" disabled/);
   assert.match(F.tag(), /מכשיר חדש/);
 });
+
+// ---- conversation 3 · app side (CHANGE 2026-11-16 F07-QA-10: new tests, nothing above changed) ----
+test("app side · people() = one row per person, the viewer's own row wins, order kept", () => {
+  const rows = [{ id: "a", person_id: "p1", user_id: "u1" }, { id: "b", person_id: "p2", user_id: "u2" }, { id: "c", person_id: "p1", user_id: "me" }, { id: "d", user_id: "u4" }];
+  const out = F.people(rows, "me");
+  assert.deepEqual(out.map(r => r.id), ["c", "b", "d"]);                                  // p1 → the viewer's row, still first; a row without person_id stands alone
+  assert.deepEqual(F.people(rows, "nobody").map(r => r.id), ["a", "b", "d"]);
+});
+
+test("app side · devsHtml: button on every device except this one and a person's last device; escaped; off without the flag", () => {
+  globalThis.RELINK_FEATURE = "on"; globalThis.STORAGE_BACKEND = "cloud";
+  assert.equal(F.devsHtml({ id: "x" }), "");                                              // not attached yet → nothing
+  F.attach({ tripId: () => "t1" }, { myMemberId: () => "m-this" });
+  const S = F.t._S;
+  S.current = "s-this";
+  S.persons = [
+    { person_id: "p1", display_name: "דנה", role: "manager", devices: [
+      { member_id: "m-this", session_id: "s-this", label: "iPhone · Safari", via: "anon", last_seen_at: new Date().toISOString() },
+      { member_id: "m-2", session_id: "s-2", label: '<img src=x onerror=1>', via: "google", last_seen_at: null }] },
+    { person_id: "p2", display_name: "אבי", role: "editor", devices: [{ member_id: "m-3", session_id: null, label: null, via: "anon", last_seen_at: null }] }];
+  const h1 = F.devsHtml({ id: "m-this", person_id: "p1" });
+  assert.equal((h1.match(/data-pt7="dis"/g) || []).length, 1);                            // only the other device
+  assert.match(h1, /data-m="m-2" data-s="s-2"/); assert.ok(!h1.includes('data-m="m-this"'));
+  assert.match(h1, /המכשיר הזה/); assert.ok(!h1.includes("<img")); assert.match(h1, /&lt;img/);
+  assert.match(h1, /Google/);
+  const h2 = F.devsHtml({ id: "p2" });                                                    // no person_id → the row id is the person; a single device, no button
+  assert.ok(!h2.includes("data-pt7=")); assert.match(h2, /טלפון/);
+  assert.match(F.foot(), /ניתוק מכשיר לא מסיר את החבר מהטיול/);
+  globalThis.RELINK_FEATURE = "off";
+  assert.equal(F.devsHtml({ id: "m-this", person_id: "p1" }), ""); assert.equal(F.foot(), "");   // flag off = nothing
+  globalThis.RELINK_FEATURE = "on";
+});
+
+test("app side · small helpers: provider names, last-seen wording, current device without a session id", () => {
+  const t = F.t;
+  assert.equal(t.viaName("anon"), ""); assert.equal(t.viaName("google"), "Google"); assert.equal(t.viaName("email"), "קוד למייל"); assert.equal(t.viaName("github"), "Github");
+  assert.equal(t.ago(null), "עוד לא נכנס/ה"); assert.equal(t.ago(new Date().toISOString()), "פעיל/ה היום");
+  assert.match(t.ago(new Date(Date.now() - 3 * 86400e3).toISOString()), /לפני 3 ימים/);
+  assert.equal(t.isCurrent({ member_id: "m-this", session_id: null }), true);               // anonymous device not recorded yet → matched by its row
+  assert.equal(t.isCurrent({ member_id: "m-2", session_id: "s-2" }), false);
+});

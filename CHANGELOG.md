@@ -1,5 +1,14 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.16 — F07 · conversations 2 + 3 (page side, app side, flag ON; 2026-11-16; phone check pending)
+<!-- CHANGE 2026-11-16 F07-DOCS-07: new entry on top of the conversation-1 entry below (same version 3.0.0-alpha.16: f07-build was never released before this merge). Notes: docs/F07_dev_notes_page.md (conversation 2), docs/F07_dev_notes_app.md (conversation 3). -->
+- `RELINK_FEATURE='on'` in the app and in `/join/`: a member on a new phone opens the join link, picks "כבר הייתי בטיול" and their name; the manager approves ("מכשיר חדש", no role picker); same name, role and records, one person with two devices.
+- "חברים וקישור": one row per person (the count is persons), the devices under it with "ניתוק" (two taps); never on this device or on a person's last device; "ניתוק מכשיר לא מסיר את החבר מהטיול".
+- "אני · <שם>" → "המכשירים שלי" card with "ניתוק". Managers: a home card "<שם> נכנס/ה ממכשיר חדש · <ספק>" with "הבנתי" / "זה לא הוא/היא · ניתוק" (C8).
+- A disconnected device signs out within 60 s (touch every 60 s; `device_revoked` or a dead session → "המכשיר הזה נותק מהטיול"). Offline: the buttons are disabled with the offline line. iPhone Safari: the F05 transfer card after an approved relink (C11).
+- Note: "אני · <שם>" is F22a's screen and `ACCOUNT_FEATURE` is still `'beta'`, so "המכשירים שלי" shows only on beta devices until F22a goes `'on'`.
+- Tests: `tests/f07/run_page.sh` (Node 9, browser 4 + 2 at 390 px); F06 browser suite 70/70 and F05 suite unchanged vs `main` (13 old failures, same as before) with the flag on.
+
 ## 3.0.0-alpha.16 — F07 · a member who changed phones gets back into the trip (conversation 1 of 3: server only, 2026-11-16)
 <!-- CHANGE 2026-11-16 F07-DOCS-05: new entry. Spec docs/F07_spec.md, notes docs/F07_dev_notes_server.md. Nothing visible in the app yet; the app/join pages are not bumped until conversation 2. -->
 - Server, not yet applied to the database: migration `0018_f07.sql` (+ QA harness `0019`): one **person** can have several devices (`person_id`); a "כבר הייתי בטיול" request (`join_request` with a person, 24 h) approved by a manager takes the person's current role and name; role / name / removal / leave apply to every device; the last-manager rule counts persons; per-device sessions (`member_sessions`) with disconnect (`device_disconnect`) and a login notice for managers (`device_list` / `device_notice_ack`).

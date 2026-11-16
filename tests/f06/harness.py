@@ -44,6 +44,10 @@ else:
     sys.modules["f05_harness"] = f05
     _spec.loader.exec_module(f05)
 f20, f04, f03, f02 = f05.f20, f05.f04, f05.f03, f05.f02
+# CHANGE 2026-11-16 F07-QA-11: new lines (3.0.0-alpha.16): migration 0018 added trip_members.person_id / relink_expires_at, and the app reads person_id with RELINK_FEATURE='on'. The fake's column whitelist must know them (it rejects unknown columns like PostgREST).
+for _c in ("person_id", "relink_expires_at"):
+    if _c not in f02.TABLES["trip_members"]["cols"]:
+        f02.TABLES["trip_members"]["cols"].append(_c)
 
 from playwright.sync_api import Error as PWError  # noqa: E402
 
