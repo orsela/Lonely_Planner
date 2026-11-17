@@ -27,7 +27,8 @@ const ICONS = ["icon-192.png", "icon-512.png"];
 /* CHANGE 2026-11-15 F14-SW-01: was ["js/f08.js", "js/f24.js", "countries.json", "airports.json"]. js/f14.js (F14, v3.0.0-alpha.15, the smart chat's page side) added, so it loads
    offline like the page itself (LEAN rule 7). Nothing else in this file changed. */
 /* CHANGE 2026-11-16 F07-SW-01: was ["js/f08.js", "js/f24.js", "js/f14.js", "countries.json", "airports.json"]. js/f07.js (F07, v3.0.0-alpha.16, the relink screens and the manager card) added (LEAN rule 7). Nothing else in this file changed. */
-const SHELL_FILES = ["js/f08.js", "js/f24.js", "js/f14.js", "js/f07.js", "countries.json", "airports.json"];
+/* CHANGE 2026-11-17 NOTES-RICH-SW-01: "js/richnotes.js" added to SHELL_FILES (LEAN rule 7). */
+const SHELL_FILES = ["js/f08.js", "js/f24.js", "js/f14.js", "js/f07.js", "js/richnotes.js", "countries.json", "airports.json"];
 const NAV_TIMEOUT_MS = 6000;
 
 self.addEventListener("install", (e) => {

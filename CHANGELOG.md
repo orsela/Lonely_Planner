@@ -1,5 +1,10 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.17 — NOTES-RICH · rich day notes, links, images (2026-11-17)
+- New `app/js/richnotes.js` (cached offline in `sw.js`), flags `RICHNOTES_FEATURE='on'` + `RICHNOTES_TRIPS` (only the Romania pilot trip; Vietnam is never listed).
+- Notes, activities and point notes as bullets (one per line); a bullet over 20 words is cut after word 20 with a "+" / "−" button; https addresses become links (site name only); `images` (https, max 10) on a day and on a point with a gallery (3 + "+N"), full-screen viewer, broken image disappears; a "ניווט" button per point; images field in the day edit form and "🖼️ תמונות" in the point sheet.
+- `'off'` / trip not listed / file missing = exactly alpha.16.5. Tests: `tests/richnotes/run.sh [browser]` (Node 7/7, browser 1/1 at 390px). Spec: claude/Plan_Travel_NOTES-RICH_decisions.md.
+
 ## 3.0.0-alpha.16.5 — app version shown in "עוד" (2026-11-16)
 - A line "גרסה 3.0.0-alpha.16.5" under "סנכרון בענן פעיל" in the More screen (`#moreVer`, filled from APP_VERSION), so a phone stuck on a cached build is visible.
 
