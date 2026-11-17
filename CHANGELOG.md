@@ -1,5 +1,11 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.17.1 — BUDGET-PP · expected cost per person per budget item (2026-11-17)
+- New `app/js/budgetpp.js` (cached offline in `sw.js`), flags `BUDGETPP_FEATURE='on'` + `BUDGETPP_TRIPS` (only the Romania pilot; Vietnam is never listed).
+- Budget screen: card "לפי סעיף · לאדם" under the category tiles. Per existing item: planned per person (€, editable by managers) vs actual per person (item spending ÷ travelers, shown in €), plus a ✈️ flights row (TLV–OTP–TLV): planned = estimate from flight sites (dated note), actual typed by hand after purchase.
+- Defaults until a manager saves (plan upper range, 10 travelers): לינה 450, אוכל 520, נסיעות 280, אטרקציות 125, שווקים 0, אחר 50, טיסות 250 → €1,675 per person. Data key `planner:budget_pp`. The existing group category plans are untouched.
+- `'off'` / trip not listed / file missing = exactly alpha.17. Tests: `tests/budgetpp/run.sh [browser]` (Node 6/6, browser 1/1 at 390px).
+
 ## 3.0.0-alpha.17 — NOTES-RICH · rich day notes, links, images (2026-11-17)
 - New `app/js/richnotes.js` (cached offline in `sw.js`), flags `RICHNOTES_FEATURE='on'` + `RICHNOTES_TRIPS` (only the Romania pilot trip; Vietnam is never listed).
 - Notes, activities and point notes as bullets (one per line); a bullet over 20 words is cut after word 20 with a "+" / "−" button; https addresses become links (site name only); `images` (https, max 10) on a day and on a point with a gallery (3 + "+N"), full-screen viewer, broken image disappears; a "ניווט" button per point; images field in the day edit form and "🖼️ תמונות" in the point sheet.
