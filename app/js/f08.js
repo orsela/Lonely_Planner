@@ -1,4 +1,5 @@
 /* Lonely Planner · F08 – country and time zone for every day (stage A, conversation 1: day fields + helper functions) · version 3.0.0-alpha.13
+   CHANGE 2026-11-24 F08-FIX-01: what changed from F08-A3-01: paintDayBox() picks the save button among the form's direct children (it used f.querySelector('button.btn.green'), which since NOTES-RICH (alpha.17) can return a button inside the images editor, so insertBefore threw and the "✈ יום טיסה" box never appeared in the day edit form). One line; nothing else changed.
    CHANGE 2026-11-13 F08-A1-01: new file (no previous version). Spec: docs/F08_spec.md §1–§3 (+ D8 home clock in §4.4 / AC15).
    CHANGE 2026-11-13 F08-A2-01 (conversation 2): what changed from F08-A1-01 (helpers only, not wired): added the screen
    "מדינות לפי ימים" + the range sheet (spec §4.1–§4.2) at the bottom of this file, and attach / mount, which app/index.html
@@ -684,7 +685,7 @@ button.p08-row{cursor:pointer}.p08-row.fl{background:#f1f0ea;border-style:dashed
     function paintDayBox() {
       const f = form(); if (!f || !dst) return;
       let box = $('ptF08DayBox');
-      if (!box) { box = document.createElement('div'); box.id = 'ptF08DayBox'; const anchor = f.querySelector('button.btn.green') || f.lastElementChild; f.insertBefore(box, anchor); }
+      if (!box) { box = document.createElement('div'); box.id = 'ptF08DayBox'; const kids = Array.prototype.slice.call(f.children), anchor = kids.filter(function (c) { return c.matches && c.matches('button.btn.green'); })[0] || f.lastElementChild; f.insertBefore(box, anchor); /* F08-FIX-01: the anchor must be a DIRECT child of the form (was f.querySelector, which since NOTES-RICH can match a green button inside the images editor and make insertBefore throw: no "יום טיסה" switch) */ }
       const d = deps.days()[dIdx]; box.innerHTML = f08DayFormHtml(dst, dayMs(d));
       const fl = $('ptF08DFl'); if (fl) fl.onchange = () => { readDayBox(); dst.isFlight = fl.checked; paintDayBox(); };
       ['from', 'to', 'n'].forEach(g => { const c = $('ptF08D_' + g + '_c'); if (c) c.onchange = () => {

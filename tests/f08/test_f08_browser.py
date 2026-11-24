@@ -1,4 +1,5 @@
 """Lonely Planner F08 · browser test in the real app (390x844) · version 1.0.0
+CHANGE 2026-11-24 F08-FIX-03: the save button is selected as a direct child of #dayForm (NOTES-RICH added another .btn.green inside the form).
 CHANGE 2026-11-14 F08-A3-03: new file (no previous version). Conversation 3: ONE browser pass over what stage A shows:
 the "מדינות לפי ימים" row + screen, the day edit box (switch "יום טיסה", origin / destination, country change on one day),
 the home clocks (here / home / destination on a flight day) and the flag-off rule. Uses the F10b harness (fake backend, no network).
@@ -63,7 +64,7 @@ def test_f08_stage_a_in_the_real_app(env):
     if page.locator("[data-g=from]").count() != 1 or page.locator("[data-g=to]").count() != 1: P.append("flight: origin/destination groups missing")
     page.locator("#ptF08D_to_c").select_option("JP"); page.wait_for_timeout(300)
     page.locator("#ptF08D_to_city").fill("טוקיו")
-    fill_required(page); page.locator("#dayForm button.btn.green").click(); page.wait_for_timeout(1200)
+    fill_required(page); page.locator("#dayForm > button.btn.green").click(); page.wait_for_timeout(1200)
     d = days_of(env, tid)
     if not d[4].get("isFlight"): P.append("day 5 not saved as flight: %r" % {k: d[4].get(k) for k in ("isFlight", "flightFrom", "flightTo")})
     elif (d[4].get("flightTo") or {}).get("country") != "JP" or d[4]["flightTo"].get("city") != "טוקיו": P.append("flightTo not saved: %r" % d[4].get("flightTo"))
@@ -73,7 +74,7 @@ def test_f08_stage_a_in_the_real_app(env):
     page.evaluate("()=>{globalDayIndex=5;fillSelects();render()}"); page.wait_for_timeout(300)
     page.locator("#dayEditBtn").click(); page.wait_for_timeout(500)
     page.locator("#ptF08D_n_c").select_option("JP"); page.wait_for_timeout(300)
-    fill_required(page); page.locator("#dayForm button.btn.green").click(); page.wait_for_timeout(1200)
+    fill_required(page); page.locator("#dayForm > button.btn.green").click(); page.wait_for_timeout(1200)
     d = days_of(env, tid)
     if d[5].get("country") != "JP" or d[5].get("tz") != "Asia/Tokyo": P.append("day 6 not saved as Japan: %r" % {k: d[5].get(k) for k in ("country", "tz", "city")})
     if d[3].get("country") not in (None, "TH"): P.append("day 4 changed: %r" % d[3].get("country"))

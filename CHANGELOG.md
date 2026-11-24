@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.2 — F08 fix · the "✈ יום טיסה" switch is back in "✎ עריכת יום" (2026-11-24)
+- Since NOTES-RICH (alpha.17) the F08 box in the day edit form never appeared (`insertBefore` threw: the save-button lookup matched a button inside the images editor). `app/js/f08.js` now takes the save button from the form's direct children. Affects every trip; no data change. Test: `tests/f08/run_browser.sh` (failed since alpha.17, passes again).
+
 ## 3.0.0-alpha.18.1 — TRIP-COUNTRY-A · country in search text and Booking link, flight search on the first / last day (2026-11-24)
 - New `app/js/tripcountry.js` (cached offline in `sw.js`), flag `TRIPCOUNTRY_FEATURE='on'`. Active only for a cloud trip that is not the Vietnam trip; Vietnam, local storage and `'off'` = exactly alpha.18.
 - Place search of a point, hotel navigation query and airport-address fallback name the day's country (was a fixed ", Vietnam"). The Booking.com link of a hotel uses the trip's traveller count (F24 C6), rooms = ceil(n/2), no children / ages (was Vietnam, 2 adults, 3 children 17/15/11, 2 rooms).
