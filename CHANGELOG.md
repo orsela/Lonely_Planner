@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.20.2 — OFFMAP · download window waits for the trip (2026-11-24)
+- Fix: opening the address with `#offmapdownload` before the trip had loaded showed 'not listed' and never updated; the window now re-checks every 1.5 s and enables the button when the trip is open.
+
 ## 3.0.0-alpha.20.1 — OFFMAP · manual download window (2026-11-24)
 - Opening the app with `#offmapdownload` at the end of the address shows a window that prepares the offline map tiles of the open trip on this device (progress, stop, resume, reasons in Hebrew, keeps the screen on, asks for persistent storage). Only for a trip listed in OFFMAP_TRIPS; the flag stays 'off'. No map display yet (conversation 2): the tiles are stored, not drawn.
 
