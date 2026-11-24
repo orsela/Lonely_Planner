@@ -1,4 +1,4 @@
-# OFFMAP · conversation 2 (viewer) · 3.0.0-alpha.21.1 · 24/11/2026 (first built as 20.3; renumbered after merging MORE-COMPACT, alpha.21.0)
+# OFFMAP · conversation 2 (viewer) · 3.0.0-alpha.21.2 · 24/11/2026 (first built as 20.3; renumbered after merging MORE-COMPACT, alpha.21.0)
 
 CHANGE 2026-11-24 OFFMAP-VIEW-06: new file. What conversation 2 built, on top of the core (docs/OFFMAP_dev_notes_core.md).
 
@@ -21,3 +21,6 @@ Open the app with `#offmapbeta` (normal rules: offline / no Google), `#offmapbet
 - Hebrew labels: protomaps-leaflet draws with canvas fonts; Romania names are Latin. RTL labels to check on the phone.
 - A route change after a download needs a page reload to refresh the saved-tile index unless the download ran in the same session (`prepare()` calls `refreshView()`).
 - Flag `OFFMAP_FEATURE` stays 'off'; turn on for Romania after the phone check (spec §7 items 2, 8, 9).
+
+## alpha.21.2 (phone check 24/11 22:37: the saved map did not show)
+Cause: the app's F02 gate namespaces `Storage.prototype` after load, so the device beta written raw at load was read back under another key. Fix: raw Storage methods captured at load (like f13.js). New: open with `#offmapstatus` for a 25-second window with the reasons (beta/flag, trip, network, Google, libraries, saved tiles, drawn). The smoke test sets the beta through the same raw path.

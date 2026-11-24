@@ -1,4 +1,5 @@
-/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core + viewer) · version 3.0.0-alpha.21.1
+/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core + viewer) · version 3.0.0-alpha.21.2
+   CHANGE 2026-11-24 OFFMAP-VIEW-08: what changed from alpha.21.1 (phone check: the saved map did not show): the device beta was read through localStorage AFTER the app's F02 gate namespaces Storage.prototype, so it never matched the raw key written at load. Now the raw Storage methods are captured at load (same technique as f13.js / F22a) and used for the beta key. New diagnostic window: open the app with #offmapstatus to list why the saved map is or is not used (flag/beta, trip, libraries, saved tiles, network, Google).
    CHANGE 2026-11-24 OFFMAP-VIEW-07: version renumbered 3.0.0-alpha.20.3 -> 21.1 (main took alpha.21.0 with MORE-COMPACT); no code change.
    CHANGE 2026-11-24 OFFMAP-VIEW-01: what changed from alpha.20.2: conversation 2 (viewer). New section "the viewer": tryDraw / release / viewFeatures / makeSource / betaLevel. Draws the saved tiles with protomaps-leaflet + Leaflet (app/vendor/, loaded lazily, only when the open trip is in OFFMAP_TRIPS and the flag is on or the device beta is set) in place of the schematic map when there is no network or Google did not load, and the open day has saved tiles. Device beta: open the app with #offmapbeta (normal rules) / #offmapbeta2 (also online, for a desk check) / #offmapbeta-off. attach() also takes redraw, dayIndex, mapMode. Everything else unchanged.
    CHANGE 2026-11-24 OFFMAP-KEY-01: what changed from alpha.19: an in-app window to enter / replace / delete the Protomaps key on THIS device (setKey, clearKey, keyHint, openKeyDialog, mountKeyEntry). It opens only when the address ends with #offmapkey (like #f22beta); the key is saved in a small device-level IndexedDB ("pt-_device-offmap": the app wraps localStorage per trip and drops writes before the trip is known, so localStorage cannot hold it), loaded at start into memory so getKey() stays synchronous (never in the address, never sent anywhere, never in the repo). Without that hash nothing is shown: the app is as alpha.19.
@@ -11,7 +12,7 @@
    The Protomaps key is NOT in this file (public repo): OFFMAP_KEY stays '' until Or approves; on a device it is entered through the key window (#offmapkey) and kept in the device IndexedDB (never committed). */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.21.1';
+  const VERSION = '3.0.0-alpha.21.2';
 
   /* ---------- constants ---------- */
   const OFFMAP_KEY = '';                                   /* Protomaps API key. EMPTY on purpose: not committed without Or's explicit approval (see report). */
@@ -540,7 +541,9 @@
   const BASE = (function () { try { const c = root.document && root.document.currentScript; return c && c.src ? c.src.replace(/[^\/]*$/, '') : ''; } catch (e) { return ''; } })();
   const vurl = function (f) { try { return BASE ? new URL('../vendor/' + f, BASE).href : 'vendor/' + f; } catch (e) { return 'vendor/' + f; } };
   const view = { map: null, layer: null, group: null, el: null, libs: null, prep: null, tripId: '', store: null, index: null, plan: null, ro: null, bound: false };
-  function betaLevel() { try { return +(root.localStorage.getItem('pt-offmap-beta') || 0) || 0; } catch (e) { return 0; } }
+  /* the browser's own Storage methods, captured at load, before the F02 gate wraps Storage.prototype (OFFMAP-VIEW-08) */
+  const RAW = (function () { try { const P = root.Storage && root.Storage.prototype; return P && root.localStorage ? { ls: root.localStorage, g: P.getItem, s: P.setItem, d: P.removeItem } : null; } catch (e) { return null; } })();
+  function betaLevel() { try { return RAW ? (+(RAW.g.call(RAW.ls, 'pt-offmap-beta') || 0) || 0) : 0; } catch (e) { return 0; } }
   function viewEnabled(t) { t = String(t == null ? '' : t); return !!t && t !== VN_TRIP && trips().indexOf(t) >= 0 && (feature() === 'on' || betaLevel() > 0); }
   /* the map is wanted only where the schematic grid would otherwise show: no network, Google not loaded; beta 2 forces it (desk check) */
   function needsOffline() { const n = root.navigator; return betaLevel() === 2 || (n && n.onLine === false) || typeof root.google === 'undefined' || !root.google || !root.google.maps; }
@@ -643,9 +646,23 @@
   /* device beta: #offmapbeta (normal rules), #offmapbeta2 (also with a network, for a desk check), #offmapbeta-off */
   function mountBeta() {
     try {
-      const h = String((root.location && root.location.hash) || ''), ls = root.localStorage;
-      if (/#offmapbeta-off$/.test(h)) ls.removeItem('pt-offmap-beta'); else if (/#offmapbeta2$/.test(h)) ls.setItem('pt-offmap-beta', '2'); else if (/#offmapbeta$/.test(h)) ls.setItem('pt-offmap-beta', '1');
+      const h = String((root.location && root.location.hash) || '');
+      if (!RAW) return;
+      if (/#offmapbeta-off$/.test(h)) RAW.d.call(RAW.ls, 'pt-offmap-beta'); else if (/#offmapbeta2$/.test(h)) RAW.s.call(RAW.ls, 'pt-offmap-beta', '2'); else if (/#offmapbeta$/.test(h)) RAW.s.call(RAW.ls, 'pt-offmap-beta', '1');
+      if (/#offmapstatus$/.test(h)) root.setTimeout(showStatus, 2500);
     } catch (e) { /* no storage */ }
+  }
+  /* #offmapstatus: why the saved map is or is not used right now (read-only; stays 25 s) */
+  function statusLines() {
+    const t = hostTrip(), n = root.navigator, ok = function (b) { return b ? 'כן' : 'לא'; };
+    return ['גרסה ' + VERSION, 'מתג מכשיר: ' + betaLevel() + ' · דגל: ' + feature(), 'טיול ברשימה: ' + ok(!!t && trips().indexOf(t) >= 0), 'רשת: ' + ok(!(n && n.onLine === false)) + ' · Google נטען: ' + ok(root.google && root.google.maps),
+      'המפה השמורה מבוקשת: ' + ok(viewEnabled(t) && needsOffline()), 'ספריות נטענו: ' + ok(root.L && root.protomapsL), 'אריחים שמורים: ' + (view.index ? view.index.size : 'לא נקרא עדיין'), 'מצויירת עכשיו: ' + ok(view.map)];
+  }
+  function showStatus() {
+    try {
+      const d = root.document, b = d.createElement('div'); b.setAttribute('style', 'position:fixed;top:60px;left:8px;right:8px;z-index:100000;background:#fff;color:#111;border:2px solid #0f6b4f;border-radius:10px;padding:10px;font:13px/1.6 sans-serif;direction:rtl;white-space:pre-line');
+      b.textContent = statusLines().join('\n'); d.body.appendChild(b); root.setTimeout(function () { try { b.remove(); } catch (e) { /* none */ } }, 25000);
+    } catch (e) { /* none */ }
   }
 
   const api = {
