@@ -98,7 +98,7 @@
       if (el) { const v = el.querySelector('.val'); if (v && v.textContent !== sub) v.textContent = sub; return; }
       const anchor = d.getElementById('ptF13LangRow'); if (!anchor || !anchor.parentNode) return;
       el = d.createElement('div'); el.className = 'listitem'; el.id = 'ptF13TrRow'; el.setAttribute('role', 'button'); el.setAttribute('tabindex', '0'); el.setAttribute('data-f13-skip', '1');
-      el.innerHTML = '<div class="ic" style="background:#eef2fb">✨</div><div class="lbl">Translate trip content<span class="val" style="display:block;font-weight:400;font-size:.72rem"></span></div>';
+      el.innerHTML = '<div class="ic" style="background:#eef2fb">✨</div><div class="lbl">Translate trip content<span class="val" style="display:block;font-weight:400;font-size:.72rem"></span></div><div class="chev">‹</div>';   /* CHANGE 2026-11-24 F13-TR-CL-03: + the chevron like every other row of More (Or's phone check: the row had none) */
       el.querySelector('.val').textContent = sub;
       const go = function () { run(); };
       el.addEventListener('click', go);
