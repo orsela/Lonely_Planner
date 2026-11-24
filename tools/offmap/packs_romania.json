@@ -1,0 +1,15 @@
+{
+  "tripId": "fd5c2b13",
+  "note": "bbox = lonMin,latMin,lonMax,latMax. Order = download order (by trip day). Approximate boxes from Romania_30Y_Trip_Plan.md; adjust after --dry-run sizes.",
+  "packs": [
+    {"id": "ro-base",     "name": "רקע כללי · כל רומניה",        "firstDay": 1, "lastDay": 10, "required": true,  "bbox": "20.2,43.6,29.8,48.3",  "maxzoom": 8},
+    {"id": "ro-bucharest","name": "בוקרשט ושדה התעופה",          "firstDay": 1, "lastDay": 10, "required": false, "bbox": "25.95,44.3,26.3,44.62","maxzoom": 14},
+    {"id": "ro-road-ob",  "name": "הדרך בוקרשט–בראשוב",          "firstDay": 1, "lastDay": 1,  "required": false, "bbox": "25.4,44.4,26.2,45.75", "maxzoom": 11},
+    {"id": "ro-brasov",   "name": "בראשוב והסביבה",              "firstDay": 1, "lastDay": 2,  "required": false, "bbox": "25.45,45.55,25.75,45.75","maxzoom": 14},
+    {"id": "ro-bran",     "name": "בראן, זרנשט ומאגורה",         "firstDay": 3, "lastDay": 4,  "required": false, "bbox": "25.1,45.35,25.6,45.6", "maxzoom": 14},
+    {"id": "ro-balvanyos","name": "באלוואניוש ואגם סנטה אנה",    "firstDay": 5, "lastDay": 5,  "required": false, "bbox": "25.7,45.7,26.2,46.2",  "maxzoom": 13},
+    {"id": "ro-sighisoara","name": "סיגישוארה והדרך לסיביו",     "firstDay": 6, "lastDay": 6,  "required": false, "bbox": "24.7,45.8,25.1,46.3",  "maxzoom": 13},
+    {"id": "ro-sibiu",    "name": "סיביו, ראשינארי ופלטיניש",    "firstDay": 6, "lastDay": 8,  "required": false, "bbox": "23.8,45.65,24.35,45.9","maxzoom": 14},
+    {"id": "ro-road-sb",  "name": "הדרך סיביו–בוקרשט",           "firstDay": 9, "lastDay": 9,  "required": false, "bbox": "24.3,44.8,26.0,45.8",  "maxzoom": 11}
+  ]
+}
