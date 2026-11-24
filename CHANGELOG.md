@@ -1,5 +1,12 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.8 — F13 stage 2 · a group can be created in English (2026-11-24)
+- Server: migration `supabase/migrations/0025_f13.sql` (applied to the live project 24/11) — `create_trip_from_invite` accepts `default_lang` `'he'` or `'en'` (was `'he'` only). It rewrites only that one condition of the deployed function body; owner, `SECURITY DEFINER` and grants (postgres, service_role) verified unchanged. The table check and `create-trip` (whitelist only) needed no change. Any other `default_lang` is still `invalid_payload`.
+- Wizard (`app/index.html` step 1): the "English" button of "שפת הקבוצה" is selectable (no "בקרוב") only where F13 is enabled on the device (`LANG_FEATURE` 'on', or 'beta' + beta device); choosing it sends `default_lang:'en'`. Other devices and flag `'off'` = alpha.18.7 (disabled, `'he'`). `app/js/f13.js` exposes `enabled()`.
+- The QA harness migration `0011_qa_f04_harness.sql` still expects `'en'` to be rejected (its test database only); it is not part of production.
+- Tests: `tests/f13/run.sh wizard` 3/3 (normal device disabled + `'he'`; beta device selects English and the create-trip request carries `'en'`; flag off).
+- Still open for stage 2: the e-mail OTP template language (Supabase dashboard, Or) and the invite/manager e-mails, which are already bilingual.
+
 ## 3.0.0-alpha.18.7 — F13 stage 3 · English layout (LTR) and formats (2026-11-24)
 - New `app/css/f13-ltr.css` (cached in `sw.js`), **generated** by `node tests/f13/gen_ltr.mjs` from every CSS rule of `app/index.html` and `app/js/*.js`: the physical-direction declarations (text-align, left/right, margin/padding/border-left/right, float, translateX) are mirrored under `html[dir=ltr]` (66 rules + inline `style="text-align:…"`). `app/js/f13.js` adds the `<link id="ptF13Ltr">` only while English is active and removes it when Hebrew returns; Hebrew and flag `'off'` never load it. Centred overlays (`left:50%` + translateX), `left:0;right:0` and `direction:ltr` blocks are left alone. A stale file fails `tests/f13/f13_stage3_test.mjs`.
 - Formats (D4): the locale wrapper now also maps calls with no locale (`toLocaleString()`, `toLocaleDateString()`) to en-GB in English and wraps `String.prototype.localeCompare` the same way (dates dd/mm/yyyy, numbers 1,234.5, sort order). Deliberate `en-US` / `en-GB` calls are untouched.
