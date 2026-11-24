@@ -1,4 +1,4 @@
-# OFFMAP · conversation 2 (viewer) · 3.0.0-alpha.20.3 · 24/11/2026
+# OFFMAP · conversation 2 (viewer) · 3.0.0-alpha.21.1 · 24/11/2026 (first built as 20.3; renumbered after merging MORE-COMPACT, alpha.21.0)
 
 CHANGE 2026-11-24 OFFMAP-VIEW-06: new file. What conversation 2 built, on top of the core (docs/OFFMAP_dev_notes_core.md).
 
