@@ -7,7 +7,11 @@
 <meta name="theme-color" content="#0f6b4f">
 <title>הזמנה · Lonely Planner</title>
 <!-- CHANGE 2026-10-12 F04-NAME-01: display name Plan_Travel → Lonely Planner (title + brand). -->
-<!-- Plan_Travel invite page · version 3.0.0-alpha.11 · F22a
+<!-- Lonely Planner invite page · version 3.0.0-alpha.18.6 · F13 stage 1
+     CHANGE 2026-11-24 F13-INV-01: what changed from 3.0.0-alpha.11: new flag LANG_FEATURE ('beta' default). With 'on' — or 'beta' on a device with localStorage 'pt-f13-beta'==='1' — every screen of this page
+     (checking, valid, invalid, no connection, the in-app browser / iPhone / Android variants, the Google button) speaks Hebrew or English: device choice pt:_device:lang → browser language → Hebrew; a small "EN / עב"
+     switch at the top re-renders in place (the token stays in memory only, never stored); <html lang dir> and the title follow; names are wrapped in <bdi>. 'off' (and every other device) = exactly alpha.11.
+     Plan_Travel invite page · version 3.0.0-alpha.11 · F22a
      CHANGE 2026-11-07 F22A-INV-01: what changed from 3.0.0-alpha.10 (this page last changed in alpha.7.2): new flag ACCOUNT_FEATURE
      (same name and values as the app's; shipped 'beta'). With it on (or 'beta' on a device with localStorage['pt-f22-beta']==='1',
      same origin as the app) a VALID invite also shows "המשך עם Google" under the code button (spec C10). It opens
@@ -43,7 +47,9 @@
 *{box-sizing:border-box}
 body{margin:0;background:#f7f6f1;color:#17211b;font-family:Arial,'Segoe UI',system-ui,sans-serif}
 main{max-width:420px;margin:0 auto;padding:28px 18px;display:flex;flex-direction:column;gap:16px}
-.brand{text-align:center;font-size:18px;font-weight:900}
+.brand{position:relative;text-align:center;font-size:18px;font-weight:900}
+.brand .lang{position:absolute;inset-inline-end:-6px;top:50%;transform:translateY(-50%);min-width:44px;min-height:44px;padding:0 4px;border:0;background:transparent;color:#0f5c43;cursor:pointer;font-family:inherit}
+.brand .lang span{display:inline-block;border:1px solid #cfd6cc;border-radius:14px;background:#fff;padding:6px 10px;font-size:12px;font-weight:800;line-height:1}   /* CHANGE 2026-11-24 F13-INV-01: new */
 .card{background:#fff;border:1px solid #e4e6df;border-radius:18px;padding:18px}
 .center{text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
 .ring{width:64px;height:64px;border-radius:50%;background:#f1f0ea;display:flex;align-items:center;justify-content:center}
@@ -100,40 +106,90 @@ a.btn{text-decoration:none;box-shadow:0 4px 12px #0f6b4f40;text-align:center;pad
 const HOME_INSTALL_FEATURE='on';
 /* CHANGE 2026-11-07 F22A-INV-FLAG: new flag (no alpha.10 equivalent), same name and values as the app's ('off' | 'on' | 'beta'). */
 const ACCOUNT_FEATURE='beta';
+/* CHANGE 2026-11-24 F13-INV-01: new flag (no alpha.11 equivalent). 'on' = Hebrew/English; 'beta' = English only on a device with pt-f13-beta=1; 'off' = alpha.11. */
+const LANG_FEATURE='beta';
 (function(){
   'use strict';
+  /* CHANGE 2026-11-24 F13-INV-01: new — language engine + dictionary (every Hebrew string below is a key; the Hebrew text is verbatim the old text) */
+  var D={he:{
+   loading:'בודקים את ההזמנה…',invT:'הקישור כבר לא בתוקף',invP1:'ייתכן שפג תוקפו, שנשלח במקומו קישור חדש, או שההזמנה בוטלה.',invP2:'בקש/י ממי שהזמין אותך לשלוח את ההזמנה שוב, ופתח/י את הקישור מהמייל האחרון.',
+   retry:'נסו שוב',offline:'אין חיבור. נסו שוב',chkFail:'לא הצלחנו לבדוק את ההזמנה. נסו שוב',verified:'ההזמנה שלך אומתה',admin:'מנהל המערכת',
+   invitedN:'{who} הזמין אותך לנהל את הקבוצה <b>"{g}"</b>. ההקמה לוקחת כ-3 דקות.',invitedNew:'{who} הזמין אותך לנהל קבוצה חדשה. ההקמה לוקחת כ-3 דקות.',
+   exp:'הקישור בתוקף עד {d}',what:'מה יקרה עכשיו',s1:'האפליקציה נפתחת ושולחת קוד בן 6 ספרות למייל שלך',s2:'שם הטיול, תאריכים ושפה',s3:'מדינות ומטבעות',s4:'קישור הצטרפות לשליחה בווטסאפ',
+   open:'פתיחה באפליקציה והקמת הטיול',inst:'האפליקציה כבר מותקנת אצלך במסך הבית? אפשר לפתוח אותה משם ולבחור "{b}".',signMail:'כניסה עם המייל',signInv:'כניסה עם הזמנה',
+   newGroup:'קבוצה חדשה',until:' · בתוקף עד {d}',foot:'ההזמנה עצמה בתוקף. אם הדף נסגר – לוחצים שוב על הכפתור במייל.',
+   inAppT:'פותחים בדפדפן הרגיל',inAppP:'הדף נפתח בתוך אפליקציית המייל, ושם ההקמה לא נשמרת. ממשיכים {b} – זה לוקח שנייה.',bSafari:'בספארי',bChrome:'ב-Chrome',
+   hSafari:'פתיחה בספארי',notWork:'הכפתור לא עבד?',o1:'לוחצים על ⋯ בפינת המסך',o2:'בוחרים "פתיחה בספארי"',ifNot:'אם {b} לא נפתח לבד:',hChrome:'לא נפתח? פתיחה ב-Chrome',
+   iosT:'קודם מוסיפים את האפליקציה למסך הבית',i1:'לוחצים על סמל השיתוף {icon} בסרגל של ספארי',i2:'בוחרים "הוספה למסך הבית"',i3:'פותחים את Lonely Planner ממסך הבית ולוחצים "כניסה עם המייל"',
+   i4:"לא רואים 'הוספה למסך הבית'? פותחים את הדף בספארי",iInfo:'באפליקציה נשלח קוד בן 6 ספרות למייל שאליו נשלחה ההזמנה. הקוד מופיע בכותרת המייל – רואים אותו בהתראה.',
+   hAdded:'הוספתי – מה עכשיו?',hSkip:'להמשיך בדפדפן בלי להתקין',sheetT:'עכשיו פותחים את האפליקציה',sheetP:'נשלח קוד בן 6 ספרות למייל שאליו נשלחה ההזמנה – רואים אותו בהתראה של המייל.',got:'הבנתי',
+   c2:'בסוף ההקמה תוכלו להתקין את האפליקציה',gBtn:'המשך עם Google',gNote:'עם חשבון Google של המייל שאליו נשלחה ההזמנה',share:'שיתוף',title:'הזמנה · Lonely Planner'
+  },en:{
+   loading:'Checking the invitation…',invT:'This link is no longer valid',invP1:'It may have expired, been replaced by a new link, or the invitation was cancelled.',invP2:'Ask whoever invited you to send the invitation again, and open the link from the latest email.',
+   retry:'Try again',offline:'No connection. Try again',chkFail:"Couldn't check the invitation. Try again",verified:'Your invitation is verified',admin:'The system administrator',
+   invitedN:'{who} invited you to manage the group <b>"{g}"</b>. Setup takes about 3 minutes.',invitedNew:'{who} invited you to manage a new group. Setup takes about 3 minutes.',
+   exp:'This link is valid until {d}',what:'What happens next',s1:'The app opens and sends a 6-digit code to your email',s2:'Trip name, dates and language',s3:'Countries and currencies',s4:'A join link to send on WhatsApp',
+   open:'Open in the app and set up the trip',inst:'Already have the app on your home screen? Open it from there and choose "{b}".',signMail:'Sign in with email',signInv:'Sign in with invitation',
+   newGroup:'New group',until:' · Valid until {d}',foot:'The invitation itself is still valid. If the page closes, tap the button in the email again.',
+   inAppT:'Open in your regular browser',inAppP:"This page opened inside your email app, where the setup isn't saved. Continue in {b} – it takes a second.",bSafari:'Safari',bChrome:'Chrome',
+   hSafari:'Open in Safari',notWork:"Didn't work?",o1:'Tap ⋯ in the corner of the screen',o2:'Choose "Open in Safari"',ifNot:"If {b} doesn't open by itself:",hChrome:"Didn't open? Open in Chrome",
+   iosT:'First, add the app to your home screen',i1:"Tap the Share icon {icon} in Safari's toolbar",i2:'Choose "Add to Home Screen"',i3:'Open Lonely Planner from the home screen and tap "Sign in with email"',
+   i4:"Don't see 'Add to Home Screen'? Open this page in Safari",iInfo:"The app sends a 6-digit code to the email the invitation was sent to. The code is in the email's subject line – you'll see it in the notification.",
+   hAdded:'I added it – what now?',hSkip:'Continue in the browser without installing',sheetT:'Now open the app',sheetP:"A 6-digit code is sent to the email the invitation was sent to – you'll see it in the email notification.",got:'Got it',
+   c2:'At the end of setup you can install the app',gBtn:'Continue with Google',gNote:'With the Google account of the email the invitation was sent to',share:'Share',title:'Invitation · Lonely Planner'
+  }};
+  var LANG_BETA=false;try{LANG_BETA=window.localStorage.getItem('pt-f13-beta')==='1'}catch(e){}
+  var LANG_ON=LANG_FEATURE==='on'||(LANG_FEATURE==='beta'&&LANG_BETA);
+  function pickLang(v){var s=String(v==null?'':v).toLowerCase().slice(0,2);return s==='he'||s==='iw'?'he':s==='en'?'en':null}
+  function lang(){
+   if(!LANG_ON)return'he';
+   var dv=null;try{dv=window.localStorage.getItem('pt:_device:lang')}catch(e){}
+   return pickLang(dv)||pickLang(navigator.language||(navigator.languages||[])[0])||'he';
+  }
+  function tr(k,p,html){
+   var L=lang(),s=(D[L]&&D[L][k]!=null)?D[L][k]:(D.he[k]!=null?D.he[k]:k);
+   return s.replace(/\{([a-z]+)\}/g,function(all,n){
+    if(!p||p[n]==null)return all;
+    var v=String(p[n]);return html?(L==='en'?'<bdi>'+esc(v)+'</bdi>':esc(v)):v;
+   });
+  }
+  function applyDoc(){var L=lang(),h=document.documentElement;h.lang=L;h.dir=L==='en'?'ltr':'rtl';document.title=tr('title')}
+  function brand(){
+   var L=lang(),sw=LANG_ON?'<button type="button" class="lang" id="langSw" data-l="'+(L==='en'?'he':'en')+'" lang="'+(L==='en'?'he':'en')+'" aria-label="'+(L==='en'?'עברית':'English')+'">'+'<span>'+(L==='en'?'עב':'EN')+'</span></button>':'';
+   return '<div class="brand">Lonely Planner'+sw+'</div>';
+  }
   var ENDPOINT='https://zwufpxnioqaweobnvffs.supabase.co/functions/v1/invite-manager';
   var KEY='sb_publishable_Atuc7ybYTF2o7ujCJBjKjA_So_TbaV8';   /* publishable by design (RLS + the function are the protection) */
   var TOKEN_RE=/^[A-Za-z0-9_-]{43}$/;
   var APP_LINK='../app/?invite=1#invite=';   /* CHANGE 2026-10-12 F04-INV-01: the app's own landing (F03-LAND-01) continues to the F04 wizard */
-  var BRAND='<div class="brand">Lonely Planner</div>';
+  /* CHANGE 2026-11-24 F13-INV-01: BRAND and the static screens are functions now (language at render time) — was: var BRAND='<div class="brand">Lonely Planner</div>' and var LOADING / var INVALID */
   var ICON_OK='<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#146c43" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   var ICON_BROKEN='<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#4b524c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/><path d="M3 3l18 18"/></svg>';
   var ICON_WIFI='<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#4b524c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><path d="M12 19h.01"/><path d="M3 3l18 18"/></svg>';
-  var LOADING=BRAND+'<section class="card center" aria-busy="true"><div class="spin" aria-hidden="true"></div><h1 style="font-size:17px">בודקים את ההזמנה…</h1></section>';
-  var INVALID=BRAND+'<section class="card center"><div class="ring">'+ICON_BROKEN+'</div><h1>הקישור כבר לא בתוקף</h1><p>ייתכן שפג תוקפו, שנשלח במקומו קישור חדש, או שההזמנה בוטלה.</p><p class="small">בקש/י ממי שהזמין אותך לשלוח את ההזמנה שוב, ופתח/י את הקישור מהמייל האחרון.</p></section>';
+  function LOADING(){return brand()+'<section class="card center" aria-busy="true"><div class="spin" aria-hidden="true"></div><h1 style="font-size:17px">'+tr('loading')+'</h1></section>'}
+  function INVALID(){return brand()+'<section class="card center"><div class="ring">'+ICON_BROKEN+'</div><h1>'+tr('invT')+'</h1><p>'+tr('invP1')+'</p><p class="small">'+tr('invP2')+'</p></section>'}
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
   function pad(n){return n<10?'0'+n:''+n}
   function dmy(ts){var d=new Date(ts);return isNaN(d)?'':pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()}
-  function net(msg){return BRAND+'<section class="card center"><div class="ring">'+ICON_WIFI+'</div><h1>'+esc(msg)+'</h1><button type="button" class="btn" id="retry">נסו שוב</button></section>'}
+  function net(msg){return brand()+'<section class="card center"><div class="ring">'+ICON_WIFI+'</div><h1>'+esc(msg)+'</h1><button type="button" class="btn" id="retry">'+tr('retry')+'</button></section>'}
   /* CHANGE 2026-10-12 F04-INV-01: valid card per artboard F04_Landing (was: amber note + disabled "התחלת הקמה · בקרוב") */
   /* CHANGE 2026-10-26 F04H-INV-04: the installed-app note names the app's gate button; with HOME_INSTALL_FEATURE='on' it is
      "כניסה עם המייל" (C1), 'off' "כניסה עם הזמנה" as in alpha.7. */
-  var NOTE_BTN=HOME_INSTALL_FEATURE==='on'?'כניסה עם המייל':'כניסה עם הזמנה';
+  function noteBtn(){return HOME_INSTALL_FEATURE==='on'?tr('signMail'):tr('signInv')}   /* CHANGE 2026-11-24 F13-INV-01: was var NOTE_BTN (a constant string) */
   var ICON_PHONE='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>';
   function valid(j){
-    var who=esc(j.inviter_name||'מנהל המערכת');
-    var grp=j.draft_name?'לנהל את הקבוצה <b>"'+esc(j.draft_name)+'"</b>':'לנהל קבוצה חדשה';
+    var who=j.inviter_name||tr('admin');
+    var invited=j.draft_name?tr('invitedN',{who:who,g:j.draft_name},true):tr('invitedNew',{who:who},true);
     var exp=dmy(j.expires_at);
-    return BRAND+'<section class="card center"><div class="ring ok">'+ICON_OK+'</div><h1>ההזמנה שלך אומתה</h1><p>'+who+' הזמין אותך '+grp+'. ההקמה לוקחת כ-3 דקות.</p>'+
-      (exp?'<p class="exp" id="exp">הקישור בתוקף עד '+esc(exp)+'</p>':'')+'</section>'+
-      '<section class="card steps go"><b>מה יקרה עכשיו</b>'+
-      '<div class="step"><span class="num">1</span><span>האפליקציה נפתחת ושולחת קוד בן 6 ספרות למייל שלך</span></div>'+
-      '<div class="step"><span class="num">2</span><span>שם הטיול, תאריכים ושפה</span></div>'+
-      '<div class="step"><span class="num">3</span><span>מדינות ומטבעות</span></div>'+
-      '<div class="step"><span class="num">4</span><span>קישור הצטרפות לשליחה בווטסאפ</span></div></section>'+
-      '<a class="btn" id="open" href="'+esc(APP_LINK+token)+'">פתיחה באפליקציה והקמת הטיול</a>'+
-      '<div class="inst">'+ICON_PHONE+'<span>האפליקציה כבר מותקנת אצלך במסך הבית? אפשר לפתוח אותה משם ולבחור "'+NOTE_BTN+'".</span></div>';
+    return brand()+'<section class="card center"><div class="ring ok">'+ICON_OK+'</div><h1>'+tr('verified')+'</h1><p>'+invited+'</p>'+
+      (exp?'<p class="exp" id="exp">'+tr('exp',{d:exp},true)+'</p>':'')+'</section>'+
+      '<section class="card steps go"><b>'+tr('what')+'</b>'+
+      '<div class="step"><span class="num">1</span><span>'+tr('s1')+'</span></div>'+
+      '<div class="step"><span class="num">2</span><span>'+tr('s2')+'</span></div>'+
+      '<div class="step"><span class="num">3</span><span>'+tr('s3')+'</span></div>'+
+      '<div class="step"><span class="num">4</span><span>'+tr('s4')+'</span></div></section>'+
+      '<a class="btn" id="open" href="'+esc(APP_LINK+token)+'">'+tr('open')+'</a>'+
+      '<div class="inst">'+ICON_PHONE+'<span>'+tr('inst',{b:noteBtn()})+'</span></div>';
   }
   /* CHANGE 2026-10-26 F04H-INV-03: new lines (no alpha.7 equivalent) — platform detection (§3.1) and the three F04-HOME variants.
      inApp: Gmail/Google app (GSA), Facebook, Instagram, LINE, LinkedIn, Outlook, any Android WebView ("; wv)"), and any iOS
@@ -145,44 +201,44 @@ const ACCOUNT_FEATURE='beta';
   var IS_ANDROID=/Android/i.test(UA);
   var IN_APP=/\b(GSA|FBAN|FBAV|Instagram|Line|LinkedInApp|Outlook|; wv\))/i.test(UA)||(IS_IOS&&!/Safari\//.test(UA));
   var hopped=false;   /* the automatic Android hop runs once per page load */
-  var ICON_SHARE='<svg class="h-share" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="שיתוף" role="img"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>';
+  var ICON_SHARE='<svg class="h-share" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Share" role="img"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>';
   var ICON_INFO='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>';
   function row1(j){
     var exp=dmy(j.expires_at);
-    return '<section class="card h-row1"><div class="ring ok">'+ICON_OK+'</div><div class="h-main"><h1>ההזמנה שלך אומתה</h1><span>'+
-      (j.draft_name?'<bdi>'+esc(j.draft_name)+'</bdi>':'קבוצה חדשה')+(exp?' · בתוקף עד '+esc(exp):'')+'</span></div></section>';
+    return '<section class="card h-row1"><div class="ring ok">'+ICON_OK+'</div><div class="h-main"><h1>'+tr('verified')+'</h1><span>'+
+      (j.draft_name?'<bdi>'+esc(j.draft_name)+'</bdi>':tr('newGroup'))+(exp?tr('until',{d:exp},true):'')+'</span></div></section>';
   }
   function here(){return location.host+location.pathname}
   function safariUrl(){return 'x-safari-https://'+here()+'#invite='+token}
   function intentUrl(){return 'intent://'+here()+'?t='+token+'#Intent;scheme=https;package=com.android.chrome;end'}
-  var FOOT='<p class="small" style="text-align:center">ההזמנה עצמה בתוקף. אם הדף נסגר – לוחצים שוב על הכפתור במייל.</p>';
+  function FOOT(){return'<p class="small" style="text-align:center">'+tr('foot')+'</p>'}   /* CHANGE 2026-11-24 F13-INV-01: was var FOOT (a constant) */
   function inAppPage(j){
-    var b=IS_IOS?'ספארי':'Chrome';
-    return BRAND+row1(j)+'<section class="card h-col"><h2>פותחים בדפדפן הרגיל</h2>'+
-      '<p>הדף נפתח בתוך אפליקציית המייל, ושם ההקמה לא נשמרת. ממשיכים ב'+(IS_IOS?'ספארי':'-Chrome')+' – זה לוקח שנייה.</p>'+
-      (IS_IOS?'<button type="button" class="btn" id="hSafari">פתיחה בספארי</button>'+
-        '<p class="h-tiny"><b>הכפתור לא עבד?</b></p><ol class="h-ol"><li>לוחצים על ⋯ בפינת המסך</li><li>בוחרים "פתיחה בספארי"</li></ol>'
-      :'<p class="h-tiny">אם '+b+' לא נפתח לבד:</p><button type="button" class="btn" id="hChrome">לא נפתח? פתיחה ב-Chrome</button>')+
-      '</section>'+FOOT;
+    var b='Chrome';
+    return brand()+row1(j)+'<section class="card h-col"><h2>'+tr('inAppT')+'</h2>'+
+      '<p>'+tr('inAppP',{b:tr(IS_IOS?'bSafari':'bChrome')})+'</p>'+
+      (IS_IOS?'<button type="button" class="btn" id="hSafari">'+tr('hSafari')+'</button>'+
+        '<p class="h-tiny"><b>'+tr('notWork')+'</b></p><ol class="h-ol"><li>'+tr('o1')+'</li><li>'+tr('o2')+'</li></ol>'
+      :'<p class="h-tiny">'+tr('ifNot',{b:b})+'</p><button type="button" class="btn" id="hChrome">'+tr('hChrome')+'</button>')+
+      '</section>'+FOOT();
   }
   function iosPage(j){
-    return BRAND+row1(j)+'<section class="card steps go"><h2>קודם מוסיפים את האפליקציה למסך הבית</h2>'+
-      '<div class="step"><span class="num">1</span><span>לוחצים על סמל השיתוף '+ICON_SHARE+' בסרגל של ספארי</span></div>'+
-      '<div class="step"><span class="num">2</span><span>בוחרים "הוספה למסך הבית"</span></div>'+
-      '<div class="step"><span class="num">3</span><span>פותחים את Lonely Planner ממסך הבית ולוחצים "כניסה עם המייל"</span></div>'+
-      '<p class="h-tiny" style="padding-top:6px">לא רואים \'הוספה למסך הבית\'? פותחים את הדף בספארי</p></section>'+
-      '<div class="inst">'+ICON_INFO+'<span>באפליקציה נשלח קוד בן 6 ספרות למייל שאליו נשלחה ההזמנה. הקוד מופיע בכותרת המייל – רואים אותו בהתראה.</span></div>'+
-      '<button type="button" class="btn" id="hAdded" aria-haspopup="dialog">הוספתי – מה עכשיו?</button>'+
-      '<a class="h-skip" id="hSkip" href="'+esc(APP_LINK+token)+'">להמשיך בדפדפן בלי להתקין</a>'+
+    return brand()+row1(j)+'<section class="card steps go"><h2>'+tr('iosT')+'</h2>'+
+      '<div class="step"><span class="num">1</span><span>'+tr('i1').replace('{icon}',ICON_SHARE.replace('aria-label="Share"','aria-label="'+tr('share')+'"'))+'</span></div>'+
+      '<div class="step"><span class="num">2</span><span>'+tr('i2')+'</span></div>'+
+      '<div class="step"><span class="num">3</span><span>'+tr('i3')+'</span></div>'+
+      '<p class="h-tiny" style="padding-top:6px">'+tr('i4')+'</p></section>'+
+      '<div class="inst">'+ICON_INFO+'<span>'+tr('iInfo')+'</span></div>'+
+      '<button type="button" class="btn" id="hAdded" aria-haspopup="dialog">'+tr('hAdded')+'</button>'+
+      '<a class="h-skip" id="hSkip" href="'+esc(APP_LINK+token)+'">'+tr('hSkip')+'</a>'+
       '<div class="h-layer" id="hLayer" hidden><div class="h-scrim" id="hScrim"></div><section class="h-sheet" role="dialog" aria-modal="true" aria-labelledby="hSheetT">'+
-      '<h2 id="hSheetT">עכשיו פותחים את האפליקציה</h2><div class="step" style="border:0;padding:0"><span class="num" style="background:#edf8f3;color:#0b5841">3</span><span>פותחים את Lonely Planner ממסך הבית ולוחצים "כניסה עם המייל"</span></div>'+
-      '<p class="h-tiny">נשלח קוד בן 6 ספרות למייל שאליו נשלחה ההזמנה – רואים אותו בהתראה של המייל.</p>'+
-      '<button type="button" class="btn" id="hSheetOk">הבנתי</button></section></div>';
+      '<h2 id="hSheetT">'+tr('sheetT')+'</h2><div class="step" style="border:0;padding:0"><span class="num" style="background:#edf8f3;color:#0b5841">3</span><span>'+tr('i3')+'</span></div>'+
+      '<p class="h-tiny">'+tr('sheetP')+'</p>'+
+      '<button type="button" class="btn" id="hSheetOk">'+tr('got')+'</button></section></div>';
   }
   function androidPage(j){
     /* today's valid page (valid() unchanged) with its first card replaced by the one-row card, + the C2 line under the button */
     var v=valid(j),i=v.indexOf('<section class="card steps go">');
-    return BRAND+row1(j)+v.slice(i).replace('</a>','</a><p class="small h-c2">בסוף ההקמה תוכלו להתקין את האפליקציה</p>');
+    return brand()+row1(j)+v.slice(i).replace('</a>','</a><p class="small h-c2">'+tr('c2')+'</p>');
   }
   function renderHome(j){
     if(IN_APP&&(IS_IOS||IS_ANDROID)){
@@ -205,7 +261,12 @@ const ACCOUNT_FEATURE='beta';
     render(IS_ANDROID?androidPage(j):valid(j));
   }
   var m=document.getElementById('m');
-  function render(html){m.innerHTML=html;var r=document.getElementById('retry');if(r)r.onclick=check;googleBtn()}
+  function render(html){
+    m.innerHTML=html;var r=document.getElementById('retry');if(r)r.onclick=check;googleBtn();
+    /* CHANGE 2026-11-24 F13-INV-01: the language switch re-checks in place (the token is still only in memory) */
+    var sw=document.getElementById('langSw');
+    if(sw)sw.onclick=function(){try{window.localStorage.setItem('pt:_device:lang',sw.getAttribute('data-l'))}catch(e){}applyDoc();check()};
+  }
   /* CHANGE 2026-11-07 F22A-INV-02: new lines (no alpha.10 equivalent): "המשך עם Google" under the code button of a valid invite
      (#open on the desktop / Android card, #hSkip on the iPhone card), spec C10. Off / beta device without the key: nothing. */
   function f22On(){
@@ -218,8 +279,8 @@ const ACCOUNT_FEATURE='beta';
     if(!f22On()||document.getElementById('ptF22InvGoogle'))return;
     if((/iPhone|iPad|iPod/i.test(String(navigator.userAgent||''))||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1))&&navigator.standalone===true)return;
     var a=document.getElementById('open')||document.getElementById('hSkip');if(!a)return;
-    a.insertAdjacentHTML('afterend','<a class="gbtn" id="ptF22InvGoogle" href="../app/?f22=google">'+G_SVG+'<span>המשך עם Google</span></a>'+
-      '<p class="small" style="text-align:center" id="ptF22InvNote">עם חשבון Google של המייל שאליו נשלחה ההזמנה</p>');
+    a.insertAdjacentHTML('afterend','<a class="gbtn" id="ptF22InvGoogle" href="../app/?f22=google">'+G_SVG+'<span>'+tr('gBtn')+'</span></a>'+
+      '<p class="small" style="text-align:center" id="ptF22InvNote">'+tr('gNote')+'</p>');
   }
   var h=String(location.hash||''),d=h;
   try{d=decodeURIComponent(h)}catch(e){}
@@ -231,16 +292,17 @@ const ACCOUNT_FEATURE='beta';
   if(HOME_INSTALL_FEATURE==='on'&&!token){var tq='';try{tq=new URLSearchParams(location.search).get('t')||''}catch(e){}if(TOKEN_RE.test(tq))token=tq}
   try{history.replaceState(null,'',location.pathname)}catch(e){}
   function check(){
-    render(LOADING);
-    if(!TOKEN_RE.test(token)){render(INVALID);return}
-    if(navigator.onLine===false){render(net('אין חיבור. נסו שוב'));return}
+    render(LOADING());
+    if(!TOKEN_RE.test(token)){render(INVALID());return}
+    if(navigator.onLine===false){render(net(tr('offline')));return}
     var ctl=('AbortController' in window)?new AbortController():null;
     var t=setTimeout(function(){if(ctl)ctl.abort()},10000);
     fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({action:'check',token:token}),signal:ctl?ctl.signal:undefined,cache:'no-store'})
       .then(function(r){clearTimeout(t);return r.json().then(function(j){return{ok:r.ok,j:j}},function(){return{ok:false,j:null}})})
-      .then(function(x){if(!x.ok||!x.j){render(net('לא הצלחנו לבדוק את ההזמנה. נסו שוב'));return}if(x.j.valid===true&&HOMEI){renderHome(x.j);return}/* CHANGE 2026-10-26 F04H-INV-06: valid + flag on → the F04-HOME variant (F04H-INV-03); otherwise as before */render(x.j.valid===true?valid(x.j):INVALID)})
-      ['catch'](function(){clearTimeout(t);render(net('אין חיבור. נסו שוב'))});
+      .then(function(x){if(!x.ok||!x.j){render(net(tr('chkFail')));return}if(x.j.valid===true&&HOMEI){renderHome(x.j);return}/* CHANGE 2026-10-26 F04H-INV-06: valid + flag on → the F04-HOME variant (F04H-INV-03); otherwise as before */render(x.j.valid===true?valid(x.j):INVALID())})
+      ['catch'](function(){clearTimeout(t);render(net(tr('offline')))});
   }
+  if(LANG_ON)applyDoc();   /* CHANGE 2026-11-24 F13-INV-01: <html lang dir> + title */
   check();
 })();
 </script>

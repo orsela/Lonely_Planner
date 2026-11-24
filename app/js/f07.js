@@ -1,4 +1,7 @@
-/* Lonely Planner · F07 (a member who changed phones gets back into the trip) · page side · version 3.0.0-alpha.16
+/* Lonely Planner · F07 (a member who changed phones gets back into the trip) · page side · version 3.0.0-alpha.18.6
+   CHANGE 2026-11-24 F13-JOIN-02: what changed from 3.0.0-alpha.16: the /join/ side (form, pending, expired, approvedNote) speaks the language of join/flow.js through J() = window.LPJoin.t with the keys 'f7.*'
+   (dictionary in join/flow.js); with no LPJoin (or English off) the same Hebrew strings as before. The app side of this file is untouched (stage 4).
+   Previous: Lonely Planner · F07 · page side · version 3.0.0-alpha.16
    CHANGE 2026-11-16 F07-UI-02: what changed from conversation 2 (same version 3.0.0-alpha.16, f07-build 2f3243b): the APP side was added at the end of this file
    (spec §3, mockup row 13 screens 4, 5, 6): devices per person in "חברים וקישור" (grouped by person, "ניתוק" per device, never on the current device or a
    person's last device), the "המכשירים שלי" card in "אני · <שם>" (F22a screen), the manager's login-notice card (C8, "הבנתי" / ניתוק), the device_revoked
@@ -17,7 +20,7 @@
 (function(){
 'use strict';
 if(window.__ptF07)return;
-const VERSION='3.0.0-alpha.16';
+const VERSION='3.0.0-alpha.18.6'; /* CHANGE 2026-11-24 F13-JOIN-02: was '3.0.0-alpha.16' */
 const NOTICE_KEY='pt:_device:relink_notice';
 const TX={
  modeNew:'אני חדש/ה בטיול',modeBack:'כבר הייתי בטיול',
@@ -31,6 +34,8 @@ const TX={
  mgrWarn:'בקשה לחבר מכשיר חדש לחבר קיים. אשרו רק אם זה באמת הוא/היא – השם והתפקיד נשמרים.',
  offline:'אין חיבור. נסו שוב כשהרשת תחזור.'
 };
+/* CHANGE 2026-11-24 F13-JOIN-02: new — J(key, params, html): the /join/ text in the current language (Hebrew fallback = TX / the old inline text) */
+function J(k,p,h,fb){try{const L=window.LPJoin;if(L&&L.t)return L.t(k,p,h)}catch(e){}return fb}
 const CSS=`
 .lpj-sw{display:flex;gap:4px;background:#e9ece5;border-radius:14px;padding:4px;margin:0 0 12px}
 .lpj-sw button{flex:1;min-height:44px;border:0;border-radius:11px;background:transparent;color:#3a443d;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer}
@@ -87,28 +92,28 @@ function form(c){
  if(!Array.isArray(people)||!people.length)return;            /* nobody to pick: the plain form stays */
  const card=c.el.querySelector('.lpj-card.lift');if(!card)return;
  const mode=c.st.f07mode==='back'?'back':'new';
- const sw=document.createElement('div');sw.className='lpj-sw';sw.setAttribute('role','group');sw.setAttribute('aria-label','סוג ההצטרפות');
- sw.innerHTML='<button type="button" id="lpjModeNew" aria-pressed="'+(mode==='new')+'">'+TX.modeNew+'</button>'+
-  '<button type="button" id="lpjModeBack" aria-pressed="'+(mode==='back')+'">'+TX.modeBack+'</button>';
+ const sw=document.createElement('div');sw.className='lpj-sw';sw.setAttribute('role','group');sw.setAttribute('aria-label',J('f7.modeAria',0,0,'סוג ההצטרפות'));
+ sw.innerHTML='<button type="button" id="lpjModeNew" aria-pressed="'+(mode==='new')+'">'+J('f7.modeNew',0,0,TX.modeNew)+'</button>'+
+  '<button type="button" id="lpjModeBack" aria-pressed="'+(mode==='back')+'">'+J('f7.modeBack',0,0,TX.modeBack)+'</button>';
  card.parentNode.insertBefore(sw,card);
  c.$('lpjModeNew').onclick=()=>{if(c.st.f07mode!=='new'){c.st.f07mode='new';c.showForm(c.st.name)}};
  c.$('lpjModeBack').onclick=()=>{if(c.st.f07mode!=='back'){c.st.f07mode='back';c.showForm(c.st.name)}};
  if(mode!=='back')return;
- card.innerHTML='<fieldset class="lpj-rad" id="lpjPeople" style="margin:0;padding:0;border:0"><legend class="lpj-lbl">'+TX.who+'</legend>'+
+ card.innerHTML='<fieldset class="lpj-rad" id="lpjPeople" style="margin:0;padding:0;border:0"><legend class="lpj-lbl">'+J('f7.who',0,0,TX.who)+'</legend>'+
   people.map((p,i)=>'<label><input type="radio" name="lpjPerson" value="'+c.esc(p.person_id)+'"'+(c.st.f07person===p.person_id?' checked':'')+'><span>'+c.esc(p.display_name)+'</span></label>').join('')+
   '</fieldset><div class="lpj-err" id="lpjRelinkErr" role="alert" hidden></div>'+
-  '<p class="lpj-help">'+TX.pickHelp+'</p><div style="height:12px"></div>'+
-  '<button type="button" class="lpj-btn" id="lpjRelink">'+TX.send+'</button>'+
-  (c.inApp?'':'<div style="text-align:center"><a class="lpj-link" id="lpjAcct" href="../app/">'+TX.acct+'</a></div>');
+  '<p class="lpj-help">'+J('f7.pickHelp',0,0,TX.pickHelp)+'</p><div style="height:12px"></div>'+
+  '<button type="button" class="lpj-btn" id="lpjRelink">'+J('f7.send',0,0,TX.send)+'</button>'+
+  (c.inApp?'':'<div style="text-align:center"><a class="lpj-link" id="lpjAcct" href="../app/">'+J('f7.acct',0,0,TX.acct)+'</a></div>');
  card.querySelectorAll('input[name="lpjPerson"]').forEach(r=>r.onchange=()=>{c.st.f07person=r.value;const e=c.$('lpjRelinkErr');if(e)e.hidden=true});
  c.$('lpjRelink').onclick=()=>request(c,c.st.f07person);
 }
 function showErr(c,msg){const e=c.$('lpjRelinkErr');if(e){e.textContent=msg;e.hidden=false}else c.toast(msg)}
 async function request(c,personId){
  if(c.st.busy)return;
- if(!personId){showErr(c,TX.pickErr);return}
- if(!c.online()){c.toast(TX.offline);return}
- c.st.busy=true;const b=c.$('lpjRelink')||c.$('lpjRelinkAgain');if(b){b.disabled=true;b.textContent=TX.sending}
+ if(!personId){showErr(c,J('f7.pickErr',0,0,TX.pickErr));return}
+ if(!c.online()){c.toast(J('offline',0,0,TX.offline));return}
+ c.st.busy=true;const b=c.$('lpjRelink')||c.$('lpjRelinkAgain');if(b){b.disabled=true;b.textContent=J('f7.sending',0,0,TX.sending)}
  try{
   const r=await c.fn({action:'request',code:c.st.code,person:personId});
   c.st.trip=Object.assign({},c.st.trip,{trip_id:r.trip_id});
@@ -118,8 +123,8 @@ async function request(c,personId){
  }catch(e){
   c.st.busy=false;
   const k=e&&e.code;
-  if(k==='person_invalid'||k==='already_member'||k==='code_invalid'){if(k==='person_invalid')c.toast(TX.gone);c.st.f07person=null;c.load();return}
-  if(b){b.disabled=false;b.textContent=TX.send}
+  if(k==='person_invalid'||k==='already_member'||k==='code_invalid'){if(k==='person_invalid')c.toast(J('f7.gone',0,0,TX.gone));c.st.f07person=null;c.load();return}
+  if(b){b.disabled=false;b.textContent=J('f7.send',0,0,TX.send)}
   c.toast(c.errText(e));
  }
 }
@@ -130,14 +135,14 @@ function pending(c){
  const t=c.st.trip||{},ri=c.st.relinkInfo||{},me=c.st.me||{};
  const name=ri.display_name||me.display_name||c.st.name||'',role=ri.role||me.role;
  const until=ri.expires_at?hm(ri.expires_at):'';
- const wa='https://wa.me/?text='+encodeURIComponent('היי, זה '+name+'. ביקשתי לחבר טלפון חדש לטיול '+(t.name||'')+' – אפשר לאשר?');
+ const wa='https://wa.me/?text='+encodeURIComponent(J('f7.waMsg',{n:name,trip:t.name||''},0,'היי, זה '+name+'. ביקשתי לחבר טלפון חדש לטיול '+(t.name||'')+' – אפשר לאשר?'));
  c.paint('pending',c.hero(true)+'<div class="lpj-body"><div class="lpj-center"><span class="lpj-ring" style="background:#fef3e2"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>'+
-  '<h2 id="lpjTitle">'+(t.manager?'הבקשה נשלחה ל'+c.esc(t.manager):'הבקשה נשלחה למנהל')+'</h2>'+
-  '<p>אחרי האישור הטיול ייפתח כאן לבד, עם אותו שם ואותו תפקיד. אפשר לסגור ולחזור לאותו קישור.</p>'+
-  '<span class="lpj-pill">מכשיר חדש · '+c.esc(name)+(role&&c.ROLE[role]?' · '+c.esc(c.ROLE[role]):'')+'</span>'+
-  (until?'<p id="lpjUntil" style="margin-top:10px;font-size:12.5px;color:#5f6861">בתוקף עד '+c.esc(until)+'</p>':'')+'</div>'+
-  '<a class="lpj-btn out lpj-wa" id="lpjWa" href="'+wa+'" target="_blank" rel="noopener noreferrer">שליחת הודעה למנהל בווטסאפ</a>'+
-  '<button type="button" class="lpj-btn ghost" id="lpjCancel">ביטול הבקשה</button></div>');
+  '<h2 id="lpjTitle">'+(t.manager?J('pendM',{m:t.manager},1,'הבקשה נשלחה ל'+c.esc(t.manager)):J('pend',0,0,'הבקשה נשלחה למנהל'))+'</h2>'+
+  '<p>'+J('f7.pendP',0,0,'אחרי האישור הטיול ייפתח כאן לבד, עם אותו שם ואותו תפקיד. אפשר לסגור ולחזור לאותו קישור.')+'</p>'+
+  '<span class="lpj-pill">'+J('f7.pillNew',{n:name},1,'מכשיר חדש · '+c.esc(name))+(role&&c.ROLE[role]?' · '+c.esc(c.ROLE[role]):'')+'</span>'+
+  (until?'<p id="lpjUntil" style="margin-top:10px;font-size:12.5px;color:#5f6861">'+J('f7.until',{t:until},1,'בתוקף עד '+c.esc(until))+'</p>':'')+'</div>'+
+  '<a class="lpj-btn out lpj-wa" id="lpjWa" href="'+wa+'" target="_blank" rel="noopener noreferrer">'+J('f7.wa',0,0,'שליחת הודעה למנהל בווטסאפ')+'</a>'+
+  '<button type="button" class="lpj-btn ghost" id="lpjCancel">'+J('cancel',0,0,'ביטול הבקשה')+'</button></div>');
  c.$('lpjCancel').onclick=c.cancel;
  c.watch();
  /* D5: when the 24 h are over the screen reloads the preview, which reports "expired" once */
@@ -151,15 +156,15 @@ function expired(c,rl){
  const people=(c.st.trip&&c.st.trip.people)||[];
  const who=people.find(p=>p.display_name===(rl&&rl.display_name));
  c.paint('expired',c.hero(true)+'<div class="lpj-body"><div class="lpj-center" style="padding-top:18px"><span class="lpj-ring" style="background:#f1f0ea"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3a443d" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>'+
-  '<h2 id="lpjTitle">הבקשה פגה</h2><p>הבקשה'+(rl&&rl.display_name?' של '+c.esc(rl.display_name):'')+' לא אושרה תוך 24 שעות. אפשר לשלוח בקשה חדשה.</p></div>'+
-  (who?'<button type="button" class="lpj-btn" id="lpjRelinkAgain">בקשה חדשה</button>':'')+
-  '<button type="button" class="lpj-btn out" id="lpjBackToName">חזרה לבחירת שם</button>'+c.back()+'</div>');
+  '<h2 id="lpjTitle">'+J('f7.expT',0,0,'הבקשה פגה')+'</h2><p>'+(rl&&rl.display_name?J('f7.expPN',{n:rl.display_name},1,'הבקשה של '+c.esc(rl.display_name)+' לא אושרה תוך 24 שעות. אפשר לשלוח בקשה חדשה.'):J('f7.expP',0,0,'הבקשה לא אושרה תוך 24 שעות. אפשר לשלוח בקשה חדשה.'))+'</p></div>'+
+  (who?'<button type="button" class="lpj-btn" id="lpjRelinkAgain">'+J('f7.again',0,0,'בקשה חדשה')+'</button>':'')+
+  '<button type="button" class="lpj-btn out" id="lpjBackToName">'+J('f7.backName',0,0,'חזרה לבחירת שם')+'</button>'+c.back()+'</div>');
  const a=c.$('lpjRelinkAgain');if(a)a.onclick=()=>request(c,who.person_id);
  c.$('lpjBackToName').onclick=()=>{c.st.f07mode='back';c.st.f07person=who?who.person_id:null;c.showForm(c.st.name)};
 }
 
 /* ---------- /join/ : after the approval ---------- */
-function approvedNote(){return'<div class="lpj-note" id="lpjLostNote" role="note">'+TX.lostNote+'</div>'}
+function approvedNote(){return'<div class="lpj-note" id="lpjLostNote" role="note">'+J('f7.lostNote',0,0,TX.lostNote)+'</div>'}
 function markNotice(){try{localStorage.setItem(NOTICE_KEY,'1')}catch(e){}}
 
 /* ---------- app: the manager's home card (F07_HomeManager) ---------- */

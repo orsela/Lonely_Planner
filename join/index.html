@@ -8,7 +8,11 @@
 <meta name="theme-color" content="#0f5c43">
 <title>הצטרפות לטיול · Lonely Planner</title>
 <!-- CHANGE 2026-10-12 F04-NAME-01: display name Plan_Travel → Lonely Planner (title + brand). -->
-<!-- Lonely Planner join page · version 3.0.0-alpha.16 · F07
+<!-- Lonely Planner join page · version 3.0.0-alpha.18.6 · F13 stage 1
+     CHANGE 2026-11-24 F13-JOIN-03: what changed from 3.0.0-alpha.16: new flag LANG_FEATURE ('beta' default, like app/index.html). With 'on' — or 'beta' on a device where localStorage 'pt-f13-beta'==='1' — the page
+     speaks Hebrew or English (device choice pt:_device:lang → browser language → Hebrew; a small "EN / עב" switch in the hero; <html lang dir> and the title follow; the error screen too).
+     'off' (and 'beta' on every other device) = exactly alpha.16: Hebrew, RTL, no switch. The strings are in join/flow.js.
+     Lonely Planner join page · version 3.0.0-alpha.16 · F07
      CHANGE 2026-11-16 F07-JOIN-02: what changed from 3.0.0-alpha.7.2: new flag RELINK_FEATURE ('off' default). With 'on' the page also loads ../app/js/f07.js and
      tells flow.js to offer "כבר הייתי בטיול" (docs/F07_spec.md §3). 'off' = exactly alpha.7.2: f07.js is not loaded, flow.js shows the plain form.
      Lonely Planner join page · version 3.0.0-alpha.7.2 · CHANGE 2026-10-26 FIX-04 (QA-DEBT-BUG-04): fatal() removes the hidden #m first; no duplicate #joinTitle.
@@ -64,6 +68,8 @@ const JOIN_FEATURE='on';
 const MEMBERS_FEATURE='on';
 /* CHANGE 2026-11-16 F07-JOIN-02: new flag (no alpha.7.2 equivalent). 'on' = a member who changed phones can pick "כבר הייתי בטיול" and ask to link this phone (F07). 'off' = alpha.7.2. */
 const RELINK_FEATURE='on';   /* CHANGE 2026-11-16 F07-FLAG-03: was 'off' (F07 conversation 3 done; same version 3.0.0-alpha.16) */
+/* CHANGE 2026-11-24 F13-JOIN-03: new flag (no alpha.16 equivalent). 'on' = Hebrew/English; 'beta' = English only on a device with pt-f13-beta=1 (set by #f13beta in the app); 'off' = alpha.16. flow.js reads it. */
+const LANG_FEATURE='beta';
 (function(){
 'use strict';
 const SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';
@@ -102,17 +108,29 @@ function enter(tripId,role){
  try{sessionStorage.removeItem(CODE_KEY)}catch(e){}
  location.href='../app/';
 }
+/* CHANGE 2026-11-24 F13-JOIN-03: new — the same language choice as flow.js, for the case flow.js did not load */
+function fatalEn(){
+ try{
+  if(!(LANG_FEATURE==='on'||(LANG_FEATURE==='beta'&&localStorage.getItem('pt-f13-beta')==='1')))return false;
+  const s=String(localStorage.getItem('pt:_device:lang')||navigator.language||'he').toLowerCase().slice(0,2);
+  return s==='en';
+ }catch(e){return false}
+}
 function fatal(){
  /* CHANGE 2026-10-26 FIX-04 (QA-DEBT-BUG-04): what changed from 3.0.0-alpha.7: the hidden F04 placeholder #m is removed first,
     so #joinTitle exists once on the error screen (was: twice). */
  const old=document.getElementById('m');if(old)old.remove();
- root.innerHTML='<main><div class="brand">Lonely Planner</div><section class="card center" role="alert"><h1 id="joinTitle">לא הצלחנו לטעון את הדף</h1>'+
-  '<p>בדקו את החיבור ונסו שוב.</p><button type="button" id="lpReload" style="min-height:44px;padding:0 18px;border:0;border-radius:12px;background:#0f6b4f;color:#fff;font-weight:800;font-size:14px">נסו שוב</button></section></main>';
+ /* CHANGE 2026-11-24 F13-JOIN-03: the error screen in the chosen language (same Hebrew when the flag is off) */
+ const en=window.LPJoin&&window.LPJoin.lang?window.LPJoin.lang()==='en':fatalEn();
+ root.innerHTML='<main><div class="brand">Lonely Planner</div><section class="card center" role="alert"><h1 id="joinTitle">'+(en?"Couldn't load the page":'לא הצלחנו לטעון את הדף')+'</h1>'+
+  '<p>'+(en?'Check your connection and try again.':'בדקו את החיבור ונסו שוב.')+'</p><button type="button" id="lpReload" style="min-height:44px;padding:0 18px;border:0;border-radius:12px;background:#0f6b4f;color:#fff;font-weight:800;font-size:14px">'+(en?'Try again':'נסו שוב')+'</button></section></main>';
+ if(en){document.documentElement.lang='en';document.documentElement.dir='ltr'}
  document.getElementById('lpReload').onclick=()=>location.reload();
 }
 Promise.all([window.supabase?Promise.resolve():load(SUPABASE_JS),window.LPJoin?Promise.resolve():load('flow.js'),
   /* CHANGE 2026-11-16 F07-JOIN-02: f07.js only with the flag; if it fails to load the plain form is used */
   (RELINK_FEATURE==='on'&&!window.__ptF07)?load('../app/js/f07.js').catch(()=>{}):Promise.resolve()])
+ .then(()=>{if(LANG_FEATURE!=='off'&&window.LPJoin.applyDoc)window.LPJoin.applyDoc()})   /* CHANGE 2026-11-24 F13-JOIN-03: <html lang dir> + title */
  .then(()=>window.LPJoin.mount(root,{getClient,fnUrl:SUPABASE_URL+'/functions/v1/join-trip',apiKey:SUPABASE_KEY,code,inApp:false,relink:RELINK_FEATURE==='on',onEnter:enter}))
  .catch(e=>{console.warn('[join] boot failed',e);fatal()});
 })();
