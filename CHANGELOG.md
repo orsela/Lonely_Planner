@@ -1,5 +1,10 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.19.2 — OFFMAP · one shared key, set once (2026-11-24)
+- The `#offmapkey` window now writes the Protomaps key ONCE to the server (table `platform_config`, function `set_offmap_key`, platform admin only, write-once: no update or delete is possible, enforced in the database). The field is masked, the key is never shown. After that the window is locked for everyone.
+- Every traveler gets the key automatically from the server when tiles are prepared (and keeps a device copy for offline); nobody sees a window or is asked for a key. Still inert while OFFMAP_FEATURE='off'.
+- Tests: 23 (Node).
+
 ## 3.0.0-alpha.19.1 — OFFMAP · key window (2026-11-24)
 - Opening the app with `#offmapkey` at the end of the address shows a small window to paste, replace or delete the Protomaps key on this device (kept on the device in IndexedDB `pt-_device-offmap`, never in the address or the repo, last 4 characters shown). No hash = nothing changes. One additive inline script after the offmap.js tag; the rest is in app/js/offmap.js.
 

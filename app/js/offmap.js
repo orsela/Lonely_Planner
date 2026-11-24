@@ -1,4 +1,4 @@
-/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core) · version 3.0.0-alpha.19.1
+/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core) · version 3.0.0-alpha.19.2
    CHANGE 2026-11-24 OFFMAP-KEY-01: what changed from alpha.19: an in-app window to enter / replace / delete the Protomaps key on THIS device (setKey, clearKey, keyHint, openKeyDialog, mountKeyEntry). It opens only when the address ends with #offmapkey (like #f22beta); the key is saved in a small device-level IndexedDB ("pt-_device-offmap": the app wraps localStorage per trip and drops writes before the trip is known, so localStorage cannot hold it), loaded at start into memory so getKey() stays synchronous (never in the address, never sent anywhere, never in the repo). Without that hash nothing is shown: the app is as alpha.19.
    CHANGE 2026-11-24 OFFMAP-01: new file (no previous version). Conversation 1 of 3 (spec: claude/Plan_Travel_OFFMAP_spec.md draft 2, approved 24/11). Contains ONLY the core, no screens and no map drawing:
    (1) pure functions: tile math, per-day corridor + tile list from tripData (planTrip), space budget (computeBudget), download queue with the sacrifice order (buildQueue), clean-up / route-change diff (cleanupPlan),
@@ -9,7 +9,7 @@
    The Protomaps key is NOT in this file (public repo): OFFMAP_KEY stays '' until Or approves; on a device it is entered through the key window (#offmapkey) and kept in the device IndexedDB (never committed). */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.19.1';
+  const VERSION = '3.0.0-alpha.19.2';
 
   /* ---------- constants ---------- */
   const OFFMAP_KEY = '';                                   /* Protomaps API key. EMPTY on purpose: not committed without Or's explicit approval (see report). */
@@ -232,6 +232,33 @@
   async function setKey(v) { v = String(v == null ? '' : v).trim(); if (!KEY_RE.test(v)) return false; try { await adapter().put(v); cachedKey = v; return true; } catch (e) { return false; } }
   async function clearKey() { try { await adapter().del(); } catch (e) { /* none */ } cachedKey = ''; }
   function keyHint() { const k = getKey(); return k ? '••••' + k.slice(-4) : ''; }   /* the last 4 characters only, for the screen */
+  /* ---------- the shared key (OFFMAP-KEY-04): one write-once row in Supabase, set by a platform admin through the window ---------- */
+  let clientGet = null;
+  function attach(o) { if (o && typeof o.client === 'function') clientGet = o.client; }
+  function sbc() { try { return clientGet ? clientGet() : null; } catch (e) { return null; } }
+  /* RPC / select with a short timeout; never throws */
+  function withTimeout(p, ms) { return Promise.race([p, new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, ms || 8000); })]); }
+  async function fetchRemoteKey() {
+    const c = sbc(); if (!c) return '';
+    try {
+      const r = await withTimeout(c.from('platform_config').select('value').eq('key', 'offmap_key').maybeSingle());
+      const v = r && r.data && r.data.value; if (v && KEY_RE.test(v)) { try { await adapter().put(v); } catch (e) { /* kept in memory */ } cachedKey = v; return v; }
+    } catch (e) { /* offline or not signed in yet */ }
+    return '';
+  }
+  /* memory, then the device copy, then the server (and the device copy is refreshed from it) */
+  async function ensureKey() { return getKey() || (await loadKey()) || (await fetchRemoteKey()); }
+  async function keyState() {
+    const c = sbc(); if (!c) return 'offline';
+    try { const r = await withTimeout(c.rpc('offmap_key_state')); return r && !r.error && typeof r.data === 'string' ? r.data : 'offline'; } catch (e) { return 'offline'; }
+  }
+  async function saveSharedKey(v) {
+    v = String(v == null ? '' : v).trim(); if (!KEY_RE.test(v)) return 'invalid';
+    const c = sbc(); if (!c) return 'offline';
+    try { const r = await withTimeout(c.rpc('set_offmap_key', { p_key: v })); if (r && !r.error && typeof r.data === 'string') { if (r.data === 'saved') { cachedKey = v; try { await adapter().put(v); } catch (e) { /* none */ } } return r.data; } } catch (e) { /* fall through */ }
+    return 'offline';
+  }
+  /* the window: the pasted key is masked (password field), never shown, never echoed; after a successful save, or when a key already exists, it is locked for everybody */
   function openKeyDialog(doc) {
     doc = doc || (root.document); if (!doc || !doc.body) return null;
     const old = doc.getElementById('ptOmKeyDlg'); if (old) old.remove();
@@ -241,21 +268,32 @@
     wrap.id = 'ptOmKeyDlg'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true');
     const box = el('div', 'background:#fff;color:#17211b;border-radius:14px;padding:18px 16px;max-width:360px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.3)');
     box.appendChild(el('h2', 'margin:0 0 6px;font-size:17px', 'מפתח מפות אופליין'));
-    box.appendChild(el('p', 'margin:0 0 10px;font-size:12.5px;color:#5f6861', 'המפתח נשמר במכשיר הזה בלבד ואינו נשלח לשום מקום חוץ מבקשות האריחים.'));
-    const status = el('p', 'margin:0 0 8px;font-size:13px;font-weight:600');
+    box.appendChild(el('p', 'margin:0 0 10px;font-size:12.5px;color:#5f6861', 'הכנסה חד-פעמית. המפתח נשמר במערכת לכל המטיילים, אינו מוצג, ולא ניתן לשנות אותו אחרי השמירה.'));
+    const status = el('p', 'margin:0 0 8px;font-size:13px;font-weight:600', 'בודק…');
     const input = el('input', 'width:100%;box-sizing:border-box;padding:10px;font-size:15px;border:1px solid #c9d1c3;border-radius:8px;direction:ltr;text-align:left');
-    input.type = 'text'; input.setAttribute('autocomplete', 'off'); input.setAttribute('autocapitalize', 'off'); input.setAttribute('spellcheck', 'false'); input.placeholder = 'הדבק מפתח';
+    input.type = 'password'; input.setAttribute('autocomplete', 'off'); input.setAttribute('autocapitalize', 'off'); input.setAttribute('spellcheck', 'false'); input.placeholder = 'הדבק מפתח'; input.disabled = true;
     const msg = el('p', 'margin:8px 0 0;min-height:18px;font-size:12.5px;color:#5f6861');
     const row = el('div', 'display:flex;gap:8px;margin-top:10px');
     const btn = function (t, bg, fg) { const b = el('button', 'flex:1;padding:11px 6px;border:0;border-radius:8px;font-size:14px;background:' + bg + ';color:' + fg + ';cursor:pointer', t); b.type = 'button'; return b; };
-    const save = btn('שמור', '#2f6f4f', '#fff'), del = btn('מחק', '#f1ece4', '#8a2b1f'), close = btn('סגור', '#eef1de', '#17211b');
-    const refresh = function () { const h = keyHint(); status.textContent = h ? 'מפתח שמור: ' + h : 'אין מפתח שמור'; };
-    const done = function () { wrap.remove(); try { if (root.location && /offmapkey/.test(root.location.hash)) root.history.replaceState(null, '', root.location.pathname + root.location.search); } catch (e) { /* ignore */ } };
-    save.onclick = async function () { const v = String(input.value || '').trim(); if (!KEY_RE.test(v)) { msg.textContent = 'המפתח לא תקין (8–128 תווים: אותיות, ספרות, - או _).'; return; } if (await setKey(v)) { input.value = ''; msg.textContent = 'נשמר במכשיר הזה ✓'; } else msg.textContent = 'השמירה נכשלה במכשיר הזה.'; refresh(); };
-    del.onclick = async function () { await clearKey(); input.value = ''; msg.textContent = 'נמחק מהמכשיר.'; refresh(); };
+    const save = btn('שמור', '#2f6f4f', '#fff'), close = btn('סגור', '#eef1de', '#17211b');
+    const paint = function (st) {
+      const open = st === 'open'; input.disabled = !open; save.disabled = !open; save.style.opacity = open ? '1' : '.4';
+      if (!open) { input.value = ''; input.style.display = 'none'; save.style.display = 'none'; } else { input.style.display = ''; save.style.display = ''; }
+      status.textContent = st === 'locked' ? 'המפתח הוגדר ✓ (נעול)' : st === 'open' ? 'אין מפתח במערכת — אפשר להדביק' : st === 'not_admin' ? 'רק מנהל המערכת יכול להגדיר מפתח. התחבר בחשבון המנהל.' : 'אין חיבור לשרת כרגע.';
+    };
+    const done = function () { input.value = ''; wrap.remove(); try { if (root.location && /offmapkey/.test(root.location.hash)) root.history.replaceState(null, '', root.location.pathname + root.location.search); } catch (e) { /* ignore */ } };
+    save.onclick = async function () {
+      const v = String(input.value || '').trim(); if (!KEY_RE.test(v)) { msg.textContent = 'המפתח לא תקין (8–128 תווים: אותיות, ספרות, - או _).'; return; }
+      save.disabled = true; msg.textContent = 'שומר…'; const r = await saveSharedKey(v); input.value = '';
+      if (r === 'saved') { msg.textContent = 'נשמר. החלון נעול.'; paint('locked'); }
+      else if (r === 'locked') { msg.textContent = 'כבר הוגדר מפתח.'; paint('locked'); }
+      else if (r === 'not_admin') { msg.textContent = 'אין הרשאה.'; paint('not_admin'); }
+      else { msg.textContent = r === 'invalid' ? 'המפתח לא תקין.' : 'השמירה נכשלה, נסה שוב.'; save.disabled = false; }
+    };
     close.onclick = done; wrap.addEventListener('click', function (e) { if (e.target === wrap) done(); });
-    row.appendChild(save); row.appendChild(del); row.appendChild(close);
-    [status, input, msg, row].forEach(function (n) { box.appendChild(n); }); wrap.appendChild(box); doc.body.appendChild(wrap); refresh(); loadKey().then(refresh);
+    row.appendChild(save); row.appendChild(close);
+    [status, input, msg, row].forEach(function (n) { box.appendChild(n); }); wrap.appendChild(box); doc.body.appendChild(wrap);
+    keyState().then(function (st) { if (wrap.isConnected) paint(st); });
     return wrap;
   }
   /* opens the window when the address carries #offmapkey (now and on later hash changes); otherwise nothing at all */
@@ -378,7 +416,7 @@
      o: { days, store, key, fetchFn, cur (index) | now, cap, storage: {quota, usage}|null, concurrency (default 5, max 6), retries (default 2), backoffMs, sleep, onProgress, signal, plan opts }
      → { status: 'done'|'stopped'|'nothing', reason: null|'rate_limited'|'forbidden'|'auth'|'network'|'cap'|'budget'|'aborted'|'no_key', downloaded, failed, bytes, remaining, plan, queue, used, budget } */
   async function prepare(o) {
-    const store = o.store, days = o.days || [], fetchFn = o.fetchFn || (root.fetch && root.fetch.bind(root)), key = o.key != null ? o.key : (getKey() || await loadKey());
+    const store = o.store, days = o.days || [], fetchFn = o.fetchFn || (root.fetch && root.fetch.bind(root)), key = o.key != null ? o.key : await ensureKey();
     const sleep = o.sleep || sleepReal, conc = clamp(o.concurrency || 5, 1, 6), retries = o.retries != null ? o.retries : 2, backoff = o.backoffMs != null ? o.backoffMs : 600;
     const res = { status: 'nothing', reason: null, downloaded: 0, failed: 0, bytes: 0, remaining: 0, plan: null, queue: null, used: 0, budget: 0 };
     if (!key) { res.reason = 'no_key'; return res; }
@@ -446,7 +484,7 @@
 
   const api = {
     version: VERSION, constants: { OFFMAP_TRIPS: OFFMAP_TRIPS, DEFAULT_CAP: DEFAULT_CAP, DEFAULTS: DEFAULTS, DEFAULT_AVG_KB: DEFAULT_AVG_KB, TILE_URL: TILE_URL, VN_TRIP: VN_TRIP },
-    configure: configure, active: active, getKey: getKey, setKey: setKey, clearKey: clearKey, loadKey: loadKey, setKeyAdapter: setKeyAdapter, keyHint: keyHint, openKeyDialog: openKeyDialog, mountKeyEntry: mountKeyEntry,
+    configure: configure, active: active, getKey: getKey, setKey: setKey, clearKey: clearKey, attach: attach, ensureKey: ensureKey, fetchRemoteKey: fetchRemoteKey, keyState: keyState, saveSharedKey: saveSharedKey, loadKey: loadKey, setKeyAdapter: setKeyAdapter, keyHint: keyHint, openKeyDialog: openKeyDialog, mountKeyEntry: mountKeyEntry,
     lon2x: lon2x, lat2y: lat2y, tileKey: tileKey, parseKey: parseKey, tileNW: tileNW, tileSizeKm: tileSizeKm, distKm: distKm, coord: coord,
     dayPoints: dayPoints, coveringTiles: coveringTiles, planTrip: planTrip, avgBytes: avgBytes, computeBudget: computeBudget, currentDayIndex: currentDayIndex,
     buildQueue: buildQueue, cleanupPlan: cleanupPlan, dayCoverage: dayCoverage,
