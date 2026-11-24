@@ -5355,6 +5355,8 @@ if(window.__ptF06&&STORAGE_BACKEND==='cloud'){
    if(LS&&RAW&&LEN&&LEN.get){const n=LEN.get.call(LS);for(let i=0;i<n;i++){const k=RAW.key.call(LS,i);if(k!=null&&k.indexOf(p)===0)ks.push(k)}}
    ks.forEach(k=>rDel(k));
    try{indexedDB.deleteDatabase('pt-vault-'+String(t))}catch{}
+   /* CHANGE 2026-11-24 F12-PURGE-01: new line (no alpha.17.1 equivalent), additive. Member removed / left this trip: the shared-vault copies saved on this device (Cache API pt-docs-v1) go too. f12.js missing or flag off: nothing happens. */
+   try{if(window.__ptF12&&typeof window.__ptF12.clearTrip==='function')window.__ptF12.clearTrip(String(t))}catch{}
   },
   /* CHANGE 2026-10-24 F06-GATE-02: what changed from the first F06 version: stopTrip() also clears TRIP and the reported trip /
      role (window.__PT.tripId = null, phase 'removed'), so the removed trip no longer counts as running and every further

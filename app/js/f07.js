@@ -399,6 +399,8 @@ function onClick(ev){
 /* ---- device_revoked / dead session (C4): the next touch tells a disconnected device to sign out ---- */
 function revoked(){
  if(S.rv)return;S.rv=true;
+ /* CHANGE 2026-11-24 F12-REVOKE-01: new line (no alpha.17.1 equivalent), additive. This device was disconnected: the shared-vault copies saved on it (Cache API pt-docs-v1, F12) are deleted. f12.js missing: nothing happens. */
+ try{if(window.__ptF12&&typeof window.__ptF12.clearAll==='function')window.__ptF12.clearAll()}catch(e){}
  try{const c=A&&A.client();if(c&&c.auth&&c.auth.signOut)c.auth.signOut({scope:'local'}).catch(()=>{})}catch(e){}
  css();
  const o=document.createElement('div');o.id='pt7Rev';o.setAttribute('role','alertdialog');o.setAttribute('aria-modal','true');o.setAttribute('aria-labelledby','pt7RevT');o.setAttribute('dir','rtl');

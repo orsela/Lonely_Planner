@@ -1,12 +1,16 @@
 /* Lonely Planner · F12 (shared document vault) · page side · version 3.0.0-alpha.18
+   CHANGE 2026-11-24 F12-OFF-01: what changed from F12-UI-01 (conversation 2, same version): conversation 3 added the offline layer. New: Cache API "pt-docs-v1" (never touched by the shell cache; key /_vault/<trip>/<doc>, metadata + last server list in /_vault/index.json),
+   a per-document "שמור לאופליין" button (manual, D2), the "שמור גם במכשיר שלי" box in the upload sheet (unchecked by default), opening a saved document with no network, dimmed "not saved" rows offline, navigator.storage.persist(),
+   and the local clean-up: on every online load a copy whose document is gone from the server is deleted (manager deleted it / member removed); clearTrip(trip) is called from the app's purge (member removed / left), clearAll() from F07 device_revoked.
+   Nothing else changed: roles, upload, view online, rename, delete, quota are as in F12-UI-01. VAULT_FEATURE stays in index.html.
    CHANGE 2026-11-24 F12-UI-01: new file (no previous version). Conversation 2 of 3 (claude/Plan_Travel_F12_spec.md §5, decisions D1-D9; server = conversation 1, docs/F12_dev_notes_server.md).
    What this file does: a "כספת משותפת" row with a counter in "עוד" (only for trips in VAULT_TRIPS), and a full-screen vault: list newest first, category filter, quota bar (warn 80 %, block 100 %),
    upload (manager / editor; pdf, jpeg, png, webp up to 10 MB; name + category), view (image inside the app, PDF through a blob and a "פתיחה" button), rename / recategorise (manager or the uploader),
    delete (manager only, through the vault-delete Edge Function). Roles are also enforced by the server (RLS + trigger); the buttons only follow them.
-   NOT here (conversation 3): "save for offline" (Cache API pt-docs-v1), local cleanup after delete / member removal / device revoke, the phone check, turning the flag on.
+   Offline (conversation 3): see F12-OFF-01 above. Still NOT here: the phone check and turning the flag on (index.html).
    Everything is built with createElement/textContent. No document title is ever logged. The smart chat (F14) does not read the vault (decision D5).
    Active only when VAULT_FEATURE==='on' AND the open trip is in VAULT_TRIPS (Vietnam never is). Off / other trip / file missing: the app is exactly 3.0.0-alpha.17.1.
-   Exposes only window.__ptF12 = {version, attach, mount, refresh, active, t} (t = pure helpers, also exported with module.exports for the Node tests). */
+   Exposes only window.__ptF12 = {version, attach, mount, refresh, active, clearTrip, clearAll, t} (t = pure helpers + makeOffline, also exported with module.exports for the Node tests). */
 (function (root) {
   'use strict';
   const VERSION = '3.0.0-alpha.18';
@@ -80,10 +84,81 @@
     quota: 'אין מספיק מקום בכספת של הטיול (100MB).', object: 'ההעלאה לא הושלמה. נסו שוב.', check: 'הקובץ לא עבר בדיקה בשרת. נסו קובץ אחר.',
     role: 'אין לכם הרשאה לפעולה הזאת.', net: 'אין חיבור. נסו שוב כשיש רשת.', other: 'משהו השתבש. נסו שוב.'
   };
-  const t = { MAX_BYTES, QUOTA_BYTES, TITLE_MAX, TYPES, CATS, MSG, catOf, fmtSize, extOfName, mimeOf, checkFile, defaultTitle, cleanTitle, quotaState, perms, filterDocs, newPath, uuid, errKind };
+
+  /* ---------- offline store (Cache API "pt-docs-v1"; cs is injectable for the Node tests) ---------- */
+  const DOC_CACHE = 'pt-docs-v1', IDX_KEY = '/_vault/index.json';
+  function docKey(trip, id) { return '/_vault/' + trip + '/' + id; }
+  const KEEP = ['id', 'title', 'category', 'mime', 'size_bytes', 'uploaded_by', 'uploader_name', 'created_at', 'storage_path'];
+  function slim(d) { const o = {}; KEEP.forEach(function (k) { if (d && d[k] != null) o[k] = d[k]; }); return o; }
+  function makeOffline(cs) {
+    const usable = !!cs && typeof cs.open === 'function';
+    let chain = Promise.resolve();
+    function serial(fn) { const r = chain.then(fn, fn); chain = r.then(function () { }, function () { }); return r; }   /* index.json read-modify-write never interleaves */
+    async function readIdx(c) {
+      try { const r = await c.match(IDX_KEY); if (!r) return { v: 1, trips: {} }; const j = await r.json(); return j && j.trips && typeof j.trips === 'object' ? j : { v: 1, trips: {} }; } catch (e) { return { v: 1, trips: {} }; }
+    }
+    async function writeIdx(c, idx) { await c.put(IDX_KEY, new Response(JSON.stringify(idx), { headers: { 'content-type': 'application/json' } })); }
+    function slot(idx, trip) { if (!idx.trips[trip]) idx.trips[trip] = { docs: [], saved: {} }; const x = idx.trips[trip]; if (!Array.isArray(x.docs)) x.docs = []; if (!x.saved || typeof x.saved !== 'object') x.saved = {}; return x; }
+    return {
+      usable: usable,
+      /* last known list (metadata only) + which ids have a local copy */
+      list: function (trip) {
+        if (!usable) return Promise.resolve({ docs: [], saved: {} });
+        return serial(async function () { const c = await cs.open(DOC_CACHE), x = slot(await readIdx(c), trip); return { docs: x.docs.slice(), saved: Object.assign({}, x.saved) }; });
+      },
+      /* online load succeeded: remember the list; delete local copies whose document is no longer on the server. returns { removed, saved } */
+      sync: function (trip, docs) {
+        if (!usable) return Promise.resolve({ removed: 0, saved: {} });
+        return serial(async function () {
+          const c = await cs.open(DOC_CACHE), idx = await readIdx(c), x = slot(idx, trip), have = {}; let removed = 0;
+          (docs || []).forEach(function (d) { have[d.id] = true; });
+          for (const id of Object.keys(x.saved)) { if (!have[id]) { try { await c.delete(docKey(trip, id)); } catch (e) { } delete x.saved[id]; removed++; } }
+          x.docs = (docs || []).map(slim); await writeIdx(c, idx);
+          return { removed: removed, saved: Object.assign({}, x.saved) };
+        });
+      },
+      save: function (trip, doc, blob) {
+        if (!usable) return Promise.reject(new Error('no cache'));
+        return serial(async function () {
+          const c = await cs.open(DOC_CACHE);
+          await c.put(docKey(trip, doc.id), new Response(blob, { headers: { 'content-type': doc.mime || 'application/octet-stream' } }));
+          const idx = await readIdx(c), x = slot(idx, trip);
+          if (!x.docs.some(function (d) { return d.id === doc.id; })) x.docs.push(slim(doc));
+          x.saved[doc.id] = { size: Number(doc.size_bytes) || (blob && blob.size) || 0 };
+          await writeIdx(c, idx);
+        });
+      },
+      get: function (trip, id) {
+        if (!usable) return Promise.resolve(null);
+        return serial(async function () { const c = await cs.open(DOC_CACHE), r = await c.match(docKey(trip, id)); return r ? await r.blob() : null; });
+      },
+      remove: function (trip, id) {
+        if (!usable) return Promise.resolve();
+        return serial(async function () {
+          const c = await cs.open(DOC_CACHE), idx = await readIdx(c), x = slot(idx, trip);
+          try { await c.delete(docKey(trip, id)); } catch (e) { }
+          delete x.saved[id]; await writeIdx(c, idx);
+        });
+      },
+      clearTrip: function (trip) {
+        if (!usable) return Promise.resolve();
+        return serial(async function () {
+          const c = await cs.open(DOC_CACHE), idx = await readIdx(c), x = idx.trips[trip];
+          if (!x) return;
+          for (const id of Object.keys(x.saved || {})) { try { await c.delete(docKey(trip, id)); } catch (e) { } }
+          delete idx.trips[trip]; await writeIdx(c, idx);
+        });
+      },
+      clearAll: function () { if (!usable) return Promise.resolve(); return serial(async function () { try { await cs.delete(DOC_CACHE); } catch (e) { } }); }
+    };
+  }
+  function pickOffline() { try { return makeOffline(root.caches); } catch (e) { return makeOffline(null); } }
+
+  const t = { makeOffline, DOC_CACHE, docKey, MAX_BYTES, QUOTA_BYTES, TITLE_MAX, TYPES, CATS, MSG, catOf, fmtSize, extOfName, mimeOf, checkFile, defaultTitle, cleanTitle, quotaState, perms, filterDocs, newPath, uuid, errKind };
 
   /* ---------- browser part ---------- */
-  const B = { dep: null, trip: null, mounted: false, docs: [], used: 0, cat: 'all', loaded: false, busy: false, scr: null, obs: null };
+  const B = { dep: null, trip: null, mounted: false, docs: [], used: 0, cat: 'all', loaded: false, busy: false, scr: null, obs: null, saved: {}, local: false, working: {} };
+  const OFF = pickOffline();
   const CSS = '.vt-scr{position:fixed;inset:0;z-index:9000;background:var(--bg,#f6f5ef);display:flex;flex-direction:column;direction:rtl;overflow:hidden}'
     + '.vt-top{display:flex;align-items:center;gap:8px;padding:12px 12px 8px}.vt-top h2{flex:1;margin:0;font-size:1.15rem}'
     + '.vt-ib{width:44px;height:44px;min-width:44px;border-radius:12px;border:1px solid var(--border,#e2ddd0);background:#fff;color:inherit;font:inherit;font-size:1.2rem;cursor:pointer}'
@@ -107,7 +182,7 @@
     + '.vt-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;border:0;background:transparent;color:inherit;font:inherit;text-align:right;cursor:pointer}.vt-menu button.dng{color:#b91c1c}'
     + '.vt-view{position:fixed;inset:0;z-index:9200;background:#111318;color:#fff;display:flex;flex-direction:column;direction:rtl}.vt-view .vt-vt{display:flex;align-items:center;gap:8px;padding:12px}'
     + '.vt-view .vt-vt b{flex:1;min-width:0;overflow-wrap:anywhere}.vt-view .vt-st{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;flex-direction:column;gap:14px;padding:12px;text-align:center}'
-    + '.vt-view img{max-width:100%;max-height:100%;object-fit:contain}.vt-view a.vt-open{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border-radius:14px;background:#0f766e;color:#fff;font-weight:700;text-decoration:none}';
+    + '.vt-row.dim{opacity:.5}.vt-tx span.vt-sv{color:#0f766e;opacity:1}.vt-ib.vt-off{width:44px;height:44px;font-size:1.05rem}.vt-ck{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:12px;font-size:.88rem}.vt-ck input{width:22px;height:22px;flex:none}.vt-view img{max-width:100%;max-height:100%;object-fit:contain}.vt-view a.vt-open{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border-radius:14px;background:#0f766e;color:#fff;font-weight:700;text-decoration:none}';
 
   function el(tag, props, kids) {
     const e = document.createElement(tag);
@@ -131,18 +206,27 @@
   function logErr(where, e) { try { console.warn('[f12] ' + where, e && (e.code || e.statusCode || e.name) || ''); } catch (x) { } }   /* codes only, never a title */
 
   /* ----- data ----- */
+  async function loadLocal(trip) {
+    const l = await OFF.list(trip);
+    B.docs = l.docs; B.saved = l.saved; B.local = true;
+    B.used = B.docs.reduce(function (n, d) { return n + (Number(d.size_bytes) || 0); }, 0);
+    B.loaded = true; return true;
+  }
   async function load() {
     const c = client(), trip = tripId();
-    if (!c || !trip || !online()) return false;
-    if (B.trip !== trip) { B.trip = trip; B.docs = []; B.used = 0; B.loaded = false; }   /* another trip opened: nothing of the previous one stays */
+    if (!c || !trip) return false;
+    if (B.trip !== trip) { B.trip = trip; B.docs = []; B.saved = {}; B.used = 0; B.loaded = false; B.local = false; }   /* another trip opened: nothing of the previous one stays */
+    if (!online()) return loadLocal(trip).catch(function (e) { logErr('local', e); return false; });
     try {
       const q = await c.from('trip_docs').select('id,title,category,mime,size_bytes,uploaded_by,uploader_name,created_at,storage_path').eq('trip_id', trip).order('created_at', { ascending: false });
       if (q.error) throw q.error;
       B.docs = q.data || [];
       const u = await c.rpc('vault_used_bytes', { p_trip: trip });
       if (!u.error && u.data != null) B.used = Number(u.data) || 0; else B.used = B.docs.reduce(function (s, d) { return s + (Number(d.size_bytes) || 0); }, 0);
-      B.loaded = true; return true;
-    } catch (e) { logErr('load', e); return false; }
+      B.local = false; B.loaded = true;
+      try { const sy = await OFF.sync(trip, B.docs); B.saved = sy.saved; } catch (e) { logErr('sync', e); }   /* a local copy whose document is gone from the server is deleted here */
+      return true;
+    } catch (e) { logErr('load', e); try { return await loadLocal(trip); } catch (x) { return false; } }
   }
   function summary() {
     if (!B.loaded) return 'מסמכי הטיול לכל החברים';
@@ -218,7 +302,7 @@
       chips.appendChild(b);
     });
     body.appendChild(chips);
-    if (!online()) body.appendChild(el('div', { cls: 'vt-hint', text: 'אין חיבור לרשת. הכספת נפתחת רק עם חיבור (שמירה לאופליין תגיע בהמשך).' }));
+    if (!online() || B.local) body.appendChild(el('div', { cls: 'vt-hint', text: 'אין חיבור לרשת. נפתחים רק מסמכים שסומנו ✅ (שמורים במכשיר). השאר מעומעמים.' }));
     const list = filterDocs(B.docs, B.cat);
     if (!list.length) {
       body.appendChild(el('div', { cls: 'vt-empty' }, [el('div', { cls: 'vt-big', text: '🗂️' }),
@@ -231,17 +315,50 @@
       fab.addEventListener('click', openUpload); B.scr.appendChild(fab);
     }
   }
+  function isOffline() { return !online() || B.local; }
   function rowFor(d) {
-    const c = catOf(d.category), pm = P(d);
+    const c = catOf(d.category), pm = P(d), saved = !!B.saved[d.id], dim = isOffline() && !saved;
     const main = el('button', { cls: 'vt-main', type: 'button' }, [el('div', { cls: 'vt-ic', text: d.mime === 'application/pdf' ? '📕' : c.icon }),
-      el('div', { cls: 'vt-tx' }, [el('b', { text: d.title }), el('span', { text: c.label + ' · ' + fmtSize(d.size_bytes) + (d.uploader_name ? ' · ' + d.uploader_name : '') })])]);
+      el('div', { cls: 'vt-tx' }, [el('b', { text: d.title }), el('span', { text: c.label + ' · ' + fmtSize(d.size_bytes) + (d.uploader_name ? ' · ' + d.uploader_name : '') }), saved ? el('span', { cls: 'vt-sv', text: '✅ שמור במכשיר' }) : null])]);
     main.addEventListener('click', function () { openDoc(d); });
     const kids = [main];
+    if (saved || !isOffline()) {   /* offline and not saved: nothing to download from */
+      const busy = !!B.working[d.id];
+      const ob = el('button', { cls: 'vt-ib vt-off', type: 'button', 'aria-label': saved ? 'הסרה מהמכשיר' : 'שמירה לאופליין', title: saved ? 'הסרה מהמכשיר' : 'שמירה לאופליין', text: busy ? '⏳' : (saved ? '✅' : '📥') });
+      if (busy) ob.disabled = true;
+      ob.addEventListener('click', function () { toggleOffline(d); }); kids.push(ob);
+    }
     if (pm.rename || pm.del) {
       const more = el('button', { cls: 'vt-ib', type: 'button', 'aria-label': 'עוד פעולות', text: '⋮' });
       more.addEventListener('click', function () { openMenu(d); }); kids.push(more);
     }
-    return el('div', { cls: 'vt-row' }, kids);
+    return el('div', { cls: 'vt-row' + (dim ? ' dim' : '') }, kids);
+  }
+  /* ----- offline save / remove (manual per document, D2) ----- */
+  async function fetchBlob(d) {
+    const r = await client().storage.from('trip-docs').createSignedUrl(d.storage_path, 60);
+    if (r.error || !r.data || !r.data.signedUrl) throw (r.error || new Error('no url'));
+    const resp = await fetch(r.data.signedUrl); if (!resp.ok) throw new Error('fetch ' + resp.status);
+    return resp.blob();
+  }
+  function persistAsk() { try { if (root.navigator && root.navigator.storage && root.navigator.storage.persist) root.navigator.storage.persist().catch(function () { }); } catch (e) { } }
+  async function saveLocal(d, blob) {
+    persistAsk();
+    await OFF.save(tripId(), d, blob); B.saved[d.id] = { size: Number(d.size_bytes) || 0 };
+  }
+  function localErr(e) { return /quota/i.test(String((e && (e.name || e.message)) || '')) ? 'אין מקום פנוי במכשיר.' : (errKind(e) === 'net' ? MSG.net : 'לא הצלחנו לשמור במכשיר. נסו שוב.'); }
+  async function toggleOffline(d) {
+    if (B.working[d.id]) return;
+    const trip = tripId(); if (!trip) return;
+    B.working[d.id] = true; if (B.scr) paintScreen();
+    try {
+      if (B.saved[d.id]) { await OFF.remove(trip, d.id); delete B.saved[d.id]; toast('הוסר מהמכשיר'); }
+      else {
+        if (!online()) { toast(MSG.net); }
+        else { const blob = await fetchBlob(d); await saveLocal(d, blob); toast('✅ נשמר במכשיר'); }
+      }
+    } catch (e) { logErr('offline', e); toast(localErr(e)); }
+    delete B.working[d.id]; if (B.scr) paintScreen();
   }
   function openMenu(d) {
     const pm = P(d);
@@ -253,27 +370,42 @@
 
   /* ----- view ----- */
   async function openDoc(d) {
-    if (!online()) { toast('צריך חיבור לרשת כדי לפתוח מסמך'); return; }
-    const c = client(); if (!c) return;
+    const trip = tripId(), local = !!B.saved[d.id];
+    if (!local && isOffline()) { toast('המסמך לא שמור במכשיר. צריך חיבור לרשת כדי לפתוח אותו.'); return; }
+    const c = client(); if (!c && !local) return;
     const close = el('button', { cls: 'vt-ib', type: 'button', 'aria-label': 'סגירה', text: '✕', style: 'background:#2a2e38;color:#fff;border:0' });
     const stage = el('div', { cls: 'vt-st', text: 'טוענים…' }), v = el('div', { cls: 'vt-view' }, [el('div', { cls: 'vt-vt' }, [el('b', { text: d.title }), close]), stage]);
     let blobUrl = null; const end = function () { if (blobUrl) { try { URL.revokeObjectURL(blobUrl); } catch (e) { } } v.remove(); };
     close.addEventListener('click', end); document.body.appendChild(v);
+    const showPdf = function (blob) {
+      blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const a = el('a', { cls: 'vt-open', href: blobUrl, target: '_blank', rel: 'noopener', text: 'פתיחת ה-PDF' });
+      stage.appendChild(el('div', { text: '📕' })); stage.appendChild(a);
+      stage.appendChild(el('div', { cls: 'vt-hint', text: 'נפתח בצופה של המכשיר.' }));
+    };
+    const showImg = function (src) {
+      const img = el('img', { alt: d.title }); img.addEventListener('error', function () { stage.textContent = 'לא הצלחנו להציג את התמונה.'; });
+      img.src = src; stage.appendChild(img);
+    };
     try {
+      if (local) {   /* a saved copy opens the same way with or without network */
+        const blob = await OFF.get(trip, d.id);
+        if (blob) {
+          stage.textContent = '';
+          if (d.mime === 'application/pdf') showPdf(blob); else { blobUrl = URL.createObjectURL(blob); showImg(blobUrl); }
+          return;
+        }
+        delete B.saved[d.id];   /* the browser evicted it: fall through to the network */
+        if (isOffline()) { stage.textContent = 'ההעתק שבמכשיר נמחק על ידי הדפדפן. צריך חיבור לרשת.'; if (B.scr) paintScreen(); return; }
+      }
       const r = await c.storage.from('trip-docs').createSignedUrl(d.storage_path, 60);
       if (r.error || !r.data || !r.data.signedUrl) throw (r.error || new Error('no url'));
       const url = r.data.signedUrl;
       stage.textContent = '';
       if (d.mime === 'application/pdf') {
         const resp = await fetch(url); if (!resp.ok) throw new Error('fetch ' + resp.status);
-        const blob = await resp.blob(); blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
-        const a = el('a', { cls: 'vt-open', href: blobUrl, target: '_blank', rel: 'noopener', text: 'פתיחת ה-PDF' });
-        stage.appendChild(el('div', { text: '📕' })); stage.appendChild(a);
-        stage.appendChild(el('div', { cls: 'vt-hint', text: 'נפתח בצופה של המכשיר.' }));
-      } else {
-        const img = el('img', { alt: d.title }); img.addEventListener('error', function () { stage.textContent = 'לא הצלחנו להציג את התמונה.'; });
-        img.src = url; stage.appendChild(img);
-      }
+        showPdf(await resp.blob());
+      } else showImg(url);
     } catch (e) { logErr('open', e); stage.textContent = MSG[errKind(e)] || MSG.other; }
   }
 
@@ -285,7 +417,9 @@
     const file = el('input', { type: 'file', accept: 'application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp', id: 'vtFile' });
     const title = el('input', { type: 'text', id: 'vtTitle', maxlength: String(TITLE_MAX), autocomplete: 'off' }), cat = catSelect('other');
     const err = el('div', { cls: 'vt-err', role: 'alert' }), go = el('button', { cls: 'vt-btn pri', type: 'button', text: 'העלאה' }), cancel = el('button', { cls: 'vt-btn', type: 'button', text: 'ביטול' });
-    const s = sheet('העלאת מסמך', [el('label', { text: 'קובץ (PDF או תמונה, עד 10MB)' }), file, el('label', { text: 'שם להצגה' }), title, el('label', { text: 'קטגוריה' }), cat, err,
+    const keep = el('input', { type: 'checkbox', id: 'vtKeep' });   /* D2: not ticked by default */
+    const s = sheet('העלאת מסמך', [el('label', { text: 'קובץ (PDF או תמונה, עד 10MB)' }), file, el('label', { text: 'שם להצגה' }), title, el('label', { text: 'קטגוריה' }), cat,
+      el('label', { cls: 'vt-ck', for: 'vtKeep' }, [keep, document.createTextNode('שמור גם במכשיר שלי')]), err,
       el('div', { cls: 'vt-btns' }, [go, cancel])]);
     cancel.addEventListener('click', function () { if (!B.busy) s.close(); });
     file.addEventListener('change', function () {
@@ -303,7 +437,13 @@
       B.busy = true; go.disabled = true; cancel.disabled = true; go.textContent = 'מעלים…';
       const r = await doUpload(f, ck, ttl, cat.value);
       B.busy = false;
-      if (r.ok) { s.close(); toast('✅ המסמך נשמר בכספת'); await refresh(); }
+      if (r.ok) {
+        s.close(); toast('✅ המסמך נשמר בכספת'); await refresh();
+        if (keep.checked) {   /* the picked file is already here: no second download */
+          const row = B.docs.filter(function (x) { return x.id === r.id; })[0] || r.doc;
+          try { await saveLocal(row, f); toast('✅ נשמר גם במכשיר'); if (B.scr) paintScreen(); } catch (e) { logErr('keep', e); toast('המסמך הועלה, אבל לא נשמר במכשיר. ' + localErr(e)); }
+        }
+      }
       else { err.textContent = MSG[r.kind] || MSG.other; go.disabled = false; cancel.disabled = false; go.textContent = 'העלאה'; }
     });
   }
@@ -319,7 +459,7 @@
     try {
       const ins = await c.from('trip_docs').insert({ id: id, trip_id: trip, title: ttl, category: category, storage_path: path, mime: ck.mime, size_bytes: ck.size, uploaded_by: uid });
       if (ins.error) throw ins.error;
-      return { ok: true, id: id };
+      return { ok: true, id: id, doc: { id: id, title: ttl, category: category, storage_path: path, mime: ck.mime, size_bytes: ck.size, uploaded_by: uid, created_at: new Date().toISOString() } };
     } catch (e) {
       logErr('insert', e);
       try { await store.remove([path]); } catch (x) { logErr('cleanup', x); }
@@ -383,7 +523,10 @@
     return true;
   }
 
-  const api = { version: VERSION, attach, mount, refresh, active, t };
+  /* clean-up entry points (F12-OFF-01): clearTrip from the app's purge (member removed / left), clearAll from F07 device_revoked. Safe with the flag off: nothing in the cache = nothing to do. */
+  function clearTrip(trip) { try { if (B.trip === trip) { B.docs = []; B.saved = {}; B.used = 0; B.loaded = false; } return OFF.clearTrip(String(trip)).catch(function (e) { logErr('clearTrip', e); }); } catch (e) { return Promise.resolve(); } }
+  function clearAll() { try { B.docs = []; B.saved = {}; B.used = 0; B.loaded = false; return OFF.clearAll().catch(function (e) { logErr('clearAll', e); }); } catch (e) { return Promise.resolve(); } }
+  const api = { version: VERSION, attach, mount, refresh, active, clearTrip, clearAll, t };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.__ptF12 = api;
 })(typeof window !== 'undefined' ? window : globalThis);
