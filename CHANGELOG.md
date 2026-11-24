@@ -1,5 +1,9 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.19 — OFFMAP core · offline map tiles from the trip's own route (2026-11-24)
+- New app/js/offmap.js (core only, no screens, no map drawing): per-day corridor and tile list from tripData, space budget (cap 150 MB + free space), download queue with the order of sacrifice, IndexedDB store per trip (`pt-<trip>-offmap`), download engine (stops on 429/403, resumes), `offmap://z/x/y` tile reader. Loaded by index.html and cached in sw.js; `OFFMAP_FEATURE='off'`, nothing calls it yet, drawMap() untouched: the app behaves exactly as alpha.18.12. The Protomaps key is not in the repo.
+- Tests: tests/offmap/run.sh (Node, 20 tests).
+
 ## 3.0.0-alpha.18.14 — F13 stage 5 · the chat in English (2026-11-24)
 - app/js/f14.js: the chat request carries `lang` = 'en' when English is active (was always 'he'), so the assistant answers in English; the server (chat-assistant) already supported it. Suggestion chips and chat messages are in the catalog.
 - No server change.
