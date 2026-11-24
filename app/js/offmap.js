@@ -1,4 +1,4 @@
-/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core) · version 3.0.0-alpha.20.1
+/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core) · version 3.0.0-alpha.20.2
    CHANGE 2026-11-24 OFFMAP-KEY-01: what changed from alpha.19: an in-app window to enter / replace / delete the Protomaps key on THIS device (setKey, clearKey, keyHint, openKeyDialog, mountKeyEntry). It opens only when the address ends with #offmapkey (like #f22beta); the key is saved in a small device-level IndexedDB ("pt-_device-offmap": the app wraps localStorage per trip and drops writes before the trip is known, so localStorage cannot hold it), loaded at start into memory so getKey() stays synchronous (never in the address, never sent anywhere, never in the repo). Without that hash nothing is shown: the app is as alpha.19.
    CHANGE 2026-11-24 OFFMAP-01: new file (no previous version). Conversation 1 of 3 (spec: claude/Plan_Travel_OFFMAP_spec.md draft 2, approved 24/11). Contains ONLY the core, no screens and no map drawing:
    (1) pure functions: tile math, per-day corridor + tile list from tripData (planTrip), space budget (computeBudget), download queue with the sacrifice order (buildQueue), clean-up / route-change diff (cleanupPlan),
@@ -9,7 +9,7 @@
    The Protomaps key is NOT in this file (public repo): OFFMAP_KEY stays '' until Or approves; on a device it is entered through the key window (#offmapkey) and kept in the device IndexedDB (never committed). */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.20.1';
+  const VERSION = '3.0.0-alpha.20.2';
 
   /* ---------- constants ---------- */
   const OFFMAP_KEY = '';                                   /* Protomaps API key. EMPTY on purpose: not committed without Or's explicit approval (see report). */
@@ -319,7 +319,9 @@
     const days = function () { try { return host.days ? (host.days() || []) : []; } catch (e) { return []; } };
     const refresh = async function () {
       const t = trip(), ok = !!t && trips().indexOf(String(t)) >= 0 && String(t) !== VN_TRIP;
-      if (!ok) { info.textContent = 'הטיול הפתוח לא ברשימת מפות האופליין.'; go.disabled = true; go.style.opacity = '.4'; return; }
+      if (running) return;
+      if (!ok) { info.textContent = t ? 'הטיול הפתוח לא ברשימת מפות האופליין.' : 'ממתין לטעינת הטיול… (פתח את הטיול באפליקציה)'; go.disabled = true; go.style.opacity = '.4'; return; }
+      go.disabled = false; go.style.opacity = '1';
       const d = days(), withPts = d.filter(function (x) { return dayPoints(x).points.length; }).length;
       try { store = store || createIdbStore(t); const ix = await store.index(); info.textContent = 'ימים עם מסלול: ' + withPts + ' מתוך ' + d.length + '. שמור במכשיר: ' + ix.size + ' אריחים (' + fmtMB(usedBytes(ix)) + ').'; } catch (e) { info.textContent = 'ימים עם מסלול: ' + withPts + ' מתוך ' + d.length + '.'; }
     };
@@ -342,6 +344,7 @@
     close.onclick = done; wrap.addEventListener('click', function (e) { if (e.target === wrap) done(); });
     row.appendChild(go); row.appendChild(stop); row.appendChild(close);
     [info, bar, msg, row].forEach(function (n) { box.appendChild(n); }); wrap.appendChild(box); doc.body.appendChild(wrap); refresh();
+    const poll = root.setInterval(function () { if (!wrap.isConnected) { root.clearInterval(poll); return; } refresh(); }, 1500);   /* the trip may still be loading when the address opens the window */
     return wrap;
   }
   /* opens the window when the address carries #offmapkey (now and on later hash changes); otherwise nothing at all */
