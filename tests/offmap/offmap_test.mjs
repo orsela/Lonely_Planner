@@ -332,7 +332,7 @@ test("flag · active only for 'on' + a listed trip; Vietnam and unlisted trips n
   OM.configure({ feature: undefined, trips: undefined });
   assert.equal(OM.getKey(), "", "no key in the repo (OFFMAP_KEY = '')"); OM.configure({ key: () => "k1" }); assert.equal(OM.getKey(), "k1"); OM.configure({ key: undefined });
   assert.deepEqual(OM.constants.OFFMAP_TRIPS, [RO]); assert.equal(OM.constants.DEFAULT_CAP, 150 * MB);
-  assert.equal(OM.version, "3.0.0-alpha.19.1");
+  assert.equal(OM.version, "3.0.0-alpha.19.2");
 });
 
 test("repo · the key is not in any file; versions agree; the page only loads the script and declares the flag 'off'", () => {
@@ -340,12 +340,12 @@ test("repo · the key is not in any file; versions agree; the page only loads th
   const js = read("../../app/js/offmap.js"), html = read("../../app/index.html"), sw = read("../../app/sw.js");
   assert.match(js, /const OFFMAP_KEY = '';/);
   assert.ok(!/protomaps\.com[^\s'"`]*key=[A-Za-z0-9]{8,}/.test(js + html + sw), "no Protomaps key literal anywhere");
-  assert.match(html, /const PT_VERSION='3\.0\.0-alpha\.19\.1'/); assert.match(html, /const APP_VERSION='3\.0\.0-alpha\.19\.1'/);
+  assert.match(html, /const PT_VERSION='3\.0\.0-alpha\.19\.2'/); assert.match(html, /const APP_VERSION='3\.0\.0-alpha\.19\.2'/);
   assert.match(html, /<script src="js\/offmap\.js"><\/script>/); assert.match(html, /const OFFMAP_FEATURE='off';/);
   assert.match(sw, /"js\/offmap\.js"/);
   const code = html.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
-  assert.equal((code.match(/__ptOM/g) || []).length, 3, "index.html touches the module only in the one mountKeyEntry line (no drawMap hook)");
-  assert.match(code, /__ptOM\.mountKeyEntry\(\)/);
+  assert.equal((code.match(/__ptOM/g) || []).length, 6, "index.html touches the module only in the mountKeyEntry line and the attach line (no drawMap hook)");
+  assert.match(code, /__ptOM\.mountKeyEntry\(\)/); assert.match(code, /__ptOM\.attach\(\{client:\(\)=>sb\}\)/);
 });
 
 test("key window · validated, stored through the device adapter, hint shows the last 4, clear removes, getKey is sync after loadKey", async () => {
@@ -370,4 +370,27 @@ test("prepare · with no key given it loads the saved device key", async () => {
   assert.equal(r.status, "done"); assert.ok(urls.every(u => u.endsWith("key=SavedKey_12345")));
   OM.setKeyAdapter({ get: async () => "", put: async () => {}, del: async () => {} });
   assert.equal((await OM.prepare({ days: [day(1, P.bv)], store: OM.createMemoryStore(), cur: 0, fetchFn: async () => { throw new Error("no"); } })).reason, "no_key");
+});
+
+function fakeClient({ admin = true, existing = "" } = {}) {
+  const calls = [];
+  return { calls, rpc: async (fn, a) => { calls.push([fn, a]);
+      if (fn === "offmap_key_state") return { data: existing ? "locked" : admin ? "open" : "not_admin" };
+      if (fn === "set_offmap_key") { if (!admin) return { data: "not_admin" }; if (!/^[A-Za-z0-9_-]{8,128}$/.test(a.p_key)) return { data: "invalid" }; if (existing) return { data: "locked" }; existing = a.p_key; return { data: "saved" }; }
+      return { error: { message: "no" } }; },
+    from: t => ({ select: () => ({ eq: () => ({ maybeSingle: async () => { calls.push(["select", t]); return { data: existing ? { value: existing } : null }; } }) }) }) };
+}
+test("shared key · state, write-once save, fetch for every user, device copy refreshed", async () => {
+  let rec = ""; OM.setKeyAdapter({ get: async () => rec, put: async v => { rec = v; }, del: async () => { rec = ""; } });
+  OM.attach({ client: () => null }); assert.equal(await OM.keyState(), "offline"); assert.equal(await OM.saveSharedKey("Abcd1234-wxyz"), "offline");
+  const fc = fakeClient(); OM.attach({ client: () => fc });
+  assert.equal(await OM.keyState(), "open"); assert.equal(await OM.saveSharedKey("short"), "invalid");
+  assert.equal(fc.calls.filter(c => c[0] === "set_offmap_key").length, 0, "an invalid key never leaves the device");
+  assert.equal(await OM.saveSharedKey("Abcd1234-wxyz"), "saved"); assert.equal(rec, "Abcd1234-wxyz");
+  assert.equal(await OM.keyState(), "locked"); assert.equal(await OM.saveSharedKey("Other1234-key9"), "locked", "second write refused");
+  const fn = fakeClient({ admin: false }); OM.attach({ client: () => fn }); assert.equal(await OM.keyState(), "not_admin"); assert.equal(await OM.saveSharedKey("Abcd1234-wxyz"), "not_admin");
+  rec = ""; OM.setKeyAdapter({ get: async () => rec, put: async v => { rec = v; }, del: async () => {} });
+  const fu = fakeClient({ admin: false, existing: "SharedKey_7777" }); OM.attach({ client: () => fu });
+  assert.equal(await OM.ensureKey(), "SharedKey_7777", "an ordinary traveler gets the key from the server"); assert.equal(rec, "SharedKey_7777", "and keeps it on the device for offline");
+  OM.setKeyAdapter({ get: async () => rec, put: async () => {}, del: async () => {} }); OM.attach({ client: () => null }); assert.equal(await OM.ensureKey(), "SharedKey_7777", "offline: the device copy");
 });
