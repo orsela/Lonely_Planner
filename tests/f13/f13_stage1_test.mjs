@@ -1,4 +1,4 @@
-/* Lonely Planner F13 stage 1 · dictionary completeness (Node, no browser) · version 3.0.0-alpha.18.6
+/* Lonely Planner F13 stage 1 · dictionary completeness (Node, no browser) · version 3.0.0-alpha.18.7
    CHANGE 2026-11-24 F13-QA-06: new file (no previous version). Checks join/flow.js and invite/index.html: he and en have the same keys, every {placeholder} of the Hebrew text is in the English text,
    no English text is empty or contains Hebrew letters, and every tr('key') / J('key') used in the sources exists. */
 import { test } from 'node:test';
