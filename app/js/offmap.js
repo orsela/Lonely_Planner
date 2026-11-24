@@ -1,4 +1,7 @@
-/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core) · version 3.0.0-alpha.20.2
+/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core + viewer) · version 3.0.0-alpha.21.2
+   CHANGE 2026-11-24 OFFMAP-VIEW-08: what changed from alpha.21.1 (phone check: the saved map did not show): the device beta was read through localStorage AFTER the app's F02 gate namespaces Storage.prototype, so it never matched the raw key written at load. Now the raw Storage methods are captured at load (same technique as f13.js / F22a) and used for the beta key. New diagnostic window: open the app with #offmapstatus to list why the saved map is or is not used (flag/beta, trip, libraries, saved tiles, network, Google).
+   CHANGE 2026-11-24 OFFMAP-VIEW-07: version renumbered 3.0.0-alpha.20.3 -> 21.1 (main took alpha.21.0 with MORE-COMPACT); no code change.
+   CHANGE 2026-11-24 OFFMAP-VIEW-01: what changed from alpha.20.2: conversation 2 (viewer). New section "the viewer": tryDraw / release / viewFeatures / makeSource / betaLevel. Draws the saved tiles with protomaps-leaflet + Leaflet (app/vendor/, loaded lazily, only when the open trip is in OFFMAP_TRIPS and the flag is on or the device beta is set) in place of the schematic map when there is no network or Google did not load, and the open day has saved tiles. Device beta: open the app with #offmapbeta (normal rules) / #offmapbeta2 (also online, for a desk check) / #offmapbeta-off. attach() also takes redraw, dayIndex, mapMode. Everything else unchanged.
    CHANGE 2026-11-24 OFFMAP-KEY-01: what changed from alpha.19: an in-app window to enter / replace / delete the Protomaps key on THIS device (setKey, clearKey, keyHint, openKeyDialog, mountKeyEntry). It opens only when the address ends with #offmapkey (like #f22beta); the key is saved in a small device-level IndexedDB ("pt-_device-offmap": the app wraps localStorage per trip and drops writes before the trip is known, so localStorage cannot hold it), loaded at start into memory so getKey() stays synchronous (never in the address, never sent anywhere, never in the repo). Without that hash nothing is shown: the app is as alpha.19.
    CHANGE 2026-11-24 OFFMAP-01: new file (no previous version). Conversation 1 of 3 (spec: claude/Plan_Travel_OFFMAP_spec.md draft 2, approved 24/11). Contains ONLY the core, no screens and no map drawing:
    (1) pure functions: tile math, per-day corridor + tile list from tripData (planTrip), space budget (computeBudget), download queue with the sacrifice order (buildQueue), clean-up / route-change diff (cleanupPlan),
@@ -9,7 +12,7 @@
    The Protomaps key is NOT in this file (public repo): OFFMAP_KEY stays '' until Or approves; on a device it is entered through the key window (#offmapkey) and kept in the device IndexedDB (never committed). */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.20.2';
+  const VERSION = '3.0.0-alpha.21.2';
 
   /* ---------- constants ---------- */
   const OFFMAP_KEY = '';                                   /* Protomaps API key. EMPTY on purpose: not committed without Or's explicit approval (see report). */
@@ -235,7 +238,7 @@
   /* ---------- the shared key (OFFMAP-KEY-04): one write-once row in Supabase, set by a platform admin through the window ---------- */
   let clientGet = null;
   const host = {};
-  function attach(o) { if (!o) return; if (typeof o.client === 'function') clientGet = o.client; ['days', 'tripId'].forEach(function (k) { if (typeof o[k] === 'function') host[k] = o[k]; }); }
+  function attach(o) { if (!o) return; if (typeof o.client === 'function') clientGet = o.client; ['days', 'tripId', 'redraw'].forEach(function (k) { if (typeof o[k] === 'function') host[k] = o[k]; }); }
   function sbc() { try { return clientGet ? clientGet() : null; } catch (e) { return null; } }
   /* RPC / select with a short timeout; never throws */
   function withTimeout(p, ms) { return Promise.race([p, new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, ms || 8000); })]); }
@@ -521,6 +524,7 @@
     Object.keys(sums).forEach(function (z) { const p = nl[z] || { n: 0, mean: 0 }, s = sums[z], n = p.n + s.n; nl[z] = { n: n, mean: (p.mean * p.n + s.tot) / n }; });
     if (Object.keys(sums).length) await store.setMeta('avg', nl);
     res.used = usedNow; res.remaining = q.queue.length - res.downloaded - res.failed;
+    if (res.downloaded) refreshView();   /* OFFMAP-VIEW-01: the viewer re-reads the saved-tile index on its next draw */
     if (stop) { res.status = 'stopped'; res.reason = stop; }
     else res.status = res.failed ? 'stopped' : 'done';
     if (res.status === 'stopped' && !res.reason) res.reason = 'network';
@@ -533,6 +537,134 @@
     return { have: have, total: total };
   }
 
+  /* ---------- the viewer (OFFMAP-VIEW-01): saved tiles drawn with protomaps-leaflet instead of the schematic map ---------- */
+  const BASE = (function () { try { const c = root.document && root.document.currentScript; return c && c.src ? c.src.replace(/[^\/]*$/, '') : ''; } catch (e) { return ''; } })();
+  const vurl = function (f) { try { return BASE ? new URL('../vendor/' + f, BASE).href : 'vendor/' + f; } catch (e) { return 'vendor/' + f; } };
+  const view = { map: null, layer: null, group: null, el: null, libs: null, prep: null, tripId: '', store: null, index: null, plan: null, ro: null, bound: false };
+  /* the browser's own Storage methods, captured at load, before the F02 gate wraps Storage.prototype (OFFMAP-VIEW-08) */
+  const RAW = (function () { try { const P = root.Storage && root.Storage.prototype; return P && root.localStorage ? { ls: root.localStorage, g: P.getItem, s: P.setItem, d: P.removeItem } : null; } catch (e) { return null; } })();
+  function betaLevel() { try { return RAW ? (+(RAW.g.call(RAW.ls, 'pt-offmap-beta') || 0) || 0) : 0; } catch (e) { return 0; } }
+  function viewEnabled(t) { t = String(t == null ? '' : t); return !!t && t !== VN_TRIP && trips().indexOf(t) >= 0 && (feature() === 'on' || betaLevel() > 0); }
+  /* the map is wanted only where the schematic grid would otherwise show: no network, Google not loaded; beta 2 forces it (desk check) */
+  function needsOffline() { const n = root.navigator; return betaLevel() === 2 || (n && n.onLine === false) || typeof root.google === 'undefined' || !root.google || !root.google.maps; }
+  function hostTrip() { try { return host.tripId ? String(host.tripId() || '') : ''; } catch (e) { return ''; } }
+  /* the pure part: what to draw for a mode. line = the route through the days (route mode only); points = {lat, lng, label, kind: 'day'|'active'|'poi'} */
+  function viewFeatures(days, mode, idx) {
+    days = Array.isArray(days) ? days : []; const out = { line: [], points: [] }, d = days[idx];
+    const pt = function (lat, lng, label, kind) { const c = coord(lat, lng); if (c) out.points.push({ lat: c.lat, lng: c.lng, label: String(label == null ? '' : label), kind: kind }); return c; };
+    const wps = function (x, pre) { ((x && x.waypoints) || []).forEach(function (w) { if (w) pt(w.lat, w.lng, (pre || '') + (w.name || ''), 'poi'); }); };
+    if (mode === 'day') { if (d) { pt(d.lat, d.lng, d.region || d.title || '', 'active'); wps(d); } }
+    else if (mode === 'poi') { days.forEach(function (x) { wps(x, 'יום ' + (x && x.day) + ': '); }); }
+    else days.forEach(function (x, i) { const c = x && coord(x.lat, x.lng); if (!c) return; out.line.push([c.lat, c.lng]); pt(c.lat, c.lng, x.region || x.title || '', i === idx ? 'active' : 'day'); });
+    return out;
+  }
+  /* protomaps-leaflet reads tiles through source.getZxy(z, x, y, signal) → {data} | undefined; here that is IndexedDB. A tile that is not stored = undefined (nothing drawn). */
+  async function gunzipIfNeeded(buf) {
+    const u = new Uint8Array(buf);
+    if (u.length > 2 && u[0] === 0x1f && u[1] === 0x8b && root.DecompressionStream) { try { return await new Response(new Blob([buf]).stream().pipeThrough(new root.DecompressionStream('gzip'))).arrayBuffer(); } catch (e) { return buf; } }
+    return buf;
+  }
+  function makeSource(store) {
+    return { getZxy: async function (z, x, y) { const r = await store.getTile(tileKey(z, x, y)); if (!r) return undefined; return { data: await gunzipIfNeeded(await unpack(r.bytes, r.c)) }; } };
+  }
+  function loadLibs() {
+    if (view.libs) return view.libs;
+    const doc = root.document;
+    const link = function (h) { return new Promise(function (res) { const l = doc.createElement('link'); l.rel = 'stylesheet'; l.href = h; l.onload = l.onerror = function () { res(); }; doc.head.appendChild(l); }); };
+    const script = function (h) { return new Promise(function (res, rej) { const s = doc.createElement('script'); s.src = h; s.onload = function () { res(); }; s.onerror = function () { rej(new Error('lib ' + h)); }; doc.head.appendChild(s); }); };
+    view.libs = (async function () {
+      if (!(root.L && root.L.map)) { await link(vurl('leaflet.css')); await script(vurl('leaflet.js')); }
+      if (!(root.protomapsL && root.protomapsL.leafletLayer)) await script(vurl('protomaps-leaflet.js'));
+      return !!(root.L && root.protomapsL);
+    })().catch(function () { view.libs = null; return false; });
+    return view.libs;
+  }
+  function redraw() { try { if (host.redraw) host.redraw(); } catch (e) { /* the page keeps the schematic map */ } }
+  /* libraries + the saved-tile index of this trip, once per trip; then asks the page to draw again */
+  function prepareView(t) {
+    if (view.prep && view.tripId === t) return view.prep;
+    view.tripId = t; view.index = null; view.plan = null;
+    view.prep = (async function () {
+      try {
+        const okLibs = await loadLibs(); if (!okLibs) return;
+        view.store = view.store && view.storeTrip === t ? view.store : createIdbStore(t); view.storeTrip = t;
+        view.index = await view.store.index();
+        view.plan = planTrip(typeof host.days === 'function' ? host.days() : []);
+      } catch (e) { view.index = null; }
+      redraw();
+    })();
+    return view.prep;
+  }
+  function refreshView() { view.prep = null; view.index = null; }   /* after a new download: next draw re-reads the index */
+  function release() {
+    if (view.ro) { try { view.ro.disconnect(); } catch (e) { /* none */ } view.ro = null; }
+    if (view.map) { const el = view.el; try { view.map.remove(); } catch (e) { /* none */ } if (el) el.innerHTML = ''; }
+    view.map = view.layer = view.group = view.el = null;
+  }
+  function dayHasTiles(idx, mode) {
+    if (!view.index || !view.index.size) return false;
+    if (mode !== 'day' || !view.plan) return true;
+    return dayCoverage(view.plan, view.index, idx).have > 0;
+  }
+  function drawView(el, o) {
+    const L = root.L, P = root.protomapsL;
+    if (view.map && view.el !== el) release();
+    if (!view.map) {
+      el.innerHTML = '';
+      const m = L.map(el, { minZoom: 6, maxZoom: 16, zoomSnap: 0.5, attributionControl: false });
+      L.control.attribution({ prefix: false }).addTo(m);
+      view.layer = P.leafletLayer({ url: makeSource(view.store), flavor: 'light', maxDataZoom: 14, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Protomaps' }).addTo(m);
+      view.group = L.layerGroup().addTo(m); view.map = m; view.el = el;
+      const b = root.document.createElement('div'); b.setAttribute('style', 'position:absolute;top:8px;right:8px;z-index:1000;background:rgba(255,255,255,.9);color:#334155;font:600 11px sans-serif;padding:3px 8px;border-radius:10px;pointer-events:none');
+      b.textContent = 'מפה שמורה'; el.appendChild(b);
+      if (root.ResizeObserver) { view.ro = new root.ResizeObserver(function () { try { m.invalidateSize(); } catch (e) { /* none */ } }); view.ro.observe(el); }
+    }
+    const f = viewFeatures(o.days, o.mode, o.dayIndex), g = view.group, pts = [];
+    g.clearLayers();
+    if (f.line.length > 1) L.polyline(f.line, { color: '#b42318', weight: 2, dashArray: '6 5', opacity: 0.75 }).addTo(g);
+    f.points.forEach(function (p) {
+      const col = p.kind === 'active' ? '#b42318' : p.kind === 'poi' ? '#075985' : '#667085';
+      const c = L.circleMarker([p.lat, p.lng], { radius: p.kind === 'active' ? 9 : p.kind === 'poi' ? 6 : 5, color: '#fff', weight: 2, fillColor: col, fillOpacity: 1 }).addTo(g);
+      if (p.label) c.bindTooltip(p.label, { permanent: p.kind === 'active', direction: 'top', offset: [0, -8] });
+      pts.push([p.lat, p.lng]);
+    });
+    try { view.map.invalidateSize(); if (pts.length > 1) view.map.fitBounds(pts, { padding: [28, 28], maxZoom: 13 }); else if (pts.length) view.map.setView(pts[0], 12); } catch (e) { /* none */ }
+    return true;
+  }
+  /* the one hook in drawMap(): true = the saved map is drawn (the page skips the schematic map); false = the page draws as before.
+     o: { days, dayIndex, mode }. First call may start the library load and return false; when ready the page is asked to draw again (host.redraw). */
+  function tryDraw(el, o) {
+    try {
+      o = o || {}; const t = hostTrip();
+      if (!el || !root.document || !viewEnabled(t) || !needsOffline()) { release(); return false; }
+      if (!view.index || view.tripId !== t || !(root.L && root.protomapsL)) { release(); prepareView(t); return false; }
+      if (!dayHasTiles(o.dayIndex, o.mode)) { release(); return false; }
+      return drawView(el, o);
+    } catch (e) { try { release(); } catch (e2) { /* none */ } return false; }
+  }
+  function bindOffline() { if (view.bound || !root.addEventListener) return; view.bound = true; root.addEventListener('offline', function () { if (viewEnabled(hostTrip())) redraw(); }); }
+  /* device beta: #offmapbeta (normal rules), #offmapbeta2 (also with a network, for a desk check), #offmapbeta-off */
+  function mountBeta() {
+    try {
+      const h = String((root.location && root.location.hash) || '');
+      if (!RAW) return;
+      if (/#offmapbeta-off$/.test(h)) RAW.d.call(RAW.ls, 'pt-offmap-beta'); else if (/#offmapbeta2$/.test(h)) RAW.s.call(RAW.ls, 'pt-offmap-beta', '2'); else if (/#offmapbeta$/.test(h)) RAW.s.call(RAW.ls, 'pt-offmap-beta', '1');
+      if (/#offmapstatus$/.test(h)) root.setTimeout(showStatus, 2500);
+    } catch (e) { /* no storage */ }
+  }
+  /* #offmapstatus: why the saved map is or is not used right now (read-only; stays 25 s) */
+  function statusLines() {
+    const t = hostTrip(), n = root.navigator, ok = function (b) { return b ? 'כן' : 'לא'; };
+    return ['גרסה ' + VERSION, 'מתג מכשיר: ' + betaLevel() + ' · דגל: ' + feature(), 'טיול ברשימה: ' + ok(!!t && trips().indexOf(t) >= 0), 'רשת: ' + ok(!(n && n.onLine === false)) + ' · Google נטען: ' + ok(root.google && root.google.maps),
+      'המפה השמורה מבוקשת: ' + ok(viewEnabled(t) && needsOffline()), 'ספריות נטענו: ' + ok(root.L && root.protomapsL), 'אריחים שמורים: ' + (view.index ? view.index.size : 'לא נקרא עדיין'), 'מצויירת עכשיו: ' + ok(view.map)];
+  }
+  function showStatus() {
+    try {
+      const d = root.document, b = d.createElement('div'); b.setAttribute('style', 'position:fixed;top:60px;left:8px;right:8px;z-index:100000;background:#fff;color:#111;border:2px solid #0f6b4f;border-radius:10px;padding:10px;font:13px/1.6 sans-serif;direction:rtl;white-space:pre-line');
+      b.textContent = statusLines().join('\n'); d.body.appendChild(b); root.setTimeout(function () { try { b.remove(); } catch (e) { /* none */ } }, 25000);
+    } catch (e) { /* none */ }
+  }
+
   const api = {
     version: VERSION, constants: { OFFMAP_TRIPS: OFFMAP_TRIPS, DEFAULT_CAP: DEFAULT_CAP, DEFAULTS: DEFAULTS, DEFAULT_AVG_KB: DEFAULT_AVG_KB, TILE_URL: TILE_URL, VN_TRIP: VN_TRIP },
     configure: configure, active: active, getKey: getKey, setKey: setKey, clearKey: clearKey, attach: attach, openDownloadDialog: openDownloadDialog, ensureKey: ensureKey, fetchRemoteKey: fetchRemoteKey, keyState: keyState, saveSharedKey: saveSharedKey, loadKey: loadKey, setKeyAdapter: setKeyAdapter, keyHint: keyHint, openKeyDialog: openKeyDialog, mountKeyEntry: mountKeyEntry,
@@ -540,8 +672,10 @@
     dayPoints: dayPoints, coveringTiles: coveringTiles, planTrip: planTrip, avgBytes: avgBytes, computeBudget: computeBudget, currentDayIndex: currentDayIndex,
     buildQueue: buildQueue, cleanupPlan: cleanupPlan, dayCoverage: dayCoverage,
     createMemoryStore: createMemoryStore, createIdbStore: createIdbStore, usedBytes: usedBytes, deviceStorage: deviceStorage, persist: persist,
-    pack: pack, unpack: unpack, parseOffmapUrl: parseOffmapUrl, tileUrl: tileUrl, loadTile: loadTile, registerProtocol: registerProtocol, prepare: prepare
+    pack: pack, unpack: unpack, parseOffmapUrl: parseOffmapUrl, tileUrl: tileUrl, loadTile: loadTile, registerProtocol: registerProtocol, prepare: prepare,
+    tryDraw: tryDraw, release: release, viewFeatures: viewFeatures, makeSource: makeSource, betaLevel: betaLevel, viewEnabled: viewEnabled, needsOffline: needsOffline, refreshView: refreshView
   };
+  try { if (root.document) { mountBeta(); bindOffline(); } } catch (e) { /* none */ }
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.__ptOM = api;
 })(typeof window !== 'undefined' ? window : globalThis);

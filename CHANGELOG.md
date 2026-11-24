@@ -1,6 +1,6 @@
 # Plan_Travel – CHANGELOG
 
-## 3.0.0-alpha.21.1 — MORE-COMPACT · fix: the compact "עוד" now actually starts (2026-11-24)
+## 3.0.0-alpha.21.3 — MORE-COMPACT · fix: the compact "עוד" now actually starts (2026-11-24)
 - alpha.21.0 passed the F06-private `go()` to morec.js (not global in the real page → ReferenceError, caught, nothing compacted). Now `switchPanel`. The stub test defined `go` itself, so it did not catch this; the test now defines only `switchPanel`.
 
 ## 3.0.0-alpha.21.0 — MORE-COMPACT · compact "עוד" + one vault with two tabs (2026-11-24)

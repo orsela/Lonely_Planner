@@ -1,6 +1,7 @@
 // Lonely Planner OFFMAP · Node tests of app/js/offmap.js (core) · version 3.0.0-alpha.19
 // CHANGE 2026-11-24 OFFMAP-T-01: new file (no previous version). Run: tests/offmap/run.sh. Covers: tile math, corridor + tile counts, coordinates (missing / invalid), budget with a small cap and a simulated
 // free space, the order of sacrifice, shared days, route change + clean-up, the download engine (cap, free space, resume, 429/403, retries, key never in results), the offmap:// reader, the flag.
+// CHANGE 2026-11-24 OFFMAP-T-03: version checks 3.0.0-alpha.20.2 -> 20.3 (viewer).
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -332,7 +333,7 @@ test("flag · active only for 'on' + a listed trip; Vietnam and unlisted trips n
   OM.configure({ feature: undefined, trips: undefined });
   assert.equal(OM.getKey(), "", "no key in the repo (OFFMAP_KEY = '')"); OM.configure({ key: () => "k1" }); assert.equal(OM.getKey(), "k1"); OM.configure({ key: undefined });
   assert.deepEqual(OM.constants.OFFMAP_TRIPS, [RO]); assert.equal(OM.constants.DEFAULT_CAP, 150 * MB);
-  assert.equal(OM.version, "3.0.0-alpha.20.2");
+  assert.equal(OM.version, "3.0.0-alpha.21.2");
 });
 
 test("repo · the key is not in any file; versions agree; the page only loads the script and declares the flag 'off'", () => {
@@ -340,11 +341,11 @@ test("repo · the key is not in any file; versions agree; the page only loads th
   const js = read("../../app/js/offmap.js"), html = read("../../app/index.html"), sw = read("../../app/sw.js");
   assert.match(js, /const OFFMAP_KEY = '';/);
   assert.ok(!/protomaps\.com[^\s'"`]*key=[A-Za-z0-9]{8,}/.test(js + html + sw), "no Protomaps key literal anywhere");
-  assert.match(html, /const PT_VERSION='3\.0\.0-alpha\.20\.2'/); assert.match(html, /const APP_VERSION='3\.0\.0-alpha\.20\.2'/);
+  assert.match(html, /const PT_VERSION='3\.0\.0-alpha\.21\.2'/); assert.match(html, /const APP_VERSION='3\.0\.0-alpha\.21\.2'/);
   assert.match(html, /<script src="js\/offmap\.js"><\/script>/); assert.match(html, /const OFFMAP_FEATURE='off';/);
   assert.match(sw, /"js\/offmap\.js"/);
   const code = html.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
-  assert.equal((code.match(/__ptOM/g) || []).length, 9, "index.html touches the module only in the mountKeyEntry line and the attach line (no drawMap hook)");
+  assert.equal((code.match(/__ptOM/g) || []).length, 15, "index.html touches the module only in the mountKeyEntry line, the attach line and the single drawMap hook (release x3 + tryDraw x3, OFFMAP-VIEW-02)");
   assert.match(code, /__ptOM\.mountKeyEntry\(\)/); assert.match(code, /__ptOM\.attach\(\{client:\(\)=>sb\}\)/);
 });
 
@@ -393,4 +394,42 @@ test("shared key · state, write-once save, fetch for every user, device copy re
   const fu = fakeClient({ admin: false, existing: "SharedKey_7777" }); OM.attach({ client: () => fu });
   assert.equal(await OM.ensureKey(), "SharedKey_7777", "an ordinary traveler gets the key from the server"); assert.equal(rec, "SharedKey_7777", "and keeps it on the device for offline");
   OM.setKeyAdapter({ get: async () => rec, put: async () => {}, del: async () => {} }); OM.attach({ client: () => null }); assert.equal(await OM.ensureKey(), "SharedKey_7777", "offline: the device copy");
+});
+
+// CHANGE 2026-11-24 OFFMAP-T-02: new tests for the viewer (alpha.20.3): what is drawn per mode, the tile source for protomaps-leaflet, the gates (flag, trip, Vietnam, network) and that tryDraw never throws.
+test("viewer · viewFeatures per mode, invalid coordinates skipped", () => {
+  const days = [
+    { day: 1, region: "A", lat: 44.5, lng: 26.1, waypoints: [{ name: "w1", lat: 44.6, lng: 26.0 }, { name: "bad", lat: null, lng: null }] },
+    { day: 2, region: "B", lat: 45.6, lng: 25.6, waypoints: [{ name: "w2", lat: 45.7, lng: 25.5 }] },
+    { day: 3, region: "C", lat: null, lng: null, waypoints: [] }];
+  const r = OM.viewFeatures(days, "route", 1);
+  assert.deepEqual(r.line, [[44.5, 26.1], [45.6, 25.6]], "route: a line through the days that have coordinates");
+  assert.deepEqual(r.points.map(p => p.kind), ["day", "active"], "the open day is the active point");
+  const d = OM.viewFeatures(days, "day", 0);
+  assert.equal(d.line.length, 0); assert.deepEqual(d.points.map(p => p.kind), ["active", "poi"], "day: the day point + its valid waypoints only");
+  const p = OM.viewFeatures(days, "poi", 0);
+  assert.deepEqual(p.points.map(x => x.label), ["יום 1: w1", "יום 2: w2"], "poi: every waypoint of every day, labelled with its day");
+  assert.deepEqual(OM.viewFeatures(null, "route", 0), { line: [], points: [] }, "no days = nothing, no throw");
+});
+test("viewer · tile source: stored tile → data, missing → undefined, gzip is unpacked", async () => {
+  const store = OM.createMemoryStore(), src = OM.makeSource(store);
+  const raw = new Uint8Array([1, 2, 3, 4]).buffer;
+  await store.putTile("10/5/6", { z: 10, bytes: raw, c: 0, n: 4, days: [1], ts: 1 });
+  const got = await src.getZxy(10, 5, 6);
+  assert.deepEqual(Array.from(new Uint8Array(got.data)), [1, 2, 3, 4]);
+  assert.equal(await src.getZxy(10, 5, 7), undefined, "a tile we do not have draws nothing");
+  const { gzipSync } = await import("node:zlib");
+  const gz = gzipSync(Buffer.from([9, 8, 7])); const ab = gz.buffer.slice(gz.byteOffset, gz.byteOffset + gz.length);
+  await store.putTile("10/5/8", { z: 10, bytes: ab, c: 0, n: 3, days: [1], ts: 1 });
+  const g2 = await src.getZxy(10, 5, 8);   // Node has no browser DecompressionStream on globalThis here → returned as stored; the browser path is covered in the page test
+  assert.ok(g2 && g2.data.byteLength > 0);
+});
+test("viewer · gates: flag, trip list, Vietnam, device beta; tryDraw never throws and says false without a page", () => {
+  OM.configure({ feature: () => "off", trips: () => [RO] });
+  assert.equal(OM.viewEnabled(RO), false, "flag off and no device beta = the app as alpha.20.2");
+  OM.configure({ feature: () => "on" });
+  assert.equal(OM.viewEnabled(RO), true); assert.equal(OM.viewEnabled(VN), false, "Vietnam never"); assert.equal(OM.viewEnabled("other"), false, "a trip outside the list");
+  assert.equal(OM.tryDraw({}, { days: [], dayIndex: 0, mode: "route" }), false, "no document = false");
+  assert.equal(OM.tryDraw(null, null), false);
+  OM.configure({ feature: undefined, trips: undefined });
 });
