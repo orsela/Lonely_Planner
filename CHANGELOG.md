@@ -1,5 +1,10 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.21.0 — MORE-COMPACT · compact "עוד" + one vault with two tabs (2026-11-24)
+- "עוד" shows four rows only (כספת, הזמנות וארנק, תמונות הטיול, הגדרות וניהול) and a small "מסונכרן" line; no sub-captions. Every other row/section (account, language, members, translate, management, offline maps, sync card) is moved into the new panel `#moreSettings`, also rows that modules add later.
+- One "כספת" row. In a trip with the shared vault both vault screens get the tabs "משותפת | במכשיר"; Vietnam / trips without it: the on-device vault only, no tabs. Vault chips and the quota bar (until 80 %) are hidden.
+- New file `app/js/morec.js`, flag `MORE_LAYOUT='compact'` (set `'v1'` = exactly alpha.20.2). Mockup approved by Or; decisions: claude/Plan_Travel_MORE-COMPACT_decisions.md. Not yet checked on Or's phone; not built: single "הוספה" button with Drive link inside.
+
 ## 3.0.0-alpha.20.2 — OFFMAP · download window waits for the trip (2026-11-24)
 - Fix: opening the address with `#offmapdownload` before the trip had loaded showed 'not listed' and never updated; the window now re-checks every 1.5 s and enables the button when the trip is open.
 
