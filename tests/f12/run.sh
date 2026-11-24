@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Lonely Planner F12 developer test runner · version 3.0.0-alpha.18
+# CHANGE 2026-11-24 F12-QA-04: what changed from F12-QA-03: new part `page` = Node tests of app/js/f12.js (f12_test.mjs, 10) + the 390px browser test on a stub page (test_f12_browser.py, 28 checks). usage now [--only fn|db|page].
 # CHANGE 2026-11-24 F12-QA-03: new file (no previous version). Conversation 1 (server): the vault-delete unit tests + the local DB
 #   runner tests/f12/db_check.py (0001…0024, qa.f01–f07 + f12 + f21 + f23). No browser tests yet (they arrive with conversations 2–3).
-# usage: tests/f12/run.sh [--only fn|db]     env: NODE, PYTHON.   `service postgresql start` first for the db part.
+# usage: tests/f12/run.sh [--only fn|db|page]     env: NODE, PYTHON.   `service postgresql start` first for the db part.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"; REPO="$(cd "$HERE/../.." && pwd)"
 NODE=${NODE:-node}; PY=${PYTHON:-python3}; ONLY=""; [ "${1:-}" = "--only" ] && ONLY=${2:-}
@@ -14,5 +15,9 @@ fi
 if [ -z "$ONLY" ] || [ "$ONLY" = db ]; then
   (service postgresql status >/dev/null 2>&1 || service postgresql start >/dev/null 2>&1) || true
   $PY "$HERE/db_check.py" || RC=1
+fi
+if [ -z "$ONLY" ] || [ "$ONLY" = page ]; then
+  (cd "$REPO" && "$NODE" --test tests/f12/f12_test.mjs 2>&1 | grep -E "^# (pass|fail)") || RC=1
+  (cd "$REPO" && $PY -I tests/f12/test_f12_browser.py 2>&1 | grep -E "^FAIL|all passed|failed") || RC=1
 fi
 exit $RC
