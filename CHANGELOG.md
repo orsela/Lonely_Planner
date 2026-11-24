@@ -1,5 +1,9 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.12 — F13 stage 4c · composed messages and budget texts (2026-11-24)
+- Catalog patterns for texts built from a Hebrew fragment + a value ("{name} הוסר/ה מהטיול", "ביקש/ה להצטרף · {when}", expense toasts, currency messages, "לפני N שעות"…); Hebrew values inside a pattern are translated too.
+- The WhatsApp invitation text is English when English is active (otherwise unchanged).
+
 ## 3.0.0-alpha.18.11 — F13 stage 4b · messages, toasts and dialogs in English (2026-11-24)
 - app/i18n/en.json: +~550 entries — error / success messages, confirmations, month and weather names, member / invitation / account texts (source: tests/f13/catalog_msgs.txt via build_catalog.py).
 - New API `__ptF13.heText(el)` and helper `heTxt()` in index.html: three places that compared DOM text with Hebrew (flight-booking label on Home, stale-rate message) now read the Hebrew source, so translation can't change their behaviour.

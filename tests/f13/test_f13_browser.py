@@ -93,7 +93,7 @@ def test_a_shipped_fresh_device_is_hebrew(browser, servers):
     if page.evaluate("()=>window.__ptF13&&window.__ptF13.mode") != "beta": P.append("mode")
     if page.evaluate("()=>window.__ptF13.active()"): P.append("active on a fresh device")
     if any("i18n/en.json" in u for u in seen): P.append("catalog fetched")
-    if page.evaluate("()=>window.__ptF13.VERSION") != "3.0.0-alpha.18.11": P.append("version")
+    if page.evaluate("()=>window.__ptF13.VERSION") != "3.0.0-alpha.18.12": P.append("version")
     if page.evaluate("()=>document.documentElement.scrollWidth>window.innerWidth+1"): P.append("horizontal overflow at 390px")
     if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
     ctx.close()

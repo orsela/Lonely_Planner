@@ -542,3 +542,30 @@ $ דולר · USD|$ Dollar · USD
 🔗 קישור ל-Drive|🔗 Link to Drive
 🔴 חריגה|🔴 Over budget
 💱 מטבעות · {n} מתוך 10|💱 Currencies · {n} of 10
+{x} הוסר/ה מהטיול|{x} was removed from the trip
+ביקש/ה להצטרף · {x}|Asked to join · {x}
+ביקש/ה לחבר מכשיר חדש · {x}|Asked to link a new device · {x}
+הצטרף/ה ב-{x}|Joined {x}
+₪ $ € קבועים ולא מופיעים כאן. {k} הוצאות ששולמו ב{c} יישארו כמו שהן.|₪ $ € are fixed and don't appear here. {k} expenses paid in {c} will stay as they are.
+{x} נכנס במקום {y}|{x} replaced {y}
+ההזמנה נשלחה ל-{x}|The invitation was sent to {x}
+ההזמנה נשלחה שוב ל-{x}|The invitation was sent again to {x}
+השם נשמר: {x}|Name saved: {x}
+הקובץ מכיל {n} ימים ויחליף את המסלול עבור כולם. להמשיך?|The file contains {n} days and will replace the itinerary for everyone. Continue?
+סכום ב-{x}|Amount in {x}
+חשב ל{x}|Convert to {x}
+המטבע {c} לא נכנס – הממיר מלא (10/10). אפשר להסיר מטבע אחר.|The currency {c} wasn't added – the converter is full (10/10). You can remove another currency.
+{n} מתוך {m} · נשארו {k}|{n} of {m} · {k} left
+{b} · אין שער ל-{x}|{b} · no rate for {x}
+להסיר {c} מהטיול?|Remove {c} from the trip?
+מחליפים את {x} ({c})|Replacing {x} ({c})
+לפני {n} דק׳|{n} min ago
+לפני {n} שעות|{n} hours ago
+לפני {n} ימים|{n} days ago
+מצטרפים לטיול "{x}" ב-Lonely Planner 🧳 נכנסים מהקישור, כותבים את השם ומחכים לאישור: {u}|Join the trip "{x}" on Lonely Planner 🧳 Open the link, write your name and wait for approval: {u}
+הצעות AI היום|AI suggestions today
+הצעות AI היום: {n} מתוך {m}|AI suggestions today: {n} of {m}
+נשמרה הוצאה · {x}|Expense saved · {x}
+{a} · היום|{a} · Today
+{a} · אתמול|{a} · Yesterday
+סה״כ|Total

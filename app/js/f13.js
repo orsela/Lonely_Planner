@@ -4,6 +4,7 @@
    to en-GB in English, and wraps String.prototype.localeCompare the same way (no locale or he/he-IL → en-GB), so dates, numbers and sort order follow the language. 'en-US'/'en-GB' calls in the app are deliberate and untouched.
    Flag 'off' = unchanged (nothing is patched, no link).
    CHANGE 2026-11-24 F13-FN-03: version 3.0.0-alpha.18.8 — API + enabled() (true when the flag is 'on', or 'beta' on a beta device): the trip wizard uses it to offer "English" as the group language (stage 2).
+   CHANGE 2026-11-24 F13-FN-08: version 3.0.0-alpha.18.12 — a Hebrew value captured by a catalog pattern is translated through the catalog as well.
    CHANGE 2026-11-24 F13-FN-07: version 3.0.0-alpha.18.11 — API heText(el): the element's text as the Hebrew source, for code that compares DOM text with Hebrew.
    CHANGE 2026-11-24 F13-FN-06: version 3.0.0-alpha.18.10 — a "שפה · Language" row in "עוד" (only where F13 is enabled and the trip is not forced Hebrew) switches this device between עברית and English.
    CHANGE 2026-11-24 F13-FN-04: version 3.0.0-alpha.18.9 (stage 4a) — the runtime DOM layer: while English is active a MutationObserver translates every Hebrew text node and the attributes placeholder / title / aria-label / alt /
@@ -20,7 +21,7 @@
    Language order (spec §4): the device choice (pt:_device:lang) → the trip's default_lang → the browser language → 'he'. Everything inside try/catch: a failure here never breaks the app. */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.18.11';   /* CHANGE 2026-11-24 F13-FN-07: was '3.0.0-alpha.18.10' (heText helper for code that reads DOM text). */ const _PREV_VERSION = '3.0.0-alpha.18.10';   /* CHANGE 2026-11-24 F13-FN-06: was '3.0.0-alpha.18.9' (a "שפה · Language" row in "עוד"). Earlier: CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
+  const VERSION = '3.0.0-alpha.18.12';   /* CHANGE 2026-11-24 F13-FN-08: was '3.0.0-alpha.18.11' (pattern values that are Hebrew are translated too, e.g. "לפני שעה" inside a sentence). */   /* CHANGE 2026-11-24 F13-FN-07: was '3.0.0-alpha.18.10' (heText helper for code that reads DOM text). */ const _PREV_VERSION = '3.0.0-alpha.18.10';   /* CHANGE 2026-11-24 F13-FN-06: was '3.0.0-alpha.18.9' (a "שפה · Language" row in "עוד"). Earlier: CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
   const LANGS = ['he', 'en'];
   const LOCALES = { he: 'he-IL', en: 'en-GB' };            /* D4 */
   const FORCED_HE_TRIPS = ['f0200000-0000-4000-8000-000000000001'];   /* the Vietnam trip: never English (spec §2) */
@@ -45,6 +46,7 @@
   function ptLocale(lang) { return LOCALES[lang] || LOCALES.he; }
   function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
   /* "יום {n} · {name}" → regex + the placeholder order; every placeholder matches any text */
+  const HE_TEST = /[\u0590-\u05FF]/;
   function compilePattern(p) {
     const names = [];
     const src = String(p.he).split(/(\{[a-zA-Z0-9_]+\})/).map(function (part) {
@@ -75,7 +77,11 @@
       for (let i = 0; i < pats.length; i++) {
         const m = pats[i].re.exec(flat);
         if (!m) continue;
-        const params = {}; pats[i].names.forEach(function (n, j) { params[n] = m[j + 1]; });
+        const params = {}; pats[i].names.forEach(function (n, j) {
+          let v = m[j + 1];
+          if (HE_TEST.test(v)) { const r = lookup(v.replace(/\s+/g, ' '), v); if (r != null) v = r; }   /* F13-FN-08: a Hebrew value inside a pattern ("לפני שעה") is translated too */
+          params[n] = v;
+        });
         return fill(pats[i].en, params);
       }
       return null;

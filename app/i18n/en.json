@@ -896,6 +896,8 @@
   "🔗 קישור Drive": "🔗 Drive link",
   "🔗 קישור ל-Drive": "🔗 Link to Drive",
   "🔴 חריגה": "🔴 Over budget",
+  "הצעות AI היום": "AI suggestions today",
+  "סה״כ": "Total",
   "אנדורה": "Andorra",
   "איחוד האמירויות": "United Arab Emirates",
   "אפגניסטן": "Afghanistan",
@@ -1398,6 +1400,106 @@
   {
    "he": "💱 מטבעות · {n} מתוך 10",
    "en": "💱 Currencies · {n} of 10"
+  },
+  {
+   "he": "{x} הוסר/ה מהטיול",
+   "en": "{x} was removed from the trip"
+  },
+  {
+   "he": "ביקש/ה להצטרף · {x}",
+   "en": "Asked to join · {x}"
+  },
+  {
+   "he": "ביקש/ה לחבר מכשיר חדש · {x}",
+   "en": "Asked to link a new device · {x}"
+  },
+  {
+   "he": "הצטרף/ה ב-{x}",
+   "en": "Joined {x}"
+  },
+  {
+   "he": "₪ $ € קבועים ולא מופיעים כאן. {k} הוצאות ששולמו ב{c} יישארו כמו שהן.",
+   "en": "₪ $ € are fixed and don't appear here. {k} expenses paid in {c} will stay as they are."
+  },
+  {
+   "he": "{x} נכנס במקום {y}",
+   "en": "{x} replaced {y}"
+  },
+  {
+   "he": "ההזמנה נשלחה ל-{x}",
+   "en": "The invitation was sent to {x}"
+  },
+  {
+   "he": "ההזמנה נשלחה שוב ל-{x}",
+   "en": "The invitation was sent again to {x}"
+  },
+  {
+   "he": "השם נשמר: {x}",
+   "en": "Name saved: {x}"
+  },
+  {
+   "he": "הקובץ מכיל {n} ימים ויחליף את המסלול עבור כולם. להמשיך?",
+   "en": "The file contains {n} days and will replace the itinerary for everyone. Continue?"
+  },
+  {
+   "he": "סכום ב-{x}",
+   "en": "Amount in {x}"
+  },
+  {
+   "he": "חשב ל{x}",
+   "en": "Convert to {x}"
+  },
+  {
+   "he": "המטבע {c} לא נכנס – הממיר מלא (10/10). אפשר להסיר מטבע אחר.",
+   "en": "The currency {c} wasn't added – the converter is full (10/10). You can remove another currency."
+  },
+  {
+   "he": "{n} מתוך {m} · נשארו {k}",
+   "en": "{n} of {m} · {k} left"
+  },
+  {
+   "he": "{b} · אין שער ל-{x}",
+   "en": "{b} · no rate for {x}"
+  },
+  {
+   "he": "להסיר {c} מהטיול?",
+   "en": "Remove {c} from the trip?"
+  },
+  {
+   "he": "מחליפים את {x} ({c})",
+   "en": "Replacing {x} ({c})"
+  },
+  {
+   "he": "לפני {n} דק׳",
+   "en": "{n} min ago"
+  },
+  {
+   "he": "לפני {n} שעות",
+   "en": "{n} hours ago"
+  },
+  {
+   "he": "לפני {n} ימים",
+   "en": "{n} days ago"
+  },
+  {
+   "he": "מצטרפים לטיול \"{x}\" ב-Lonely Planner 🧳 נכנסים מהקישור, כותבים את השם ומחכים לאישור: {u}",
+   "en": "Join the trip \"{x}\" on Lonely Planner 🧳 Open the link, write your name and wait for approval: {u}"
+  },
+  {
+   "he": "הצעות AI היום: {n} מתוך {m}",
+   "en": "AI suggestions today: {n} of {m}"
+  },
+  {
+   "he": "נשמרה הוצאה · {x}",
+   "en": "Expense saved · {x}"
+  },
+  {
+   "he": "{a} · היום",
+   "en": "{a} · Today"
+  },
+  {
+   "he": "{a} · אתמול",
+   "en": "{a} · Yesterday"
   }
  ],
  "keys": {}
