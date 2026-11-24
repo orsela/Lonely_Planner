@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.21.3 — MORE-COMPACT · fix: the compact "עוד" now actually starts (2026-11-24)
+- alpha.21.0 passed the F06-private `go()` to morec.js (not global in the real page → ReferenceError, caught, nothing compacted). Now `switchPanel`. The stub test defined `go` itself, so it did not catch this; the test now defines only `switchPanel`.
+
 ## 3.0.0-alpha.21.0 — MORE-COMPACT · compact "עוד" + one vault with two tabs (2026-11-24)
 - "עוד" shows four rows only (כספת, הזמנות וארנק, תמונות הטיול, הגדרות וניהול) and a small "מסונכרן" line; no sub-captions. Every other row/section (account, language, members, translate, management, offline maps, sync card) is moved into the new panel `#moreSettings`, also rows that modules add later.
 - One "כספת" row. In a trip with the shared vault both vault screens get the tabs "משותפת | במכשיר"; Vietnam / trips without it: the on-device vault only, no tabs. Vault chips and the quota bar (until 80 %) are hidden.

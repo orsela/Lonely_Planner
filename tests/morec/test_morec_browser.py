@@ -20,7 +20,7 @@ STUB = """<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><
 <div id="documentsModal" class="modal"><div class="modal-box"><div class="modal-head"><h2>🔐 כספת מסמכים</h2><button class="modal-x" data-modal-x type="button">×</button></div><p class="muted">הסבר</p></div></div>
 <script>
 const TAB_FOR_PANEL={more:'more',management:'more'};
-function go(id){document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.panel===(TAB_FOR_PANEL[id]||id)))}
+function switchPanel(id){document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.panel===(TAB_FOR_PANEL[id]||id)))}
 document.getElementById('documentsBtn').onclick=()=>document.getElementById('documentsModal').classList.add('open');
 document.querySelector('[data-modal-x]').onclick=()=>document.getElementById('documentsModal').classList.remove('open');
 window.addVault=function(){const v=document.createElement('div');v.className='listitem';v.id='vaultBtn';v.innerHTML='<span id="vaultSummary">3 מסמכים · 1MB</span>';
@@ -29,7 +29,7 @@ window.addVault=function(){const v=document.createElement('div');v.className='li
 window.addLate=function(){const r=document.createElement('div');r.className='listitem';r.id='ptF13LangRow';r.textContent='שפה';document.getElementById('documentsBtn').after(r);
  const a=document.createElement('div');a.id='acct';a.textContent='החשבון שלי';document.getElementById('more').insertBefore(a,document.getElementById('more').firstChild)};
 </script><script src="file://%S%"></script>
-<script>window.MOUNT=function(flag){return window.__ptMoreC.mount({flag:()=>flag,go:go,tabMap:TAB_FOR_PANEL})}</script></body></html>"""
+<script>window.MOUNT=function(flag){return window.__ptMoreC.mount({flag:()=>flag,go:id=>switchPanel(id),tabMap:TAB_FOR_PANEL})}</script></body></html>"""
 fails = []
 def chk(n, c):
     print(('PASS ' if c else 'FAIL ') + n)
