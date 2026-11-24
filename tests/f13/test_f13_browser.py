@@ -93,7 +93,7 @@ def test_a_shipped_fresh_device_is_hebrew(browser, servers):
     if page.evaluate("()=>window.__ptF13&&window.__ptF13.mode") != "beta": P.append("mode")
     if page.evaluate("()=>window.__ptF13.active()"): P.append("active on a fresh device")
     if any("i18n/en.json" in u for u in seen): P.append("catalog fetched")
-    if page.evaluate("()=>window.__ptF13.VERSION") != "3.0.0-alpha.18.14": P.append("version")
+    if page.evaluate("()=>window.__ptF13.VERSION") != "3.0.0-alpha.19.0": P.append("version")
     if page.evaluate("()=>document.documentElement.scrollWidth>window.innerWidth+1"): P.append("horizontal overflow at 390px")
     if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
     ctx.close()
@@ -258,3 +258,31 @@ def test_i_language_row_in_more(browser, servers):
     if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
     ctx.close()
     assert not P, P
+
+
+def test_j_translation_layer(browser, servers):
+    """F13-TR: __ptF13.addLayer({he:en}) translates user text through the DOM layer (also later nodes), the catalog wins over the layer, the Hebrew restores, no TR row on a local-only device."""
+    import json as _json
+    ctx, page, seen, errs = new_page(browser)
+    page.route("**/i18n/en.json", lambda r: r.fulfill(status=200, content_type="application/json", body=_json.dumps(CATALOG)))
+    P = []
+    page.goto(servers["shipped"] + "#f13beta"); page.wait_for_timeout(300)
+    page.goto(servers["shipped"] + "#f13en"); page.wait_for_timeout(300); page.reload(); page.wait_for_timeout(1200)
+    page.evaluate("()=>{const d=document.createElement('div');d.id='f13l';d.innerHTML='<p id=a>מלון ליד האגם</p><p id=b>שלום</p>';document.body.appendChild(d)}")
+    page.wait_for_timeout(200)
+    n = page.evaluate("()=>window.__ptF13.addLayer({'מלון ליד האגם':'Hotel by the lake','שלום':'LAYER-HELLO'})")
+    page.wait_for_timeout(300)
+    page.evaluate("()=>{const p=document.createElement('p');p.id='late';p.textContent='  מלון   ליד האגם ';document.getElementById('f13l').appendChild(p)}")
+    page.wait_for_timeout(300)
+    g = lambda s: page.evaluate("(s)=>document.querySelector(s).textContent", s).strip()
+    if n != 2: P.append("addLayer returned %r" % n)
+    if g("#a") != "Hotel by the lake": P.append("#a %r" % g("#a"))
+    if g("#late") != "Hotel by the lake": P.append("#late %r" % g("#late"))
+    if g("#b") != "Hello": P.append("catalog must win over layer: %r" % g("#b"))
+    if page.evaluate("()=>window.__ptF13.layerSize()") != 2: P.append("layerSize")
+    if page.evaluate("()=>!!document.getElementById('ptF13TrRow')"): P.append("TR row on a local-only device")
+    page.evaluate("()=>window.__ptF13.setLang('he')"); page.wait_for_timeout(300)
+    if g("#a") != "מלון ליד האגם": P.append("restore %r" % g("#a"))
+    if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
+    ctx.close()
+    assert not P, "\n".join(P)

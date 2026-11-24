@@ -1,5 +1,11 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.19.0 — F13-TR · AI translation of trip content (2026-11-24)
+- DB: migration 0026 (private.tr_usage, tr_take / tr_refund, service role only) applied live. Edge Function `translate-content` deployed (verify_jwt=false; Haiku; max 3 runs per trip per UTC day; a failed run is refunded).
+- app/js/f13tr.js (new): "Translate trip content" row in More (only while English is active, cloud trips; never Vietnam), collects Hebrew itinerary + booking texts without a translation (journal excluded), one-time privacy prompt, friendly errors, the answer is a separate layer kept in planner:i18n_en (+ local cache).
+- app/js/f13.js: addLayer()/layerSize() — layer entries translate user text through the DOM layer; catalog entries win; Hebrew source untouched.
+- Flag TRANSLATE_FEATURE='on' (index.html); sw.js caches f13tr.js. Tests: f13tr_test.mjs (5), browser case J, translate-content test.ts (5).
+
 ## 3.0.0-alpha.18.14 — F13 stage 5 · the chat in English (2026-11-24)
 - app/js/f14.js: the chat request carries `lang` = 'en' when English is active (was always 'he'), so the assistant answers in English; the server (chat-assistant) already supported it. Suggestion chips and chat messages are in the catalog.
 - No server change.
