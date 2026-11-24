@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="margin:0">
+<div style="width:390px;height:380px;position:relative"><div id="map" style="width:100%;height:100%"></div></div>
+<pre id="out"></pre>
+<script src="/app/js/offmap.js"></script>
+<script>
+const RO='fd5c2b13-cdc0-455e-9c12-b52f2e45a334', OM=window.__ptOM, log=[];
+window.onerror=(m)=>log.push('ERR '+m);
+const days=[{day:1,region:'Brasov',lat:45.6427,lng:25.5887,waypoints:[{name:'Piata',lat:45.6400,lng:25.5900},{name:'Bran',lat:45.5154,lng:25.3672}]},{day:2,region:'Sibiu',lat:45.7983,lng:24.1256,waypoints:[]}];
+function zz(n){return (n<<1)^(n>>31)}
+function varint(n){const o=[];n>>>=0;while(n>127){o.push((n&127)|128);n>>>=7}o.push(n);return o}
+function ldelim(f,b){return [(f<<3)|2,...varint(b.length),...b]}
+const geom=[9,...varint(zz(0)),...varint(zz(0)),26,...varint(zz(4096)),...varint(zz(0)),...varint(zz(0)),...varint(zz(4096)),...varint(zz(-4096)),...varint(zz(0)),15];
+const feat=[(3<<3)|0,3,...ldelim(4,geom)];
+const layer=[...ldelim(1,[...'earth'].map(c=>c.charCodeAt(0))),...ldelim(2,feat),(5<<3)|0,...varint(4096),(15<<3)|0,2];
+const mvt=new Uint8Array(ldelim(3,layer));
+(async()=>{
+  try{
+  OM.configure({feature:()=>'on',trips:()=>[RO]});
+  localStorage.setItem('pt-offmap-beta','2');
+  OM.attach({tripId:()=>RO,days:()=>days,redraw:()=>{ log.push('redraw->'+OM.tryDraw(document.getElementById('map'),{days,dayIndex:0,mode:'route'})); }});
+  const st=OM.createIdbStore(RO);await st.clear();
+  for(let z=6;z<=14;z++){const cx=OM.lon2x(25.5887,z),cy=OM.lat2y(45.6427,z);for(let x=cx-3;x<=cx+3;x++)for(let y=cy-3;y<=cy+3;y++){const pk=await OM.pack(mvt.buffer.slice(0));await st.putTile(OM.tileKey(z,x,y),{z,bytes:pk.bytes,c:pk.c,n:mvt.length,days:[1],ts:1});}}
+  log.push('first='+OM.tryDraw(document.getElementById('map'),{days,dayIndex:0,mode:'route'}));
+  await new Promise(r=>setTimeout(r,3000));
+  const m=document.getElementById('map');
+  log.push('markers='+m.querySelectorAll('path.leaflet-interactive').length+' canvases='+m.querySelectorAll('canvas').length+' badge='+m.textContent.includes('מפה שמורה')+' attr='+((m.querySelector('.leaflet-control-attribution')||{}).textContent));
+  }catch(e){log.push('EXC '+e)}
+  document.getElementById('out').textContent=log.join(' | ');
+})();
+</script>
