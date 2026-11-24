@@ -93,7 +93,7 @@ def test_a_shipped_fresh_device_is_hebrew(browser, servers):
     if page.evaluate("()=>window.__ptF13&&window.__ptF13.mode") != "beta": P.append("mode")
     if page.evaluate("()=>window.__ptF13.active()"): P.append("active on a fresh device")
     if any("i18n/en.json" in u for u in seen): P.append("catalog fetched")
-    if page.evaluate("()=>window.__ptF13.VERSION") != "3.0.0-alpha.18.8": P.append("version")
+    if page.evaluate("()=>window.__ptF13.VERSION") != "3.0.0-alpha.18.9": P.append("version")
     if page.evaluate("()=>document.documentElement.scrollWidth>window.innerWidth+1"): P.append("horizontal overflow at 390px")
     if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
     ctx.close()
@@ -198,6 +198,44 @@ def test_g_stage3_ltr_css_and_formats(browser, servers):
     if en["sw"]: P.append("horizontal overflow in English at 390px")
     page.evaluate("()=>window.__ptF13.setLang('he')"); page.wait_for_timeout(300)
     if page.evaluate("()=>!!document.getElementById('ptF13Ltr')"): P.append("link not removed when Hebrew is back")
+    if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
+    ctx.close()
+    assert not P, "\n".join(P)
+
+
+CATALOG = {"version": 1, "exact": {"שלום": "Hello", "ביטול": "Cancel", "חיפוש": "Search", "אישור": "OK", "כותרת הדף": "Page title"},
+           "patterns": [{"he": "יום {n} · {name}", "en": "Day {n} · {name}"}], "keys": {}}
+
+
+def test_h_stage4a_dom_layer(browser, servers):
+    """stage 4a: with English on, Hebrew text nodes and attributes are translated through the catalog (also nodes added later), user fields are left alone, a miss stays Hebrew, Hebrew restores"""
+    import json as _json
+    ctx, page, seen, errs = new_page(browser)
+    page.route("**/i18n/en.json", lambda r: r.fulfill(status=200, content_type="application/json", body=_json.dumps(CATALOG)))
+    P = []
+    page.goto(servers["shipped"] + "#f13beta"); page.wait_for_timeout(300)
+    page.goto(servers["shipped"] + "#f13en"); page.wait_for_timeout(300); page.reload(); page.wait_for_timeout(1200)
+    page.evaluate("""()=>{const d=document.createElement('div');d.id='f13t';d.innerHTML='<p id=a>שלום</p><p id=b>  יום 3 · טוקיו </p><p id=c>טקסט בלי תרגום</p><input id=d placeholder="חיפוש"><button id=e aria-label="ביטול">x</button>'+
+      '<textarea id=f>שלום</textarea><div id=g data-f13-skip>שלום</div><input id=h type=button value="אישור"><p id=i>ביטול\\n   </p>';document.body.appendChild(d)}""")
+    page.wait_for_timeout(300)
+    page.evaluate("()=>{const p=document.createElement('p');p.id='late';p.textContent='שלום';document.getElementById('f13t').appendChild(p);document.title='כותרת הדף'}")
+    page.wait_for_timeout(300)
+    g = lambda s, a=None: page.evaluate("([s,a])=>{const e=document.querySelector(s);return a?e.getAttribute(a):e.textContent}", [s, a])
+    exp = {"#a": "Hello", "#b": "Day 3 · טוקיו", "#c": "טקסט בלי תרגום", "#late": "Hello", "#g": "שלום", "#i": "Cancel"}
+    for s, v in exp.items():
+        if g(s).strip() != v: P.append("%s = %r (expected %r)" % (s, g(s).strip(), v))
+    if g("#d", "placeholder") != "Search": P.append("placeholder %r" % g("#d", "placeholder"))
+    if g("#e", "aria-label") != "Cancel": P.append("aria-label %r" % g("#e", "aria-label"))
+    if g("#h", "value") != "OK": P.append("button value %r" % g("#h", "value"))
+    if page.evaluate("()=>document.getElementById('f').value") != "שלום": P.append("textarea value changed")
+    if page.evaluate("()=>document.title") != "Page title": P.append("title %r" % page.evaluate("()=>document.title"))
+    st = page.evaluate("()=>window.__ptF13.stats()")
+    if "טקסט בלי תרגום" not in st["missingList"]: P.append("miss not listed: %r" % st["missingList"][:5])
+    page.evaluate("()=>window.__ptF13.setLang('he')"); page.wait_for_timeout(300)
+    back = {"#a": "שלום", "#b": "יום 3 · טוקיו", "#late": "שלום"}
+    for s, v in back.items():
+        if g(s).strip() != v: P.append("restore %s = %r" % (s, g(s).strip()))
+    if g("#d", "placeholder") != "חיפוש": P.append("placeholder not restored")
     if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
     ctx.close()
     assert not P, "\n".join(P)

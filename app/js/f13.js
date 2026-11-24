@@ -4,6 +4,11 @@
    to en-GB in English, and wraps String.prototype.localeCompare the same way (no locale or he/he-IL → en-GB), so dates, numbers and sort order follow the language. 'en-US'/'en-GB' calls in the app are deliberate and untouched.
    Flag 'off' = unchanged (nothing is patched, no link).
    CHANGE 2026-11-24 F13-FN-03: version 3.0.0-alpha.18.8 — API + enabled() (true when the flag is 'on', or 'beta' on a beta device): the trip wizard uses it to offer "English" as the group language (stage 2).
+   CHANGE 2026-11-24 F13-FN-04: version 3.0.0-alpha.18.9 (stage 4a) — the runtime DOM layer: while English is active a MutationObserver translates every Hebrew text node and the attributes placeholder / title / aria-label / alt /
+   (button) value through the catalog (exact → pattern), keeps the Hebrew original of each touched node so the page can go back to Hebrew, skips script/style/textarea/contenteditable/[data-f13-skip] and form values, and also translates
+   document.title and the messages of alert/confirm/prompt. No catalog entry = the Hebrew stays (and is listed by stats().missingList). Whitespace inside a text is collapsed before the lookup. Flag 'off' = none of this runs.
+   CHANGE 2026-11-24 F13-FN-05: the translator also matches a known text inside decoration (emoji, ➕, ·, …, ?, : around it): the catalog holds "לינה" once and "🏨 לינה" / "לינה:" follow; direction arrows around the text are
+   mirrored for English ("פתח מסלול ←" → "Open itinerary →", "ניהול מטבעות ‹" → "Manage currencies ›").
    Previous: foundation · version 3.0.0-alpha.17.2
    CHANGE 2026-11-24 F13-FN-01: new file (no previous version). Stage 0 of claude/Plan_Travel_F13_spec.md + claude/Plan_Travel_F13_decisions.md (D1 hybrid dictionary, D3 all at once + a personal
    test switch, D4 en-GB + an additive wrapper of toLocale*String). It ships NO visible English yet: the catalog (app/i18n/en.json) is empty and no screen calls t() / translate(); the later stages
@@ -13,7 +18,7 @@
    Language order (spec §4): the device choice (pt:_device:lang) → the trip's default_lang → the browser language → 'he'. Everything inside try/catch: a failure here never breaks the app. */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.18.8';   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
+  const VERSION = '3.0.0-alpha.18.9';   /* CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
   const LANGS = ['he', 'en'];
   const LOCALES = { he: 'he-IL', en: 'en-GB' };            /* D4 */
   const FORCED_HE_TRIPS = ['f0200000-0000-4000-8000-000000000001'];   /* the Vietnam trip: never English (spec §2) */
@@ -52,12 +57,27 @@
       return params && Object.prototype.hasOwnProperty.call(params, k) && params[k] != null ? String(params[k]) : all;
     });
   }
+  /* F13-FN-05: leading / trailing decoration = anything that is not a letter, digit or a placeholder bracket (emoji, ➕, ←, ‹, ·, …, ?, !, :) */
+  const DECO = /^([^\u0590-\u05FFA-Za-z0-9{(₪$€]*)([\s\S]*?)([^\u0590-\u05FFA-Za-z0-9})%₪$€]*)$/;
+  const ARROWS = { '←': '→', '→': '←', '‹': '›', '›': '‹', '«': '»', '»': '«', '❮': '❯', '❯': '❮', '◀': '▶', '▶': '◀', '⟵': '⟶', '⟶': '⟵' };
+  function mirror(s) { return s ? s.replace(/[←→‹›«»❮❯◀▶⟵⟶]/g, function (c) { return ARROWS[c]; }) : s; }
   /* catalog = {version, exact:{he:en}, patterns:[{he,en}], keys:{key:{he,en}}} */
   function makeTranslator(catalog) {
     const cat = catalog || {};
     const exact = cat.exact || {};
     const pats = (cat.patterns || []).map(compilePattern);
     const keys = cat.keys || {};
+    function lookup(flat, trimmed) {
+      if (Object.prototype.hasOwnProperty.call(exact, trimmed)) return String(exact[trimmed]);
+      if (Object.prototype.hasOwnProperty.call(exact, flat)) return String(exact[flat]);
+      for (let i = 0; i < pats.length; i++) {
+        const m = pats[i].re.exec(flat);
+        if (!m) continue;
+        const params = {}; pats[i].names.forEach(function (n, j) { params[n] = m[j + 1]; });
+        return fill(pats[i].en, params);
+      }
+      return null;
+    }
     return {
       /* the Hebrew source → English; null when there is no entry (the caller keeps the Hebrew) */
       translate: function (src) {
@@ -65,14 +85,12 @@
         const trimmed = src.trim();
         if (!trimmed) return null;
         const lead = src.slice(0, src.indexOf(trimmed.charAt(0))), trail = src.slice(lead.length + trimmed.length);
-        let out = Object.prototype.hasOwnProperty.call(exact, trimmed) ? String(exact[trimmed]) : null;
+        const flat = trimmed.replace(/\s+/g, ' ');   /* F13-FN-04: markup whitespace / line breaks inside a text */
+        let out = lookup(flat, trimmed);
         if (out == null) {
-          for (let i = 0; i < pats.length; i++) {
-            const m = pats[i].re.exec(trimmed);
-            if (!m) continue;
-            const params = {}; pats[i].names.forEach(function (n, j) { params[n] = m[j + 1]; });
-            out = fill(pats[i].en, params); break;
-          }
+          /* F13-FN-05: decoration around a known text — "🏨 לינה", "פתח מסלול ←", "ניהול מטבעות ‹", "שאל…" — the catalog holds the plain text; the emoji / symbols are kept, direction arrows mirror */
+          const m = DECO.exec(flat);
+          if (m && (m[1] || m[3]) && m[2]) { const core = lookup(m[2], m[2]); if (core != null) out = mirror(m[1]) + core + mirror(m[3]); }
         }
         return out == null ? null : lead + out + trail;
       },
@@ -152,7 +170,7 @@
     S.lang = l;
     if (enabled()) patchLocale();
     applyDoc();
-    if (l === 'en') loadCatalog();
+    if (l === 'en') { loadCatalog(); domStart(); } else if (changed) domStop();   /* F13-FN-04 */
     if (changed) { try { root.dispatchEvent(new root.CustomEvent('pt:langchange', { detail: { lang: l } })); } catch (e) { /* no CustomEvent */ } }
     return l;
   }
@@ -161,16 +179,97 @@
     if (S.loaded || S.loading || typeof root.fetch !== 'function') return S.loading || Promise.resolve(S.catalog);
     S.loading = root.fetch(CATALOG_URL, { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (j && typeof j === 'object') { S.catalog = j; S.tr = makeTranslator(j); }
-      S.loaded = true; S.loading = null; return S.catalog;
+      S.loaded = true; S.loading = null; domRefresh(); return S.catalog;   /* F13-FN-04: translate what was drawn before the catalog arrived */
     }).catch(function () { S.loading = null; return null; });   /* offline without a cached copy: stay with the Hebrew text */
     return S.loading;
   }
+
+  /* ---------------- runtime DOM layer (F13-FN-04) ---------------- */
+  const HE = /[\u0590-\u05FF]/;
+  const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
+  const SKIP_TAG = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, NOSCRIPT: 1, CODE: 1 };
+  const D = { orig: new WeakMap(), touched: new Set(), obs: null, wrapped: false, origDlg: null, title: null };
+  function skipEl(el) {
+    for (let e = el; e && e.nodeType === 1; e = e.parentNode) {
+      if (SKIP_TAG[e.tagName] || e.isContentEditable || (e.hasAttribute && e.hasAttribute('data-f13-skip'))) return true;
+    }
+    return false;
+  }
+  function trText(n) {
+    const v = n.nodeValue; if (!v || !HE.test(v)) return;
+    const rec = D.orig.get(n); if (rec && rec.en === v) return;                 /* our own write */
+    if (!n.parentNode || skipEl(n.parentNode)) return;
+    const out = translate(v); if (out === v) return;
+    D.orig.set(n, { he: v, en: out }); D.touched.add(n); n.nodeValue = out;
+  }
+  function trAttrs(el) {
+    if (skipEl(el)) return;
+    const names = ATTRS.slice();
+    if (el.tagName === 'INPUT' && /^(button|submit|reset)$/i.test(el.type || '')) names.push('value');
+    for (let i = 0; i < names.length; i++) {
+      const a = names[i], v = el.getAttribute(a); if (!v || !HE.test(v)) continue;
+      let rec = D.orig.get(el); if (!rec) { rec = {}; D.orig.set(el, rec); }
+      if (rec[a] && rec[a].en === v) continue;
+      const out = translate(v); if (out === v) continue;
+      rec[a] = { he: v, en: out }; D.touched.add(el); el.setAttribute(a, out);
+    }
+  }
+  function trTree(node) {
+    if (!node) return;
+    if (node.nodeType === 3) { trText(node); return; }
+    if (node.nodeType !== 1 && node.nodeType !== 11) return;
+    if (node.nodeType === 1) { if (SKIP_TAG[node.tagName]) return; trAttrs(node); }
+    for (let c = node.firstChild; c; c = c.nextSibling) trTree(c);
+  }
+  function trTitle() { try { const d = W.document, v = d.title; if (v && HE.test(v)) { const o = translate(v); if (o !== v) { D.title = v; d.title = o; } } } catch (e) { /* no document */ } }
+  function wrapDialogs() {
+    if (D.wrapped) return; D.wrapped = true;
+    D.origDlg = { alert: root.alert, confirm: root.confirm, prompt: root.prompt };
+    ['alert', 'confirm', 'prompt'].forEach(function (k) {
+      const o = D.origDlg[k]; if (typeof o !== 'function') return;
+      root[k] = function (msg) { const a = Array.prototype.slice.call(arguments); if (S.lang === 'en' && typeof msg === 'string') a[0] = translate(msg); return o.apply(root, a); };
+    });
+  }
+  function domStart() {
+    if (!W || !W.document || D.obs || typeof root.MutationObserver !== 'function') return;
+    const go = function () {
+      if (S.lang !== 'en' || D.obs) return;
+      try { trTitle(); trTree(W.document.documentElement); } catch (e) { /* never break the app */ }
+      D.obs = new root.MutationObserver(function (recs) {
+        if (S.lang !== 'en') return;
+        try {
+          for (let i = 0; i < recs.length; i++) {
+            const r = recs[i];
+            if (r.type === 'characterData') trText(r.target);
+            else if (r.type === 'attributes') trAttrs(r.target);
+            else for (let j = 0; j < r.addedNodes.length; j++) trTree(r.addedNodes[j]);
+          }
+          if (W.document.title && HE.test(W.document.title)) trTitle();
+        } catch (e) { /* never break the app */ }
+      });
+      D.obs.observe(W.document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS.concat(['value']) });
+      wrapDialogs();
+    };
+    if (W.document.readyState === 'loading') W.document.addEventListener('DOMContentLoaded', go, { once: true }); else go();
+  }
+  function domStop() {
+    if (D.obs) { try { D.obs.disconnect(); } catch (e) { /* ignore */ } D.obs = null; }
+    D.touched.forEach(function (n) {
+      const rec = D.orig.get(n); if (!rec) return;
+      if (n.nodeType === 3) { if (n.nodeValue === rec.en) n.nodeValue = rec.he; }
+      else Object.keys(rec).forEach(function (a) { if (n.getAttribute(a) === rec[a].en) n.setAttribute(a, rec[a].he); });
+    });
+    D.touched.clear();
+    if (D.title != null) { try { W.document.title = D.title; } catch (e) { /* ignore */ } D.title = null; }
+    if (D.wrapped && D.origDlg) { ['alert', 'confirm', 'prompt'].forEach(function (k) { if (D.origDlg[k]) root[k] = D.origDlg[k]; }); D.wrapped = false; }
+  }
+  function domRefresh() { if (S.lang === 'en') { if (!D.obs) domStart(); else { try { trTitle(); trTree(W.document.documentElement); } catch (e) { /* ignore */ } } } }
 
   /* ---------------- public API ---------------- */
   function translate(src) {
     if (!active()) return src;
     const out = S.tr.translate(src);
-    if (out == null) { const k = String(src).trim(); if (k && !S.miss[k]) { S.miss[k] = 1; S.missN++; } return src; }   /* missing → the Hebrew stays; counted for coverage */
+    if (out == null) { const k = String(src).trim().replace(/\s+/g, ' '); if (S.loaded && k && !S.miss[k]) { S.miss[k] = 1; S.missN++; } return src; }   /* missing → the Hebrew stays; counted for coverage */
     return out;
   }
   function t(key, params) { return S.tr.t(key, params, active() ? 'en' : 'he'); }
@@ -181,7 +280,7 @@
     VERSION: VERSION, mode: MODE,
     lang: function () { return S.lang; }, enabled: function () { return enabled(); }, active: function () { return MODE !== 'off' && S.lang === 'en'; },
     locale: function () { return ptLocale(S.lang); },
-    translate: translate, t: t, setTrip: setTrip, setLang: setLang, loadCatalog: loadCatalog,
+    translate: translate, t: t, refresh: domRefresh, setTrip: setTrip, setLang: setLang, loadCatalog: loadCatalog,
     stats: function () { return { lang: S.lang, loaded: S.loaded, missing: S.missN, missingList: Object.keys(S.miss) }; },
     _pure: { normLang: normLang, pickLang: pickLang, isForcedHebrew: isForcedHebrew, ptLocale: ptLocale, makeTranslator: makeTranslator, compilePattern: compilePattern, fill: fill }
   };

@@ -1,5 +1,11 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.9 — F13 stage 4a · English for the app shell (2026-11-24)
+- Runtime translation layer (app/js/f13.js): text nodes and attributes (placeholder, title, aria-label, alt) are translated from app/i18n/en.json while English is on; later-added nodes too; user fields and `data-f13-skip` untouched; Hebrew restored on switching back.
+- Matching also works through decoration (emoji, ➕, ·, …) and mirrors direction arrows (← → ‹ ›).
+- app/i18n/en.json: ~750 entries — tabs, home, itinerary, journal, budget, More menu, dialogs, vault, bookings, countries and currencies (from the app's own data). Built by tests/f13/build_catalog.py; gaps listed by tests/f13/collect_missing.py.
+- Everything behind LANG_FEATURE ('beta': only on a device with #f13beta). Vietnam trip stays Hebrew.
+
 ## 3.0.0-alpha.18.8 — F13 stage 2 · a group can be created in English (2026-11-24)
 - Server: migration `supabase/migrations/0025_f13.sql` (applied to the live project 24/11) — `create_trip_from_invite` accepts `default_lang` `'he'` or `'en'` (was `'he'` only). It rewrites only that one condition of the deployed function body; owner, `SECURITY DEFINER` and grants (postgres, service_role) verified unchanged. The table check and `create-trip` (whitelist only) needed no change. Any other `default_lang` is still `invalid_payload`.
 - Wizard (`app/index.html` step 1): the "English" button of "שפת הקבוצה" is selectable (no "בקרוב") only where F13 is enabled on the device (`LANG_FEATURE` 'on', or 'beta' + beta device); choosing it sends `default_lang:'en'`. Other devices and flag `'off'` = alpha.18.7 (disabled, `'he'`). `app/js/f13.js` exposes `enabled()`.

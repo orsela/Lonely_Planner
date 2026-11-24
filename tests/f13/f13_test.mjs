@@ -158,3 +158,19 @@ test("beta without the key never patches Date (zero footprint)", async () => {
   assert.equal(String(w.D.prototype.toLocaleString).includes("native code"), true);   /* the native function, not our wrapper */
   assert.equal(String(w.D.prototype.toLocaleDateString).includes("native code"), true);
 });
+
+/* F13 stage 4a (alpha.18.9): the shell catalog */
+import { readFileSync as _rf } from 'node:fs';
+{
+  const cat = JSON.parse(_rf(new URL('../../app/i18n/en.json', import.meta.url), 'utf8'));
+  const he = /[֐-׿]/;
+  test('catalog: sizeable, no Hebrew left in English values, placeholders match', () => {
+    assert.ok(Object.keys(cat.exact).length > 500);
+    for (const [k, v] of Object.entries(cat.exact)) assert.ok(!he.test(v), 'Hebrew in English value: ' + k);
+    for (const p of cat.patterns) {
+      assert.ok(!he.test(p.en), 'Hebrew in pattern: ' + p.he);
+      const ph = s => (s.match(/\{[a-z0-9_]+\}/gi) || []).sort().join();
+      if (!p.he.includes('{flag}')) assert.equal(ph(p.en), ph(p.he), 'placeholders differ: ' + p.he);
+    }
+  });
+}
