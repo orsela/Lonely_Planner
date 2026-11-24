@@ -1,5 +1,9 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.5 — TRIP-COUNTRY · neutral route-screen map (2026-11-24)
+- The schematic map of the route screen (used offline or when Google Maps fails) drew the Vietnam outline, rivers and "מפרץ טונקין" for every trip. For a cloud trip that is not Vietnam, with `TRIPOFFLINE_FEATURE='on'`, it is now a neutral grid with the route line and points. Vietnam, local storage and `'off'` = exactly alpha.18.4.
+- Tests: Node 11/11, browser 390px 11 checks. Real offline maps (downloaded when joining a trip) = a separate spec.
+
 ## 3.0.0-alpha.18.4 — TRIP-COUNTRY fix · TC-BUG-01, offline start of a trip that is not Vietnam (2026-11-24)
 - Cause: reading the trip's days from the cloud never left a copy on the device, so an offline start of a trip that was only opened (not edited) on that phone fell through `loadState` to `makeSeed()` = the Vietnam days (Hanoi, 16/09–06/10, 20 nights, Vietnam map).
 - Flag `TRIPOFFLINE_FEATURE='on'` (app/js/tripcountry.js `tcPick` + additive lines in `loadState`), only for a cloud trip that is not Vietnam: every successful read is saved on the device; nothing readable = an empty trip with the notice "אין עותק של הטיול במכשיר" (never the Vietnam seed); a failed re-read keeps the days on screen. Vietnam, local storage and `'off'` = exactly alpha.18.3.

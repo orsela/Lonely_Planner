@@ -1,5 +1,6 @@
-/* Lonely Planner · TRIP-COUNTRY-A – country-aware search text and booking link (no Vietnam hard-coding for other trips) · version 3.0.0-alpha.18.4
+/* Lonely Planner · TRIP-COUNTRY-A – country-aware search text and booking link (no Vietnam hard-coding for other trips) · version 3.0.0-alpha.18.5
    CHANGE 2026-11-24 TC-OFF-01: what changed from alpha.18.3 (TC-BUG-01, Or's phone check 4): pick(v, current) decides what loadState does for a cloud trip that is not Vietnam when TRIPOFFLINE_FEATURE is 'on': days read -> use them and save a copy on the device (save:true); nothing read but days already on screen -> keep them; nothing at all -> an empty trip (empty:true), never the Vietnam SEED_DATA. Null = inactive: loadState runs exactly as in alpha.18.3 (Vietnam, local storage, flag off).
+   CHANGE 2026-11-24 TC-OFF-02: what changed from alpha.18.4: schematicBase(W, H) = the route-screen schematic map background (grid, no Vietnam outline / rivers / "מפרץ טונקין") for the same trips and flag; null = the Vietnam shapes as before.
    CHANGE 2026-11-24 TC-B-01: what changed from alpha.18.2 (alpha.18.1 here) (Or's choice A of the mockup, with the offline-maps hint): fallbackMap(el) swaps the Vietnam outline of the home-screen fallback map for a neutral grid and adds a chip "מפה פשוטה · אין חיבור למפה" with the line "לניווט בלי רשת: Google Maps ← מפות אופליין ← הורדת האזור" (shown only after the real map image failed: mapFailed(true)); region(d) gives the Static Maps `region=` parameter of the trip's country instead of a fixed VN. Same activation rule as before; inactive = the Vietnam map exactly as it was (and a swap made earlier is undone).
    CHANGE 2026-11-24 TC-A-01: new file (no previous version). Why: a trip that is not Vietnam (the Romania pilot) got ", Vietnam" appended to the place search
    (waypoint lookup), to the hotel navigation query and to the airport-address fallback, and its Booking.com link was fixed to "Vietnam", 2 adults, 3 children
@@ -9,7 +10,7 @@
    ", Vietnam" and booking() is null (the caller keeps its own old parameters), so the Vietnam trip is byte-identical to alpha.18. Pure helpers, no DOM. */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.18.4';
+  const VERSION = '3.0.0-alpha.18.5';
   const VN_TRIP = 'f0200000-0000-4000-8000-000000000001';   /* the Vietnam trip id (same as app/js/f13.js FORCED_HE_TRIPS) */
   const env = {};   /* feature() → 'on'|'off', backend() → 'cloud'|…, tripId() → string, travelers() → number */
   function tcConfigure(o) { Object.assign(env, o || {}); }
@@ -29,6 +30,12 @@
     if (Array.isArray(v)) return { save: false, keep: false, empty: false };   /* a stored 0-day trip: the existing F04 path handles it */
     if (Array.isArray(current) && current.length) return { save: false, keep: true, empty: false };
     return { save: false, keep: false, empty: true };
+  }
+  /* TC-OFF-MAP: SVG background of the route-screen schematic map (W x H) without Vietnam shapes; null = inactive (the caller draws the Vietnam shapes as before) */
+  function tcSchematicBase(W, H) {
+    if (!tcOfflineActive()) return null;
+    const xs = [], ys = []; for (let k = 1; k < 10; k++) { xs.push(Math.round(W * k / 10)); ys.push(Math.round(H * k / 10)); }
+    return '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#eef1de"/>' + xs.map(x => '<path d="M' + x + ' 0V' + H + '" stroke="#dfe5c6" stroke-width=".8"/>').join('') + ys.map(y => '<path d="M0 ' + y + 'H' + W + '" stroke="#dfe5c6" stroke-width=".8"/>').join('');
   }
   function tcActive() { try { return feature() === 'on' && backend() === 'cloud' && !!tripId() && tripId() !== VN_TRIP; } catch (e) { return false; } }
 
@@ -84,7 +91,7 @@
   /* Static Maps `region=` parameter: the trip's country when active, else the old fixed VN */
   function tcRegion(d) { if (!tcActive()) return 'region=VN'; const c = dayCountry(d); return c ? 'region=' + c : ''; }
 
-  const api = { version: VERSION, tcConfigure, tcActive, tcCountryName, tcSuffix, tcBooking, tcFallbackMap, tcMapFailed, tcRegion, tcPick, tcOfflineActive };
+  const api = { version: VERSION, tcConfigure, tcActive, tcCountryName, tcSuffix, tcBooking, tcFallbackMap, tcMapFailed, tcRegion, tcPick, tcOfflineActive, tcSchematicBase };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  else { root.__ptTC = { version: VERSION, configure: tcConfigure, active: tcActive, countryName: tcCountryName, suffix: tcSuffix, booking: tcBooking, fallbackMap: tcFallbackMap, mapFailed: tcMapFailed, region: tcRegion, pick: tcPick, offlineActive: tcOfflineActive }; }
+  else { root.__ptTC = { version: VERSION, configure: tcConfigure, active: tcActive, countryName: tcCountryName, suffix: tcSuffix, booking: tcBooking, fallbackMap: tcFallbackMap, mapFailed: tcMapFailed, region: tcRegion, pick: tcPick, offlineActive: tcOfflineActive, schematicBase: tcSchematicBase }; }
 })(typeof window !== 'undefined' ? window : globalThis);

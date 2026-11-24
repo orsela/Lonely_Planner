@@ -117,3 +117,11 @@ test("never falls back to SEED_DATA · the only makeSeed() call sits after the t
   assert.ok(at > 0 && f.indexOf("tcp.empty") < at && f.indexOf("tcp.keep") < at);
   tcOff(); assert.equal(TC.tcPick(null, []).empty, true);
 });
+
+test("schematicBase · neutral background (no Vietnam shapes) only for the active trip; null otherwise (caller draws the Vietnam shapes)", () => {
+  tcOff(); const b = TC.tcSchematicBase(600, 380);
+  assert.ok(b && b.includes("<rect") && !b.includes("polygon") && !b.includes("טונקין"));
+  tcOff({ trip: VN_TRIP }); assert.equal(TC.tcSchematicBase(600, 380), null);
+  tcOff({ off: "off" }); assert.equal(TC.tcSchematicBase(600, 380), null);
+  tcOff({ backend: "local" }); assert.equal(TC.tcSchematicBase(600, 380), null);
+});

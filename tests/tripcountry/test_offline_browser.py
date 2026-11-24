@@ -1,5 +1,5 @@
 """Lonely Planner TC-BUG-01 browser test · 390px, offline start of a cloud trip that is not Vietnam · version 3.0.0-alpha.18.4
-CHANGE 2026-11-24 TC-OFF-T-02: new file (no previous version). Real app + fake backend (F10b harness), no network. Four checks:
+CHANGE 2026-11-24 TC-OFF-T-02: new file (no previous version). Real app + fake backend (F10b harness), no network. Five checks (5 = the route-screen schematic map):
 1 opened online, then started offline -> the trip's own 10 days (no Vietnam), a copy is on the device; 2 never opened, started offline -> an empty trip with the notice,
 never the Vietnam seed, no page error; 3 flag 'off' offline = alpha.18.3 (the Vietnam seed, the bug) - proves 'off' is unchanged; 4 no horizontal scroll at 390px.
 Run: tests/tripcountry/run_browser.sh"""
@@ -12,6 +12,7 @@ import harness as H
 from playwright.sync_api import sync_playwright
 h10, f04 = H.h10, H.f04 if hasattr(H, 'f04') else H.h10.f04
 FLAG = re.compile(r"""((?:const|let|var)\s+TRIPOFFLINE_FEATURE\s*=\s*)(['"])(on|off)\2""")
+MAPJS = "()=>{mapProvider='schematic';mapMode='route';drawMap();const m=document.getElementById('map');return m?m.innerHTML:''}"
 VN_WORDS = ('האנוי', 'טיסה להאנוי')
 fails = []
 def check(name, cond, extra=''):
@@ -46,10 +47,12 @@ with sync_playwright() as pw:
                 check('1 offline start (opened before) = the trip\'s own 10 days, no Vietnam', st == 'app' and off['n'] == 10 and not any(w in off['body'] for w in VN_WORDS), (st, off['n']))
                 check('1 a copy of the days is on the device', off['ls'] == 10, off['ls'])
                 check('4 no horizontal scroll at 390px', not off['hscroll'])
+                svg = pg.evaluate(MAPJS); check('5 route map offline: no Vietnam outline / river / Tonkin Gulf', '<svg' in svg and '<polygon' not in svg and 'טונקין' not in svg, svg[:120])
                 # 2: a second device that never opened the trip online
                 dev2 = h10.boot(env, tid, role='manager', name='B', offline_boot=True) if False else None
             else:
                 check('3 flag off, offline = alpha.18.3 (the Vietnam seed)', off['n'] == 22 and off['first'] == 'טיסות', (off['n'], off['first']))
+                svg = pg.evaluate(MAPJS); check('5 flag off: the route map still draws the Vietnam shapes (= alpha.18.3)', '<polygon' in svg and 'טונקין' in svg)
             dev.page.close()
         finally:
             env.close(); srv.stop()
