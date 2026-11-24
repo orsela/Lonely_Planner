@@ -1,5 +1,10 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.17.2 — F13 stage 0 · English foundation, nothing visible (2026-11-24)
+- New `app/js/f13.js` + empty catalog `app/i18n/en.json` (both cached offline in `sw.js`), flag `LANG_FEATURE='beta'`: language state (device choice → trip default → browser → he), `lang`/`dir` on `<html>`, `translate()` (Hebrew-source catalog: exact + patterns), `t('key')` for new code, an additive en-GB wrapper of `toLocale*String`, `__ptF13.setTrip()` hooks in `setTrip`/`stopTrip`. No screen is translated yet.
+- Personal test switch: open the app with `#f13beta` (then `#f13en` / `#f13he`); `#f13beta-off` clears both. Other devices are unchanged. The Vietnam trip and a non-cloud backend are always Hebrew/RTL.
+- `'off'` = exactly alpha.17.1 (inert file). Tests: `tests/f13/run.sh [browser]` (Node 12/12) + `tests/f13/coverage.mjs` (baseline: every Hebrew literal still without English). Spec: claude/Plan_Travel_F13_spec.md, decisions: claude/Plan_Travel_F13_decisions.md. Final version number is set at merge (F12 targets alpha.18).
+
 ## 3.0.0-alpha.17.1 — BUDGET-PP · expected cost per person per budget item (2026-11-17)
 - New `app/js/budgetpp.js` (cached offline in `sw.js`), flags `BUDGETPP_FEATURE='on'` + `BUDGETPP_TRIPS` (only the Romania pilot; Vietnam is never listed).
 - Budget screen: card "לפי סעיף · לאדם" under the category tiles. Per existing item: planned per person (€, editable by managers) vs actual per person (item spending ÷ travelers, shown in €), plus a ✈️ flights row (TLV–OTP–TLV): planned = estimate from flight sites (dated note), actual typed by hand after purchase.

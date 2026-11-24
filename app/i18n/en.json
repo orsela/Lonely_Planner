@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "_note": "F13 English catalog. exact: Hebrew source text -> English. patterns: same with {placeholders}. keys: for new code, t('key'). Empty in stage 0 (3.0.0-alpha.17.2); later stages fill it. See claude/Plan_Travel_F13_spec.md.",
+  "exact": {},
+  "patterns": [],
+  "keys": {}
+}
