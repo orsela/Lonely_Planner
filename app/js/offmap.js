@@ -1,14 +1,15 @@
-/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core) · version 3.0.0-alpha.19
+/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core) · version 3.0.0-alpha.19.1
+   CHANGE 2026-11-24 OFFMAP-KEY-01: what changed from alpha.19: an in-app window to enter / replace / delete the Protomaps key on THIS device (setKey, clearKey, keyHint, openKeyDialog, mountKeyEntry). It opens only when the address ends with #offmapkey (like #f22beta); the key is saved in a small device-level IndexedDB ("pt-_device-offmap": the app wraps localStorage per trip and drops writes before the trip is known, so localStorage cannot hold it), loaded at start into memory so getKey() stays synchronous (never in the address, never sent anywhere, never in the repo). Without that hash nothing is shown: the app is as alpha.19.
    CHANGE 2026-11-24 OFFMAP-01: new file (no previous version). Conversation 1 of 3 (spec: claude/Plan_Travel_OFFMAP_spec.md draft 2, approved 24/11). Contains ONLY the core, no screens and no map drawing:
    (1) pure functions: tile math, per-day corridor + tile list from tripData (planTrip), space budget (computeBudget), download queue with the sacrifice order (buildQueue), clean-up / route-change diff (cleanupPlan),
    current-day index; (2) storage: IndexedDB per trip ("pt-<trip>-offmap": stores tiles / index / meta) + an in-memory twin for tests; (3) prepare(): the download engine (4-6 parallel, retry with back-off,
    stops on 429/403/401, resumes from what is stored); (4) the offmap://z/x/y tile reader (+ MapLibre addProtocol helper). Nothing in the app calls this file yet: index.html only loads it (<script>) and
    declares OFFMAP_FEATURE='off'; drawMap() is untouched (conversation 2). Loading the file has no side effect except defining window.__ptOM.
    Active ONLY when OFFMAP_FEATURE === 'on' and the open trip is in OFFMAP_TRIPS (Vietnam is never active). Off / other trip = the app exactly as alpha.18.13.
-   The Protomaps key is NOT in this file (public repo): OFFMAP_KEY stays '' until Or approves; on a test device it can be read from localStorage['pt-offmap-key'] (never committed). */
+   The Protomaps key is NOT in this file (public repo): OFFMAP_KEY stays '' until Or approves; on a device it is entered through the key window (#offmapkey) and kept in the device IndexedDB (never committed). */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.19';
+  const VERSION = '3.0.0-alpha.19.1';
 
   /* ---------- constants ---------- */
   const OFFMAP_KEY = '';                                   /* Protomaps API key. EMPTY on purpose: not committed without Or's explicit approval (see report). */
@@ -17,7 +18,6 @@
   const MB = 1024 * 1024;
   const DEFAULT_CAP = 150 * MB;                            /* per-trip cap (spec §2), changeable by the user later */
   const TILE_URL = 'https://api.protomaps.com/tiles/v4/{z}/{x}/{y}.mvt?key={key}';
-  const LS_KEY = 'pt-offmap-key';
 
   /* corridor defaults (spec §4.1): z<=10 15–30 km (25), z11–12 8 km, z13–14 3 km. Background = low zooms over the whole trip box. */
   const DEFAULTS = {
@@ -212,10 +212,58 @@
   function configure(o) { Object.assign(env, o || {}); }
   function feature() { return env.feature ? env.feature() : (typeof OFFMAP_FEATURE !== 'undefined' ? OFFMAP_FEATURE : 'off'); }
   function trips() { return env.trips ? env.trips() : OFFMAP_TRIPS; }
+  let cachedKey = '', keyAdapter = null;
   function getKey() {
     if (env.key) { try { return String(env.key() || ''); } catch (e) { return ''; } }
-    if (OFFMAP_KEY) return OFFMAP_KEY;
-    try { return String((root.localStorage && root.localStorage.getItem(LS_KEY)) || ''); } catch (e) { return ''; }
+    return OFFMAP_KEY || cachedKey;
+  }
+  /* ---------- the key window (OFFMAP-KEY-01) ---------- */
+  const KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
+  /* device-level storage of the key: one record in IndexedDB "pt-_device-offmap" (a name starting with 'pt-' is left alone by the app's storage wrapper) */
+  function idbKeyAdapter() {
+    const idb = root.indexedDB, name = 'pt-_device-offmap';
+    const open = function () { return new Promise(function (res, rej) { const r = idb.open(name, 1); r.onupgradeneeded = function () { if (!r.result.objectStoreNames.contains('kv')) r.result.createObjectStore('kv', { keyPath: 'k' }); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }); };
+    const run = function (mode, fn) { return open().then(function (db) { return new Promise(function (res, rej) { const t = db.transaction('kv', mode); let rq; t.oncomplete = function () { db.close(); res(rq ? rq.result : undefined); }; t.onerror = t.onabort = function () { db.close(); rej(t.error || new Error('idb')); }; rq = fn(t.objectStore('kv')); }); }); };
+    return { get: function () { return run('readonly', function (s) { return s.get('key'); }).then(function (r) { return r ? r.v : ''; }); }, put: function (v) { return run('readwrite', function (s) { return s.put({ k: 'key', v: v }); }); }, del: function () { return run('readwrite', function (s) { return s.delete('key'); }); } };
+  }
+  function adapter() { return keyAdapter || (keyAdapter = idbKeyAdapter()); }
+  function setKeyAdapter(a) { keyAdapter = a; cachedKey = ''; }   /* tests */
+  async function loadKey() { try { const v = await adapter().get(); cachedKey = v && KEY_RE.test(v) ? v : ''; } catch (e) { /* no storage: no key */ } return cachedKey; }
+  async function setKey(v) { v = String(v == null ? '' : v).trim(); if (!KEY_RE.test(v)) return false; try { await adapter().put(v); cachedKey = v; return true; } catch (e) { return false; } }
+  async function clearKey() { try { await adapter().del(); } catch (e) { /* none */ } cachedKey = ''; }
+  function keyHint() { const k = getKey(); return k ? '••••' + k.slice(-4) : ''; }   /* the last 4 characters only, for the screen */
+  function openKeyDialog(doc) {
+    doc = doc || (root.document); if (!doc || !doc.body) return null;
+    const old = doc.getElementById('ptOmKeyDlg'); if (old) old.remove();
+    const el = function (tag, css, text) { const n = doc.createElement(tag); if (css) n.style.cssText = css; if (text != null) n.textContent = text; return n; };
+    const wrap = el('div', 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;direction:rtl;font-family:inherit');
+    wrap.style.setProperty('display', 'flex', 'important');   /* the app's gate rule `html.pt-gate body > :not(#ptGate){display:none!important}` would hide this window while signed out */
+    wrap.id = 'ptOmKeyDlg'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true');
+    const box = el('div', 'background:#fff;color:#17211b;border-radius:14px;padding:18px 16px;max-width:360px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.3)');
+    box.appendChild(el('h2', 'margin:0 0 6px;font-size:17px', 'מפתח מפות אופליין'));
+    box.appendChild(el('p', 'margin:0 0 10px;font-size:12.5px;color:#5f6861', 'המפתח נשמר במכשיר הזה בלבד ואינו נשלח לשום מקום חוץ מבקשות האריחים.'));
+    const status = el('p', 'margin:0 0 8px;font-size:13px;font-weight:600');
+    const input = el('input', 'width:100%;box-sizing:border-box;padding:10px;font-size:15px;border:1px solid #c9d1c3;border-radius:8px;direction:ltr;text-align:left');
+    input.type = 'text'; input.setAttribute('autocomplete', 'off'); input.setAttribute('autocapitalize', 'off'); input.setAttribute('spellcheck', 'false'); input.placeholder = 'הדבק מפתח';
+    const msg = el('p', 'margin:8px 0 0;min-height:18px;font-size:12.5px;color:#5f6861');
+    const row = el('div', 'display:flex;gap:8px;margin-top:10px');
+    const btn = function (t, bg, fg) { const b = el('button', 'flex:1;padding:11px 6px;border:0;border-radius:8px;font-size:14px;background:' + bg + ';color:' + fg + ';cursor:pointer', t); b.type = 'button'; return b; };
+    const save = btn('שמור', '#2f6f4f', '#fff'), del = btn('מחק', '#f1ece4', '#8a2b1f'), close = btn('סגור', '#eef1de', '#17211b');
+    const refresh = function () { const h = keyHint(); status.textContent = h ? 'מפתח שמור: ' + h : 'אין מפתח שמור'; };
+    const done = function () { wrap.remove(); try { if (root.location && /offmapkey/.test(root.location.hash)) root.history.replaceState(null, '', root.location.pathname + root.location.search); } catch (e) { /* ignore */ } };
+    save.onclick = async function () { const v = String(input.value || '').trim(); if (!KEY_RE.test(v)) { msg.textContent = 'המפתח לא תקין (8–128 תווים: אותיות, ספרות, - או _).'; return; } if (await setKey(v)) { input.value = ''; msg.textContent = 'נשמר במכשיר הזה ✓'; } else msg.textContent = 'השמירה נכשלה במכשיר הזה.'; refresh(); };
+    del.onclick = async function () { await clearKey(); input.value = ''; msg.textContent = 'נמחק מהמכשיר.'; refresh(); };
+    close.onclick = done; wrap.addEventListener('click', function (e) { if (e.target === wrap) done(); });
+    row.appendChild(save); row.appendChild(del); row.appendChild(close);
+    [status, input, msg, row].forEach(function (n) { box.appendChild(n); }); wrap.appendChild(box); doc.body.appendChild(wrap); refresh(); loadKey().then(refresh);
+    return wrap;
+  }
+  /* opens the window when the address carries #offmapkey (now and on later hash changes); otherwise nothing at all */
+  function mountKeyEntry() {
+    loadKey();   /* the saved key (if any) into memory so getKey() answers synchronously */
+    const check = function () { try { if (root.location && /(^|[#&])offmapkey$/.test(root.location.hash)) openKeyDialog(root.document); } catch (e) { /* never break the page */ } };
+    try { root.addEventListener('hashchange', check); } catch (e) { /* none */ }
+    if (root.document && root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', check); else check();
   }
   /* true only for the flag 'on' and a trip in the list; Vietnam never */
   function active(tripId) { const t = String(tripId == null ? '' : tripId); return feature() === 'on' && !!t && t !== VN_TRIP && trips().indexOf(t) >= 0; }
@@ -330,7 +378,7 @@
      o: { days, store, key, fetchFn, cur (index) | now, cap, storage: {quota, usage}|null, concurrency (default 5, max 6), retries (default 2), backoffMs, sleep, onProgress, signal, plan opts }
      → { status: 'done'|'stopped'|'nothing', reason: null|'rate_limited'|'forbidden'|'auth'|'network'|'cap'|'budget'|'aborted'|'no_key', downloaded, failed, bytes, remaining, plan, queue, used, budget } */
   async function prepare(o) {
-    const store = o.store, days = o.days || [], fetchFn = o.fetchFn || (root.fetch && root.fetch.bind(root)), key = o.key != null ? o.key : getKey();
+    const store = o.store, days = o.days || [], fetchFn = o.fetchFn || (root.fetch && root.fetch.bind(root)), key = o.key != null ? o.key : (getKey() || await loadKey());
     const sleep = o.sleep || sleepReal, conc = clamp(o.concurrency || 5, 1, 6), retries = o.retries != null ? o.retries : 2, backoff = o.backoffMs != null ? o.backoffMs : 600;
     const res = { status: 'nothing', reason: null, downloaded: 0, failed: 0, bytes: 0, remaining: 0, plan: null, queue: null, used: 0, budget: 0 };
     if (!key) { res.reason = 'no_key'; return res; }
@@ -398,7 +446,7 @@
 
   const api = {
     version: VERSION, constants: { OFFMAP_TRIPS: OFFMAP_TRIPS, DEFAULT_CAP: DEFAULT_CAP, DEFAULTS: DEFAULTS, DEFAULT_AVG_KB: DEFAULT_AVG_KB, TILE_URL: TILE_URL, VN_TRIP: VN_TRIP },
-    configure: configure, active: active, getKey: getKey,
+    configure: configure, active: active, getKey: getKey, setKey: setKey, clearKey: clearKey, loadKey: loadKey, setKeyAdapter: setKeyAdapter, keyHint: keyHint, openKeyDialog: openKeyDialog, mountKeyEntry: mountKeyEntry,
     lon2x: lon2x, lat2y: lat2y, tileKey: tileKey, parseKey: parseKey, tileNW: tileNW, tileSizeKm: tileSizeKm, distKm: distKm, coord: coord,
     dayPoints: dayPoints, coveringTiles: coveringTiles, planTrip: planTrip, avgBytes: avgBytes, computeBudget: computeBudget, currentDayIndex: currentDayIndex,
     buildQueue: buildQueue, cleanupPlan: cleanupPlan, dayCoverage: dayCoverage,
