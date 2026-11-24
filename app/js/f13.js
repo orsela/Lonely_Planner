@@ -4,6 +4,7 @@
    to en-GB in English, and wraps String.prototype.localeCompare the same way (no locale or he/he-IL → en-GB), so dates, numbers and sort order follow the language. 'en-US'/'en-GB' calls in the app are deliberate and untouched.
    Flag 'off' = unchanged (nothing is patched, no link).
    CHANGE 2026-11-24 F13-FN-03: version 3.0.0-alpha.18.8 — API + enabled() (true when the flag is 'on', or 'beta' on a beta device): the trip wizard uses it to offer "English" as the group language (stage 2).
+   CHANGE 2026-11-24 F13-FN-06: version 3.0.0-alpha.18.10 — a "שפה · Language" row in "עוד" (only where F13 is enabled and the trip is not forced Hebrew) switches this device between עברית and English.
    CHANGE 2026-11-24 F13-FN-04: version 3.0.0-alpha.18.9 (stage 4a) — the runtime DOM layer: while English is active a MutationObserver translates every Hebrew text node and the attributes placeholder / title / aria-label / alt /
    (button) value through the catalog (exact → pattern), keeps the Hebrew original of each touched node so the page can go back to Hebrew, skips script/style/textarea/contenteditable/[data-f13-skip] and form values, and also translates
    document.title and the messages of alert/confirm/prompt. No catalog entry = the Hebrew stays (and is listed by stats().missingList). Whitespace inside a text is collapsed before the lookup. Flag 'off' = none of this runs.
@@ -18,7 +19,7 @@
    Language order (spec §4): the device choice (pt:_device:lang) → the trip's default_lang → the browser language → 'he'. Everything inside try/catch: a failure here never breaks the app. */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.18.9';   /* CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
+  const VERSION = '3.0.0-alpha.18.10';   /* CHANGE 2026-11-24 F13-FN-06: was '3.0.0-alpha.18.9' (a "שפה · Language" row in "עוד"). Earlier: CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
   const LANGS = ['he', 'en'];
   const LOCALES = { he: 'he-IL', en: 'en-GB' };            /* D4 */
   const FORCED_HE_TRIPS = ['f0200000-0000-4000-8000-000000000001'];   /* the Vietnam trip: never English (spec §2) */
@@ -164,6 +165,25 @@
     if (S.lang === 'en') { doc.lang = 'en'; doc.dir = 'ltr'; S.changedDoc = true; ltrCss(true); }
     else if (S.changedDoc) { doc.lang = 'he'; doc.dir = 'rtl'; S.changedDoc = false; ltrCss(false); }   /* back to exactly what the page ships with */
   }
+  /* CHANGE 2026-11-24 F13-FN-06: new — a "שפה · Language" row in "עוד" (only where F13 is enabled and the trip is not forced-Hebrew); tap switches this device between עברית / English */
+  function langRow() {
+    try {
+      const d = W && W.document, more = d && d.getElementById('more'); if (!more) return;
+      const show = enabled() && !isForcedHebrew(S.trip, backend());
+      let row = d.getElementById('ptF13LangRow');
+      if (!show) { if (row) row.remove(); return; }
+      const sub = S.lang === 'en' ? 'English · tap for עברית' : 'עברית · לחיצה ל-English';
+      if (row) { const v = row.querySelector('.val'); if (v && v.textContent !== sub) v.textContent = sub; return; }
+      const anchor = d.getElementById('documentsBtn'); if (!anchor || !anchor.parentNode) return;
+      row = d.createElement('div'); row.className = 'listitem'; row.id = 'ptF13LangRow'; row.setAttribute('role', 'button'); row.setAttribute('tabindex', '0'); row.setAttribute('data-f13-skip', '1');
+      row.innerHTML = '<div class="ic" style="background:#eef2fb">🌐</div><div class="lbl">שפה · Language<span class="val" style="display:block;font-weight:400;font-size:.72rem"></span></div><div class="chev">‹</div>';
+      row.querySelector('.val').textContent = sub;
+      const go = function () { setLang(S.lang === 'en' ? 'he' : 'en'); };
+      row.addEventListener('click', go);
+      row.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); } });
+      anchor.parentNode.insertBefore(row, anchor);
+    } catch (e) { /* no DOM */ }
+  }
   function apply() {
     if (MODE === 'off') return S.lang;
     const l = effectiveLang(), changed = l !== S.lang;
@@ -171,6 +191,7 @@
     if (enabled()) patchLocale();
     applyDoc();
     if (l === 'en') { loadCatalog(); domStart(); } else if (changed) domStop();   /* F13-FN-04 */
+    langRow();
     if (changed) { try { root.dispatchEvent(new root.CustomEvent('pt:langchange', { detail: { lang: l } })); } catch (e) { /* no CustomEvent */ } }
     return l;
   }
@@ -303,6 +324,7 @@
       root.addEventListener('hashchange', function () { if (hashCmd()) { try { root.location.reload(); } catch (e) { apply(); } } });   /* a hash typed into an open app: reload, like F22a */
     }
     apply();
+    try { if (W && W.document.readyState === 'loading') W.document.addEventListener('DOMContentLoaded', langRow); } catch (e) { /* no DOM */ }   /* F13-FN-06: the script loads in <head> */
   } catch (e) { /* never break the app */ }
 }(typeof window !== 'undefined' ? window : globalThis));
 

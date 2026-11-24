@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.10 — F13 · language switch in "עוד" (2026-11-24)
+- A "שפה · Language" row in the More menu switches this device between Hebrew and English (behind LANG_FEATURE; hidden for the Vietnam trip).
+
 ## 3.0.0-alpha.18.9 — F13 stage 4a · English for the app shell (2026-11-24)
 - Runtime translation layer (app/js/f13.js): text nodes and attributes (placeholder, title, aria-label, alt) are translated from app/i18n/en.json while English is on; later-added nodes too; user fields and `data-f13-skip` untouched; Hebrew restored on switching back.
 - Matching also works through decoration (emoji, ➕, ·, …) and mirrors direction arrows (← → ‹ ›).

@@ -93,7 +93,7 @@ def test_a_shipped_fresh_device_is_hebrew(browser, servers):
     if page.evaluate("()=>window.__ptF13&&window.__ptF13.mode") != "beta": P.append("mode")
     if page.evaluate("()=>window.__ptF13.active()"): P.append("active on a fresh device")
     if any("i18n/en.json" in u for u in seen): P.append("catalog fetched")
-    if page.evaluate("()=>window.__ptF13.VERSION") != "3.0.0-alpha.18.9": P.append("version")
+    if page.evaluate("()=>window.__ptF13.VERSION") != "3.0.0-alpha.18.10": P.append("version")
     if page.evaluate("()=>document.documentElement.scrollWidth>window.innerWidth+1"): P.append("horizontal overflow at 390px")
     if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
     ctx.close()
@@ -239,3 +239,22 @@ def test_h_stage4a_dom_layer(browser, servers):
     if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
     ctx.close()
     assert not P, "\n".join(P)
+
+
+def test_i_language_row_in_more(browser, servers):
+    """F13-FN-06: with F13 enabled (beta device) a 'שפה · Language' row appears in 'עוד' and toggles he/en; without beta there is no row."""
+    ctx, page, seen, errs = new_page(browser)
+    P = []
+    page.goto(servers["shipped"]); page.wait_for_timeout(1200)
+    if page.evaluate("()=>!!document.getElementById('ptF13LangRow')"): P.append("row exists without beta")
+    page.goto(servers["shipped"] + "#f13beta"); page.wait_for_timeout(300); page.reload(); page.wait_for_timeout(1500)
+    if not page.evaluate("()=>!!document.getElementById('ptF13LangRow')"): P.append("no row on a beta device")
+    else:
+        page.evaluate("()=>document.getElementById('ptF13LangRow').click()"); page.wait_for_timeout(500)
+        if page.evaluate("()=>window.__ptF13.lang()") != "en": P.append("click did not switch to en")
+        if page.evaluate("()=>document.documentElement.dir") != "ltr": P.append("dir not ltr")
+        page.evaluate("()=>document.getElementById('ptF13LangRow').click()"); page.wait_for_timeout(500)
+        if page.evaluate("()=>window.__ptF13.lang()") != "he": P.append("second click did not return to he")
+    if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
+    ctx.close()
+    assert not P, P
