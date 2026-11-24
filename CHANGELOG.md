@@ -1,5 +1,11 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.1 — TRIP-COUNTRY-A · country in search text and Booking link, flight search on the first / last day (2026-11-24)
+- New `app/js/tripcountry.js` (cached offline in `sw.js`), flag `TRIPCOUNTRY_FEATURE='on'`. Active only for a cloud trip that is not the Vietnam trip; Vietnam, local storage and `'off'` = exactly alpha.18.
+- Place search of a point, hotel navigation query and airport-address fallback name the day's country (was a fixed ", Vietnam"). The Booking.com link of a hotel uses the trip's traveller count (F24 C6), rooms = ceil(n/2), no children / ages (was Vietnam, 2 adults, 3 children 17/15/11, 2 rooms).
+- `app/js/f24.js`: a trip whose first / last day is not marked as a flight day now gets the flight search card on that day (first: TLV → the country's main airport, round trip to the last day; last: the country's main airport → TLV), unless a flight is booked, a flight day is marked within 2 days of that end, or the day is in Israel. The lodging card stays under it.
+- Tests: `tests/tripcountry/run.sh` (Node 4/4); f24 20/20, f08 31/31, f12 15/15 unchanged. Not yet checked on a phone. Not done here (still open in TRIP-COUNTRY): the fallback home map (needs a mockup) and the Timeline import time zone.
+
 ## 3.0.0-alpha.18 — F12 · shared document vault (2026-11-24)
 - Server: migrations 0023 + 0024, private bucket `trip-docs`, Edge Function `vault-delete`. Page: new `app/js/f12.js` ("כספת משותפת" in "עוד": upload PDF / JPG / PNG / WEBP up to 10 MB, 100 MB per trip, view, rename, delete by manager, "שמור לאופליין" per document, "שמור גם במכשיר שלי" on upload; copies on the device in Cache API `pt-docs-v1`, deleted after a server delete, member removal, `device_revoked` and sign-out).
 - Flag `VAULT_FEATURE='on'`, `VAULT_TRIPS` = the test trip "בדיקה04" and the Romania trip (added 24/11 at Or's request, while the phone check is still running). Vietnam is never listed. Not listed / `'off'` = exactly alpha.17.2.

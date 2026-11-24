@@ -1,4 +1,9 @@
-/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.16.4
+/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.18.1
+   CHANGE 2026-11-24 TC-A-F24-01: what changed from alpha.16.4 (Or's phone check: the Romania trip has no flight search on its first and last day because those days are not marked as flight days): when
+   app/js/tripcountry.js is active (TRIPCOUNTRY_FEATURE='on', cloud, not the Vietnam trip) f24FlightSearch also answers for the FIRST day (from Tel Aviv to the day's country, main airport unless the day's city is an
+   airport; round trip when the last day is also unmarked and not booked) and the LAST day (from the day's country to Tel Aviv) of a trip with at least 2 days, when no day within 2 days of that end is marked as a flight
+   day, the day is abroad and no flight is booked for it. The card says so ("ניחוש לפי המדינה") and keeps the change controls. paintDay shows the day's lodging card too under such a flight card. Marked flight days
+   and every other day behave as in alpha.16.4; with the flag off or on the Vietnam trip nothing changes.
    CHANGE 2026-11-16 F24-FIX-06: what changed from alpha.16.3 (Or's choice, Google Flights opened "from Haifa" round trip): a flight side that is only a country now gets that country's main airport (the first one in
    airports.json: AE→DXB, GR→ATH…), marked guessFrom/guessTo and shown as "ניחוש לפי המדינה" on the card, so the link always names origin, destination, date and "one way". A side with a city or code is untouched.
    CHANGE 2026-11-16 F24-FIX-05: what changed from alpha.16.2 (Or's phone check, day 9): the destination leg of the flight card is now a button with a "שינוי" control, like the origin. It opens the same airport sheet
@@ -128,12 +133,32 @@
 
   /* ---- C1, C4, C5: the flight search of day i (null = no card) ---- */
   function flightIdx() { const f = F8(), a = days(), out = []; for (let i = 0; i < a.length; i++) if (f.f08IsFlight(a[i])) out.push(i); return out; }
+  /* TC-A-F24-01: 'first' / 'last' when day i is an end day of the trip that is not marked as a flight day but should offer a flight search (see the header); '' otherwise */
+  function edgeOn() { try { return !!(root.__ptTC && root.__ptTC.active && root.__ptTC.active()); } catch (e) { return false; } }
+  function edgeDay(i) {
+    if (!edgeOn()) return '';
+    const f = F8(), a = days(), n = a.length, d = a[i];
+    if (n < 2 || !d || f.f08IsFlight(d)) return '';
+    const cc = f.f08DayCountry(d); if (!cc || cc === HOME_CC) return '';
+    const fl = flightIdx();
+    if (i === 0 && !fl.some(k => k <= 1)) return 'first';
+    if (i === n - 1 && !fl.some(k => k >= n - 2)) return 'last';
+    return '';
+  }
+  function edgePlace(d) {   /* the day's city when it is an airport city in the day's country, else only the country (→ the country's main airport below) */
+    const cc = F8().f08DayCountry(d), p = placeOfSide({ country: cc, city: d.city });
+    return p.iata ? p : { iata: '', city: '', cityHe: '', country: cc };
+  }
   function f24FlightSearch(i, opt) {
     if (off()) return null;
     const f = F8(), a = days(), d = a[i], date = dayIso(d);
-    if (!d || !date || !f.f08IsFlight(d) || f24FlightBooked(i)) return null;
-    const fl = flightIdx(), first = fl[0] === i;
-    let to = placeOfSide(f.f08FlightTo(d)), from = placeOfSide(f.f08FlightFrom(d));
+    if (!d || !date || f24FlightBooked(i)) return null;
+    const virt = f.f08IsFlight(d) ? '' : edgeDay(i);   /* TC-A-F24-01 */
+    if (!f.f08IsFlight(d) && !virt) return null;
+    const fl = flightIdx(), first = virt ? virt === 'first' : fl[0] === i;
+    let to, from;
+    if (virt) { const here = edgePlace(d), home = placeOfSide({}); if (virt === 'first') { from = home; to = here; } else { from = here; to = home; } }
+    else { to = placeOfSide(f.f08FlightTo(d)); from = placeOfSide(f.f08FlightFrom(d)); }
     /* F24-FIX-04: the last day of the trip, destination only a country → home (TLV); origin only a country → the airport of the previous day's city, else this day's city */
     if (i === a.length - 1 && isVague(to)) {
       to = placeOfSide({});
@@ -143,7 +168,7 @@
       }
     }
     /* C4: the first flight of the trip leaves from TLV, unless the trip already spent days abroad before it */
-    const sideFrom = f.f08FlightFrom(d);
+    const sideFrom = virt ? {} : f.f08FlightFrom(d);
     if (first && !(sideFrom.country && sideFrom.country !== HOME_CC && i > 0)) from = placeOfSide({});
     const o = opt && opt.origin ? f24Airport(opt.origin) : null; if (o) from = place(o);
     const dd = opt && opt.dest ? f24Airport(opt.dest) : null; if (dd) to = place(dd);   /* F24-FIX-05: manual destination */
@@ -153,11 +178,12 @@
     if (gf) from = gf; if (gt) to = gt;
     /* C5: round trip only on the first flight day, when a later flight day flies back to Israel */
     let returnDate = '';
-    if (first && isHomePlace(from) && !isHomePlace(to)) {
+    if (virt === 'first') { const li = a.length - 1, ld = dayIso(a[li]); if (ld && ld > date && edgeDay(li) === 'last' && !f24FlightBooked(li)) returnDate = ld; }   /* TC-A-F24-01 */
+    else if (first && isHomePlace(from) && !isHomePlace(to)) {
       for (let k = fl.length - 1; k > 0; k--) { const b = a[fl[k]], bd = dayIso(b); if (bd && bd > date && isHomePlace(placeOfSide(f.f08FlightTo(b)))) { returnDate = bd; break; } }
     }
     const q = { from, to, date, returnDate, adults: f24Travelers() };
-    return { i, kind: 'flight', guessFrom: !!gf, guessTo: !!gt, from, to, date, returnDate, roundTrip: !!returnDate, adults: q.adults, links: { googleFlights: f24GoogleFlightsUrl(q), skyscanner: f24SkyscannerUrl(q) } };
+    return { i, kind: 'flight', virt: virt || '', guessFrom: !!gf, guessTo: !!gt, from, to, date, returnDate, roundTrip: !!returnDate, adults: q.adults, links: { googleFlights: f24GoogleFlightsUrl(q), skyscanner: f24SkyscannerUrl(q) } };
   }
 
   /* ---- C2: the lodging search of day i: only on the first night of a run of non-flight, not-booked nights in one city ---- */
@@ -348,6 +374,7 @@ button.p24-leg{cursor:pointer}
   function paintDay(res) {
     if (res) setReservations(res);
     const old = document.getElementById('ptF24Card'); if (old) old.remove();
+    const old2 = document.getElementById('ptF24Card2'); if (old2) old2.remove();   /* TC-A-F24-01 */
     if (!B.mounted || off()) return;
     const i = B.dep && B.dep.dayIndex ? B.dep.dayIndex() : 0, anchor = document.getElementById('routeDayWeather') || document.getElementById('dayReservations'); if (!anchor) return;   /* F24-A3-01: route-v2 hides the old day card in the map view, so the card sits under the day strip's weather card (both views) */
     let c = null, html = '', on = onlineNow();
@@ -359,6 +386,7 @@ button.p24-leg{cursor:pointer}
     if (!c) return;
     const el = document.createElement('div'); el.id = 'ptF24Card'; el.className = 'p24-find'; el.setAttribute('data-kind', c.kind); el.innerHTML = html;
     anchor.insertAdjacentElement('afterend', el);
+    if (c.virt) { try { const h = f24LodgingSearch(i); if (h) { const e2 = document.createElement('div'); e2.id = 'ptF24Card2'; e2.className = 'p24-find'; e2.setAttribute('data-kind', 'hotel'); e2.innerHTML = f24HotelCardHtml(h, { online: on }); el.insertAdjacentElement('afterend', e2); } } catch (e) { } }   /* TC-A-F24-01: the first / last day keeps its lodging card */
     const chg = document.getElementById('ptF24Chg'); if (chg) chg.onclick = () => openSheet(i, c.from.iata || HOME_IATA);
     const chgTo = document.getElementById('ptF24ChgTo'); if (chgTo) chgTo.onclick = () => openSheet(i, c.to.iata || HOME_IATA, 'to');
     refreshMembers();

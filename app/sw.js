@@ -31,7 +31,8 @@ const ICONS = ["icon-192.png", "icon-512.png"];
 /* CHANGE 2026-11-17 NOTES-RICH-SW-01: "js/richnotes.js" added to SHELL_FILES (LEAN rule 7). */
 /* CHANGE 2026-11-24 F13-SW-01: was [..., "js/budgetpp.js", "countries.json", "airports.json"]. js/f13.js (F13 stage 0, 3.0.0-alpha.17.2) and i18n/en.json (the English catalog, fetched only when English is active) added, so they load offline (LEAN rule 7). Nothing else in this file changed. */
 /* CHANGE 2026-11-24 F12-SW-01: "js/f12.js" added to SHELL_FILES (LEAN rule 7). */
-const SHELL_FILES = ["js/f08.js", "js/f24.js", "js/f14.js", "js/f07.js", "js/richnotes.js", "js/budgetpp.js", "js/f13.js", "i18n/en.json", "js/f12.js", "countries.json", "airports.json"];
+/* CHANGE 2026-11-24 TC-A-SW-01: "js/tripcountry.js" added to SHELL_FILES (LEAN rule 7). */
+const SHELL_FILES = ["js/f08.js", "js/f24.js", "js/f14.js", "js/f07.js", "js/richnotes.js", "js/budgetpp.js", "js/f13.js", "i18n/en.json", "js/f12.js", "js/tripcountry.js", "countries.json", "airports.json"];
 const NAV_TIMEOUT_MS = 6000;
 
 self.addEventListener("install", (e) => {
