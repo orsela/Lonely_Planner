@@ -332,7 +332,7 @@ test("flag · active only for 'on' + a listed trip; Vietnam and unlisted trips n
   OM.configure({ feature: undefined, trips: undefined });
   assert.equal(OM.getKey(), "", "no key in the repo (OFFMAP_KEY = '')"); OM.configure({ key: () => "k1" }); assert.equal(OM.getKey(), "k1"); OM.configure({ key: undefined });
   assert.deepEqual(OM.constants.OFFMAP_TRIPS, [RO]); assert.equal(OM.constants.DEFAULT_CAP, 150 * MB);
-  assert.equal(OM.version, "3.0.0-alpha.19");
+  assert.equal(OM.version, "3.0.0-alpha.19.1");
 });
 
 test("repo · the key is not in any file; versions agree; the page only loads the script and declares the flag 'off'", () => {
@@ -340,8 +340,34 @@ test("repo · the key is not in any file; versions agree; the page only loads th
   const js = read("../../app/js/offmap.js"), html = read("../../app/index.html"), sw = read("../../app/sw.js");
   assert.match(js, /const OFFMAP_KEY = '';/);
   assert.ok(!/protomaps\.com[^\s'"`]*key=[A-Za-z0-9]{8,}/.test(js + html + sw), "no Protomaps key literal anywhere");
-  assert.match(html, /const PT_VERSION='3\.0\.0-alpha\.19'/); assert.match(html, /const APP_VERSION='3\.0\.0-alpha\.19'/);
+  assert.match(html, /const PT_VERSION='3\.0\.0-alpha\.19\.1'/); assert.match(html, /const APP_VERSION='3\.0\.0-alpha\.19\.1'/);
   assert.match(html, /<script src="js\/offmap\.js"><\/script>/); assert.match(html, /const OFFMAP_FEATURE='off';/);
   assert.match(sw, /"js\/offmap\.js"/);
-  assert.ok(!/__ptOM/.test(html.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "")), "index.html never calls the module in this conversation (no hook, no drawMap change)");
+  const code = html.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
+  assert.equal((code.match(/__ptOM/g) || []).length, 3, "index.html touches the module only in the one mountKeyEntry line (no drawMap hook)");
+  assert.match(code, /__ptOM\.mountKeyEntry\(\)/);
+});
+
+test("key window · validated, stored through the device adapter, hint shows the last 4, clear removes, getKey is sync after loadKey", async () => {
+  let rec = ""; const ad = { get: async () => rec, put: async v => { rec = v; }, del: async () => { rec = ""; } };
+  OM.setKeyAdapter(ad); OM.configure({ key: undefined });
+  assert.equal(OM.getKey(), ""); assert.equal(OM.keyHint(), "");
+  for (const bad of ["", "short", "has space 12345", "a".repeat(129), "ü".repeat(10), null]) assert.equal(await OM.setKey(bad), false, String(bad));
+  assert.equal(rec, "", "a rejected key stores nothing");
+  assert.equal(await OM.setKey("  Abcd1234-wxyz_9876  "), true, "trimmed");
+  assert.equal(rec, "Abcd1234-wxyz_9876"); assert.equal(OM.getKey(), "Abcd1234-wxyz_9876"); assert.equal(OM.keyHint(), "••••9876"); assert.ok(!OM.keyHint().includes("Abcd"));
+  OM.setKeyAdapter(ad); assert.equal(OM.getKey(), "", "a new page starts without the key in memory"); assert.equal(await OM.loadKey(), "Abcd1234-wxyz_9876"); assert.equal(OM.getKey(), "Abcd1234-wxyz_9876");
+  OM.configure({ key: () => "from-config-1" }); assert.equal(OM.getKey(), "from-config-1", "configure() still wins"); OM.configure({ key: undefined });
+  await OM.clearKey(); assert.equal(OM.getKey(), ""); assert.equal(rec, "");
+  rec = "bad key!"; assert.equal(await OM.loadKey(), "", "a corrupt stored value is ignored");
+  OM.setKeyAdapter({ get: async () => { throw new Error("no idb"); }, put: async () => { throw new Error("no idb"); }, del: async () => { throw new Error("no idb"); } });
+  assert.equal(await OM.setKey("Abcd1234-wxyz"), false, "storage failure: false, no throw"); assert.equal(await OM.loadKey(), "");
+});
+test("prepare · with no key given it loads the saved device key", async () => {
+  let rec = "SavedKey_12345"; OM.setKeyAdapter({ get: async () => rec, put: async () => {}, del: async () => {} }); OM.configure({ key: undefined });
+  const urls = []; const store = OM.createMemoryStore();
+  const r = await OM.prepare({ days: [day(1, P.bv)], store, cur: 0, sleep: async () => {}, fetchFn: async u => { urls.push(u); return okRes(zOf(u), 2000); } });
+  assert.equal(r.status, "done"); assert.ok(urls.every(u => u.endsWith("key=SavedKey_12345")));
+  OM.setKeyAdapter({ get: async () => "", put: async () => {}, del: async () => {} });
+  assert.equal((await OM.prepare({ days: [day(1, P.bv)], store: OM.createMemoryStore(), cur: 0, fetchFn: async () => { throw new Error("no"); } })).reason, "no_key");
 });

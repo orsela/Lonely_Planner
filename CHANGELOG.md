@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.19.1 — OFFMAP · key window (2026-11-24)
+- Opening the app with `#offmapkey` at the end of the address shows a small window to paste, replace or delete the Protomaps key on this device (kept on the device in IndexedDB `pt-_device-offmap`, never in the address or the repo, last 4 characters shown). No hash = nothing changes. One additive inline script after the offmap.js tag; the rest is in app/js/offmap.js.
+
 ## 3.0.0-alpha.19 — OFFMAP core · offline map tiles from the trip's own route (2026-11-24)
 - New app/js/offmap.js (core only, no screens, no map drawing): per-day corridor and tile list from tripData, space budget (cap 150 MB + free space), download queue with the order of sacrifice, IndexedDB store per trip (`pt-<trip>-offmap`), download engine (stops on 429/403, resumes), `offmap://z/x/y` tile reader. Loaded by index.html and cached in sw.js; `OFFMAP_FEATURE='off'`, nothing calls it yet, drawMap() untouched: the app behaves exactly as alpha.18.12. The Protomaps key is not in the repo.
 - Tests: tests/offmap/run.sh (Node, 20 tests).
