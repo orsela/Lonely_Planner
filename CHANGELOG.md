@@ -1,5 +1,11 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.4 — TRIP-COUNTRY fix · TC-BUG-01, offline start of a trip that is not Vietnam (2026-11-24)
+- Cause: reading the trip's days from the cloud never left a copy on the device, so an offline start of a trip that was only opened (not edited) on that phone fell through `loadState` to `makeSeed()` = the Vietnam days (Hanoi, 16/09–06/10, 20 nights, Vietnam map).
+- Flag `TRIPOFFLINE_FEATURE='on'` (app/js/tripcountry.js `tcPick` + additive lines in `loadState`), only for a cloud trip that is not Vietnam: every successful read is saved on the device; nothing readable = an empty trip with the notice "אין עותק של הטיול במכשיר" (never the Vietnam seed); a failed re-read keeps the days on screen. Vietnam, local storage and `'off'` = exactly alpha.18.3.
+- Each member must open the app online once on this version before the flight. Not in this version: the route-screen schematic map still draws Vietnam outlines (separate fix), other offline keys (expenses, reservations, budget).
+- Tests: `tests/tripcountry/run.sh` Node 10/10; `tests/tripcountry/run_browser.sh` 390px offline 9/9. Not checked on a phone.
+
 ## 3.0.0-alpha.18.3 — TRIP-COUNTRY-B · neutral home fallback map + offline-maps hint (2026-11-24)
 - Home screen, non-Vietnam cloud trip with `TRIPCOUNTRY_FEATURE='on'`: when the real map image does not load, the fallback shows a neutral grid (no Vietnam / Laos outline) with the same route line, dots and labels, plus a chip "מפה פשוטה · אין חיבור למפה" and the hint "Google Maps ← מפות אופליין ← הורדת האזור" (chip only after a real failure, not while loading). Mockup option A, approved by Or 24/11.
 - The Static Maps request names the trip's country (`region=`) instead of a fixed `VN`. Vietnam, local storage and `'off'` = exactly alpha.18.2.

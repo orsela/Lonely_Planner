@@ -89,3 +89,31 @@ test("region · trip country when active, the old fixed VN otherwise", () => {
   setup(roDays(), { trip: VN_TRIP }); assert.equal(TC.tcRegion(days[0]), "region=VN");
   setup(roDays(), { flag: "off" }); assert.equal(TC.tcRegion(days[0]), "region=VN");
 });
+
+// CHANGE 2026-11-24 TC-OFF-T-01: TC-BUG-01 (3.0.0-alpha.18.4): tcPick decides what loadState does; a non-Vietnam cloud trip never gets the Vietnam seed.
+const tcOff = (o = {}) => { setup(roDays(), o); TC.tcConfigure({ offlineFeature: () => o.off || "on" }); };
+const D = [{ date: "26/05/2027" }];
+test("pick · days read -> use + save a copy on the device", () => {
+  tcOff(); assert.deepEqual(TC.tcPick(D, []), { save: true, keep: false, empty: false });
+});
+test("pick · nothing read: keep the days on screen, else an EMPTY trip (never the seed)", () => {
+  tcOff(); assert.deepEqual(TC.tcPick(null, D), { save: false, keep: true, empty: false });
+  assert.deepEqual(TC.tcPick(null, []), { save: false, keep: false, empty: true });
+  assert.deepEqual(TC.tcPick(undefined, undefined), { save: false, keep: false, empty: true });
+  assert.deepEqual(TC.tcPick([], D), { save: false, keep: false, empty: false }, "a stored 0-day trip stays on the F04 path");
+});
+test("pick · inactive (null = loadState exactly as alpha.18.3): Vietnam, local storage, flag off, no trip id", () => {
+  tcOff({ trip: VN_TRIP }); assert.equal(TC.tcPick(null, []), null);
+  tcOff({ backend: "local" }); assert.equal(TC.tcPick(null, []), null);
+  tcOff({ off: "off" }); assert.equal(TC.tcPick(null, []), null);
+  tcOff(); TC.tcConfigure({ tripId: () => "" }); assert.equal(TC.tcPick(null, []), null);
+  setup(roDays()); TC.tcConfigure({ offlineFeature: undefined }); assert.equal(TC.tcPick(null, []), null, "no configure = off");
+});
+test("never falls back to SEED_DATA · the only makeSeed() call sits after the tcPick return, and every non-Vietnam outcome of pick returns before it", () => {
+  const src = readFileSync(new URL("../../app/index.html", import.meta.url), "utf8");
+  const f = src.slice(src.indexOf("async function loadState()"), src.indexOf("async function saveTrip()"));
+  const at = f.indexOf(":makeSeed()");
+  assert.equal((f.match(/:makeSeed\(\)/g) || []).length, 1);
+  assert.ok(at > 0 && f.indexOf("tcp.empty") < at && f.indexOf("tcp.keep") < at);
+  tcOff(); assert.equal(TC.tcPick(null, []).empty, true);
+});
