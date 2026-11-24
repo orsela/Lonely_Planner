@@ -4,6 +4,7 @@
    to en-GB in English, and wraps String.prototype.localeCompare the same way (no locale or he/he-IL → en-GB), so dates, numbers and sort order follow the language. 'en-US'/'en-GB' calls in the app are deliberate and untouched.
    Flag 'off' = unchanged (nothing is patched, no link).
    CHANGE 2026-11-24 F13-FN-03: version 3.0.0-alpha.18.8 — API + enabled() (true when the flag is 'on', or 'beta' on a beta device): the trip wizard uses it to offer "English" as the group language (stage 2).
+   CHANGE 2026-11-24 F13-FN-07: version 3.0.0-alpha.18.11 — API heText(el): the element's text as the Hebrew source, for code that compares DOM text with Hebrew.
    CHANGE 2026-11-24 F13-FN-06: version 3.0.0-alpha.18.10 — a "שפה · Language" row in "עוד" (only where F13 is enabled and the trip is not forced Hebrew) switches this device between עברית and English.
    CHANGE 2026-11-24 F13-FN-04: version 3.0.0-alpha.18.9 (stage 4a) — the runtime DOM layer: while English is active a MutationObserver translates every Hebrew text node and the attributes placeholder / title / aria-label / alt /
    (button) value through the catalog (exact → pattern), keeps the Hebrew original of each touched node so the page can go back to Hebrew, skips script/style/textarea/contenteditable/[data-f13-skip] and form values, and also translates
@@ -19,7 +20,7 @@
    Language order (spec §4): the device choice (pt:_device:lang) → the trip's default_lang → the browser language → 'he'. Everything inside try/catch: a failure here never breaks the app. */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.18.10';   /* CHANGE 2026-11-24 F13-FN-06: was '3.0.0-alpha.18.9' (a "שפה · Language" row in "עוד"). Earlier: CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
+  const VERSION = '3.0.0-alpha.18.11';   /* CHANGE 2026-11-24 F13-FN-07: was '3.0.0-alpha.18.10' (heText helper for code that reads DOM text). */ const _PREV_VERSION = '3.0.0-alpha.18.10';   /* CHANGE 2026-11-24 F13-FN-06: was '3.0.0-alpha.18.9' (a "שפה · Language" row in "עוד"). Earlier: CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
   const LANGS = ['he', 'en'];
   const LOCALES = { he: 'he-IL', en: 'en-GB' };            /* D4 */
   const FORCED_HE_TRIPS = ['f0200000-0000-4000-8000-000000000001'];   /* the Vietnam trip: never English (spec §2) */
@@ -223,6 +224,15 @@
     const out = translate(v); if (out === v) return;
     D.orig.set(n, { he: v, en: out }); D.touched.add(n); n.nodeValue = out;
   }
+  /* F13-FN-07: the element's text as the Hebrew source — for code that reads DOM text and compares it with Hebrew (translated text nodes give back their original) */
+  function heText(el) {
+    if (!el) return '';
+    try {
+      const w = W.document.createTreeWalker(el, 4), out = []; let n;
+      while ((n = w.nextNode())) { const r = D.orig.get(n); out.push(r && r.en === n.nodeValue ? r.he : n.nodeValue); }
+      return out.join('');
+    } catch (e) { return el.textContent || ''; }
+  }
   function trAttrs(el) {
     if (skipEl(el)) return;
     const names = ATTRS.slice();
@@ -301,7 +311,7 @@
     VERSION: VERSION, mode: MODE,
     lang: function () { return S.lang; }, enabled: function () { return enabled(); }, active: function () { return MODE !== 'off' && S.lang === 'en'; },
     locale: function () { return ptLocale(S.lang); },
-    translate: translate, t: t, refresh: domRefresh, setTrip: setTrip, setLang: setLang, loadCatalog: loadCatalog,
+    heText: heText, translate: translate, t: t, refresh: domRefresh, setTrip: setTrip, setLang: setLang, loadCatalog: loadCatalog,
     stats: function () { return { lang: S.lang, loaded: S.loaded, missing: S.missN, missingList: Object.keys(S.miss) }; },
     _pure: { normLang: normLang, pickLang: pickLang, isForcedHebrew: isForcedHebrew, ptLocale: ptLocale, makeTranslator: makeTranslator, compilePattern: compilePattern, fill: fill }
   };

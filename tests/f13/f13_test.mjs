@@ -166,7 +166,8 @@ import { readFileSync as _rf } from 'node:fs';
   const he = /[֐-׿]/;
   test('catalog: sizeable, no Hebrew left in English values, placeholders match', () => {
     assert.ok(Object.keys(cat.exact).length > 500);
-    for (const [k, v] of Object.entries(cat.exact)) assert.ok(!he.test(v), 'Hebrew in English value: ' + k);
+    const KEEP_HE = new Set(['⚠️ לא נמצא גיליון בשם "מסלול" בקובץ']);   /* names a Hebrew sheet in the user's Excel file */
+    for (const [k, v] of Object.entries(cat.exact)) assert.ok(KEEP_HE.has(k) || !he.test(v), 'Hebrew in English value: ' + k);
     for (const p of cat.patterns) {
       assert.ok(!he.test(p.en), 'Hebrew in pattern: ' + p.he);
       const ph = s => (s.match(/\{[a-z0-9_]+\}/gi) || []).sort().join();

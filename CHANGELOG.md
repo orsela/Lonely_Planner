@@ -1,5 +1,10 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.11 — F13 stage 4b · messages, toasts and dialogs in English (2026-11-24)
+- app/i18n/en.json: +~550 entries — error / success messages, confirmations, month and weather names, member / invitation / account texts (source: tests/f13/catalog_msgs.txt via build_catalog.py).
+- New API `__ptF13.heText(el)` and helper `heTxt()` in index.html: three places that compared DOM text with Hebrew (flight-booking label on Home, stale-rate message) now read the Hebrew source, so translation can't change their behaviour.
+- Known gap: texts built by joining a Hebrew fragment with a value (e.g. name + " הוסר/ה מהטיול") stay Hebrew until they get patterns / t() keys (next stage).
+
 ## 3.0.0-alpha.18.10 — F13 · language switch in "עוד" (2026-11-24)
 - A "שפה · Language" row in the More menu switches this device between Hebrew and English (behind LANG_FEATURE; hidden for the Vietnam trip).
 

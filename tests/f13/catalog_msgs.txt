@@ -1,0 +1,544 @@
+אפשר לראות הכול, אבל לא לשנות.|You can see everything, but not change it.
+הבקשות הממתינות נשארות|Pending requests stay
+החברים בטיול לא מושפעים.|Trip members are not affected.
+לא נכנס – הממיר מלא (10/10). אפשר להסיר מטבע אחר.|Not added – the converter is full (10/10). You can remove another currency.
+עדיין תקף. לא נשלח קוד חדש.|Still valid. No new code was sent.
+שינויים לא סונכרנו — לחצו לניסיון|Changes not synced — tap to retry
+שינויים שמורים רק במכשיר הזה|Changes are saved on this device only
+שינויים שעשית בלי רשת לא נשמרו.|Changes you made offline were not saved.
+Google Maps לא זמין כרגע · הערכה לפי קו אווירי|Google Maps unavailable right now · straight-line estimate
+אופס, הייתה בעיית תקשורת רגעית 🙈 אפשר לנסות שוב?|Oops, a momentary connection problem 🙈 Try again?
+אימות והמשך להקמה|Verify and continue to set up
+אימות מייל|Email verification
+אין בקשות חדשות|No new requests
+אין בקשות שמחכות לאישור|No requests waiting for approval
+אין הוצאות בקטגוריה זו|No expenses in this category
+אין חיבור לאחסון משותף — הנתונים נשמרים במכשיר זה בלבד|No connection to shared storage — data is saved on this device only
+אין חיבור לרשימת המטבעות|No connection to the currency list
+אין חיבור לשרת משותף. לחצו להסבר|No connection to the shared server. Tap for details
+אין חיבור – אפשר לשנות כשהרשת תחזור.|No connection – you can change this when the network is back.
+אין חיבור – נסו שוב|No connection – try again
+אין חיבור. נסו שוב|No connection. Try again
+אין חיבור. נסו שוב כשהרשת תחזור.|No connection. Try again when the network is back.
+אין חיבור. צריך חיבור כדי לשנות מטבעות – הרשימה מוצגת כפי שנשמרה.|No connection. A connection is needed to change currencies – the list is shown as saved.
+אין ימים בטיול|No days in the trip
+אין לך הרשאת סופר-אדמין.|You don't have super-admin permission.
+אין נקודות עניין להיום|No points of interest for today
+אין עדיין טיולים|No trips yet
+אין עותק של הטיול במכשיר. הוא ייטען כשתהיה רשת.|There is no copy of the trip on this device. It will load when there is a network.
+אין שער|No rate
+אין שערים שמורים — לחצו "🔄 עדכן שערים אוטומטית" או הזינו ידנית|No saved rates — tap "🔄 Update rates automatically" or enter manually
+אין שעת המראה בהזמנה.|The booking has no departure time.
+איפה הקוד?|Where's the code?
+איפה הקוד? בהתראה של המייל|Where's the code? In the email notification
+אישור|OK
+אישור · מחליף את ההזמנה|Confirm · replaces the invitation
+אישור · מייל באנגלית|Confirm · email in English
+אישור ביטול|Confirm cancellation
+אישור בקשה|Approve request
+אישור וקישור|Confirm and link
+אישור ושליחת הזמנה|Confirm and send invitation
+אישור ושליחת הזמנה חדשה|Confirm and send a new invitation
+אישור טיול נוסף|Confirm another trip
+אנגלית|English
+אנגלית – כמו הבקשה|English – like the request
+אני|Me
+אפשר לבחור עד 15 מדינות.|You can pick up to 15 countries.
+אפשרויות: עריכה או מחיקה|Options: edit or delete
+את/ה המנהל/ת היחיד/ה – קודם ממנים מנהל|You're the only manager – appoint another manager first
+באייפון: כניסה עם קוד למייל|On iPhone: sign in with an email code
+בבית|At home
+בודקים…|Checking…
+בחר ILS כמטבע יעד|Pick ILS as the target currency
+בטיול חייב להישאר מנהל אחד|A trip must keep at least one manager
+בטיסה|In flight
+ביטוח|Insurance
+ביטול הישנה ושליחת הזמנה חדשה|Cancel the old one and send a new invitation
+ביקרנו בפועל|Actually visited
+בלי חשבון|Without an account
+בסיס|Base
+בסיס · תמיד בטיול|Base · always on the trip
+בספארי: שיתוף ← "הוספה למסך הבית"|In Safari: Share → "Add to Home Screen"
+בצע המרה תחילה|Convert first
+בקרוב|Coming soon
+בקשות|Requests
+בקשות, קבוצות והזמנת מנהלים|Requests, groups and inviting managers
+גרסה חדשה זמינה · רענון|New version available · Refresh
+דגשים|Highlights
+דוחים…|Rejecting…
+דחייה|Reject
+דחיית בקשה|Reject request
+דרכונים / ויזות|Passports / visas
+דרכים אחרות|Other ways
+האימות פג. פתחו שוב את ההזמנה ואמתו את המייל.|Verification expired. Open the invitation again and verify the email.
+האישור התקבל. פתחו את הקישור מהמייל השני אם נשלח.|Confirmation received. Open the link in the second email if one was sent.
+האפליקציה הותקנה…|The app was installed…
+הבקשה הממתינה נשארת|The pending request stays
+הבקשה כבר טופלה|The request was already handled
+הבקשה נדחתה|The request was rejected
+הבקשה נדחתה ונשלחה הודעה במייל|The request was rejected and an email was sent
+הבקשה נדחתה, בלי מייל (התקרה היומית מלאה)|The request was rejected, no email (daily limit reached)
+הבקשה נדחתה, המייל לא נשלח|The request was rejected, the email was not sent
+הבקשה שלך ל-Lonely Planner|Your request to Lonely Planner
+ההוצאה|The expense
+ההוצאה תימחק אצל כל בני המשפחה.|The expense will be deleted for the whole family.
+ההזמנה בוטלה|The invitation was cancelled
+ההזמנה הוסרה מהרשימה|The booking was removed from the list
+ההזמנה וההוצאה המקושרת אליה יימחקו אצל כל בני המשפחה.|The booking and its linked expense will be deleted for the whole family.
+ההזמנה כבר נוצלה או בוטלה, ואי אפשר לשלוח אותה שוב.|The invitation was already used or cancelled, and can't be sent again.
+ההזמנה כבר נוצלה להקמת טיול, ואי אפשר לבטל אותה.|The invitation was already used to set up a trip, and can't be cancelled.
+ההזמנה לא נמצאה. רעננו את הרשימה.|The invitation wasn't found. Refresh the list.
+ההזמנה לא נפתחה|The invitation wasn't opened
+ההזמנה נמחקה|The booking was deleted
+ההזמנה תימחק אצל כל בני המשפחה, וסימון "הוזמן" יוסר מימי השהייה.|The booking will be deleted for the whole family, and the "booked" mark will be removed from the stay days.
+ההעתקה לא הצליחה. אפשר לסמן את הקישור ולהעתיק.|Copy failed. You can select the link and copy it.
+הוזמן (כן/לא)|Booked (yes/no)
+הוסף כהוצאה|Add as expense
+הוספה למסך הבית|Add to Home Screen
+הוספת Google|Add Google
+הוספת מטבע|Add currency
+הוספת נקודת עניין|Add a point of interest
+הוספת קישור Drive|Add Drive link
+הוצאה|Expense
+הוצאה חדשה|New expense
+הזמנה מאושרת|Confirmed booking
+הזמנת הטיסה|The flight booking
+הוספת הזמנת טיסה|Add a flight booking
+הזמנת מנהל|Invite a manager
+החבר היחיד בטיול לא מושפע.|The only member of the trip isn't affected.
+החברות שלי בטיול|My trip membership
+החלפה|Replace
+החלפת מטבע|Replace currency
+החלפת משתמש|Switch user
+החשבון חובר. מעכשיו אפשר להיכנס איתו מכל טלפון.|Account linked. You can now sign in with it from any phone.
+החשבון כבר שייך למישהו אחר|The account already belongs to someone else
+החשבון שלי ומעבר בין טיולים|My account and switching trips
+הטיול הגיע ל-10 מטבעות – בחרו מטבע להחלפה|The trip reached 10 currencies – pick one to replace
+הטיול הוקם|The trip was set up
+הטיול הנוכחי|The current trip
+הטיול נוצר|The trip was created
+הטיולים שלי|My trips
+הטיולים שלך|Your trips
+הטיולים שלך · בוחרים טיול|Your trips · pick a trip
+הטלפון הזה כבר בטיול. אפשר לחבר את Google במסך "עוד → אני".|This phone is already on the trip. You can link Google in "More → Me".
+הטלפון הזה כבר חבר בטיול הזה.|This phone is already a member of this trip.
+היסטוריה מקומית|Local history
+היעד הראשון|The first destination
+היעדים|Destinations
+הכול נכון?|Is everything correct?
+הכניסה בוטלה|Sign-in cancelled
+הכניסה נכשלה. נסו שוב.|Sign-in failed. Try again.
+המטבעות|Currencies
+המייל הזה כבר מקושר לחשבון אחר.|This email is already linked to another account.
+המייל לא נשלח. שום דבר לא השתנה – נסו שוב.|The email wasn't sent. Nothing changed – try again.
+המייל קושר לחשבון ✓|Email linked to the account ✓
+המיקום המדויק בלבד|Exact location only
+המכשיר הזה|This device
+המכשירים שלי|My devices
+המלון|The hotel
+הממ, לא הצלחתי לגבש תשובה טובה לזה. אפשר לנסח קצת אחרת?|Hmm, I couldn't come up with a good answer. Could you rephrase?
+המסמך יימחק מהמכשיר הזה.|The document will be deleted from this device.
+המשך עם Google|Continue with Google
+הנה הזמנים 👇|Here are the times 👇
+הנה מה שאני חושב שכדאי לעשות 🙂|Here's what I think is worth doing 🙂
+הנקודה הבאה|The next point
+הנקודה תימחק אצל כל בני המשפחה.|The point will be deleted for the whole family.
+הסעה|Transfer
+הסרה|Remove
+הסרת חשבון Google|Remove Google account
+הסרת מטבע|Remove currency
+הסרת תמונה|Remove photo
+הסתיימה|Ended
+הסתיימו|Ended
+הערה לצ'ק-אין|Check-in note
+הערות הזמנה|Booking notes
+הערכה|Estimate
+העתקת קוד המכשיר|Copy device code
+הפרטים|Details
+הצ'אט יחזור בקרוב|The chat will be back soon
+הקובץ הזה לא נראה כמו JSON תקין.|This file doesn't look like valid JSON.
+הקוד לא תקף. פותחים שוב את קישור ההצטרפות בספארי ומקבלים קוד חדש.|The code isn't valid. Open the join link again in Safari to get a new code.
+הקוד נשלח למייל|The code was sent by email
+הקוד פג. שלחו קוד חדש.|The code expired. Send a new code.
+הקוד שגוי. בדקו את המייל האחרון ונסו שוב.|Wrong code. Check the latest email and try again.
+הקישור הועתק|Link copied
+הקישור נמחק|Link deleted
+הקישור נפתח|Link opened
+הרשאה למצטרפים|Permission for joiners
+השיתוף לא הצליח. אפשר לנסות לפתוח או לשמור את הקובץ.|Sharing failed. You can try opening or saving the file.
+השם ארוך מדי (עד 80 תווים).|The name is too long (up to 80 characters).
+השם בקבוצה|Name in the group
+השם בקבוצה ארוך מדי (עד 40 תווים).|The name in the group is too long (up to 40 characters).
+השם שלי בקבוצה|My name in the group
+השם שלך בקבוצה|Your name in the group
+השערים נשמרים במכשיר ומשותפים למשפחה. לעדכון שערים מלא עברו לתקציב.|Rates are saved on the device and shared with the family. For a full rate update go to the budget.
+התחלת הקמה · בקרוב|Start setup · coming soon
+התקנת האפליקציה|Install the app
+התקרה היומית מלאה – הדחייה תהיה בלי מייל|Daily limit reached – the rejection will be sent without an email
+ויזה/דרכון|Visa/passport
+זום מפה|Map zoom
+חבר אחד|1 member
+חדש|New
+חודש|Month
+חושב…|Thinking…
+חזרה|Back
+חזרה למסך עוד|Back to More
+חיבור חשבון עוד לא פתוח בשרת. נסו שוב מאוחר יותר.|Account linking isn't open on the server yet. Try again later.
+חיפוש לפי שם, קוד או מדינה|Search by name, code or country
+חיפוש מדינה, בעברית או באנגלית…|Search a country, in Hebrew or English…
+חיפוש: שם, קוד או מדינה|Search: name, code or country
+חשב לאירו|Convert to euros
+חשב לדולרים|Convert to dollars
+חשב לשקלים|Convert to shekels
+חשבון ה-Google הוסר|The Google account was removed
+חשבון כניסה|Sign-in account
+חשבון כניסה · לא חובה|Sign-in account · optional
+חשבון כניסה · מוגן|Sign-in account · protected
+טוען…|Loading…
+טוענים את הקישור… נסו שוב בעוד רגע.|Loading the link… try again in a moment.
+טוענים את רשימת המדינות…|Loading the country list…
+טוענים…|Loading…
+טיול|Trip
+טיול יכול להימשך עד 120 ימים.|A trip can last up to 120 days.
+טיסה|Flight
+טיסה חזרה|Return flight
+טיסות|Flights
+יולי|July
+יום|Day
+יום אחד|One day
+יום טיסה|Flight day
+יום מעבר|Transit day
+יומיים|Two days
+יוני|June
+יותר מדי מטבעות – עד 10 כולל שקל, דולר ויורו.|Too many currencies – up to 10 including shekel, dollar and euro.
+יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.|Too many attempts. Try again in a few minutes.
+יותר מדי ניסיונות. נסו שוב מאוחר יותר.|Too many attempts. Try again later.
+ייווצר יום ריק לכל תאריך|An empty day will be created for each date
+ייצוא נתוני Timeline|Export Timeline data
+ינואר|January
+יעדים|Destinations
+יעדים ומטבעות|Destinations & currencies
+יציאה|Leave
+יציאה לשדה (מומלץ)|Head to the airport (recommended)
+יצירת הטיול|Create the trip
+יש לבחור או להזין שם|Pick or enter a name
+יש לבחור לפחות יום אחד (טווח תאריכים או בחירה ידנית למטה)|Pick at least one day (a date range or manual selection below)
+יש לבחור משתמש|Pick a user
+יש להזין שם טיול|Enter a trip name
+יש לזהות את שתי הנקודות קודם (הקלידו כתובת/בחרו צ׳יפ)|Identify both points first (type an address / pick a chip)
+יש לי קישור הצטרפות|I have a join link
+יש לי קישור הצטרפות מווטסאפ|I have a join link from WhatsApp
+כאן|Here
+כאן עכשיו|Here now
+כבר אינך חבר/ה בטיול|You're no longer a member of the trip
+כבר בטיול|Already on the trip
+כבר בטיול? כניסה עם החשבון|Already on a trip? Sign in with your account
+כבר הייתי בטיול|I've already been on the trip
+כל המסלול|Whole itinerary
+כמה מתוכנן להוציא היום?|How much do you plan to spend today?
+כמו שהוא|As is
+כמעט שם|Almost there
+כניסה לטיול|Enter the trip
+כניסה עם הזמנה|Sign in with an invitation
+כניסה עם המייל|Sign in with email
+כספת משותפת|Shared vault
+כתבו שם של עד 40 תווים.|Write a name of up to 40 characters.
+כתובת המייל לא תקינה.|The email address isn't valid.
+לא אפשר להסיר|Can't remove
+לא בטוח שהבנתי לגמרי -- אפשר לספר עוד קצת?|I'm not sure I fully understood -- could you tell me a bit more?
+לא הצלחנו לבדוק את ההזמנה. נסו שוב|Couldn't check the invitation. Try again
+לא הצלחנו לטעון את הטיולים. נסו שוב.|Couldn't load the trips. Try again.
+לא הצלחנו לטעון את הקישור.|Couldn't load the link.
+לא הצלחנו לטעון את רכיב האקסל — בדקו חיבור לרשת ונסו שוב.|Couldn't load the Excel component — check your connection and try again.
+לא הצלחנו לקבל את המיקום של הטלפון. צריך לאשר גישה למיקום ולנסות שוב.|Couldn't get the phone's location. Allow location access and try again.
+לא הצלחנו לשלוח את המייל. נסו שוב.|Couldn't send the email. Try again.
+לא הצלחנו לשלוח את הקוד. נסו שוב.|Couldn't send the code. Try again.
+לא הצלחתי לזהות את נקודת המוצא. אפשר לנסות שוב עם שם מדויק יותר.|I couldn't identify the starting point. Try again with a more exact name.
+לא הצלחתי למצוא תשובה כרגע|I couldn't find an answer right now
+לא מומלץ|Not recommended
+לא מצאנו הזמנה פעילה למייל הזה|We didn't find an active invitation for this email
+לא מצאנו הזמנה פעילה…|We didn't find an active invitation…
+לא נמצא מטבע|No currency found
+לא נמצאה הזמנת טיסה ליום הזה.|No flight booking found for this day.
+לא עכשיו|Not now
+לאן נוסעים?|Where are you going?
+לאן נכנסים?|Which one are you entering?
+לבחירת מלון יש לבחור לפחות יום אחד (טווח תאריכים או בחירה ידנית)|To choose a hotel, pick at least one day (a date range or manual selection)
+לבצע את הפעולה המוצעת?|Do the suggested action?
+להסיר את המסלול בפועל שהועלה? אפשר להעלות קובץ חדש בכל שלב.|Remove the uploaded actual route? You can upload a new file at any time.
+לחץ על "חשב לשקלים" לפני השמירה|Tap "Convert to shekels" before saving
+לחצו לסנכרון מיידי|Tap to sync now
+לילה בטיסה|Night flight
+למחוק את היום הנבחר? היומן והתמונות של הימים שאחריו יועברו אוטומטית.|Delete the selected day? The journal and photos of the following days will be moved automatically.
+למחוק את המסמך?|Delete the document?
+למחוק את הצ'ק-אין הזה?|Delete this check-in?
+למחוק הוצאה זו?|Delete this expense?
+למחוק הזמנה זו?|Delete this booking?
+למסלול|To the itinerary
+למשל: יפן 2027|e.g. Japan 2027
+לנהל קבוצה חדשה|Manage a new group
+לפי סעיף · לאדם|By item · by person
+לפני 1 דקות|1 minute ago
+לפני דקה|A minute ago
+לפני יומיים|Two days ago
+לפני שעה|An hour ago
+לפני שעתיים|Two hours ago
+לפתוח תמיד ישר לטיול האחרון|Always open straight to the last trip
+לשריין כרטיסים מראש|Reserve tickets in advance
+מאושר|Approved
+מאי|May
+מאתר מיקום ומקומות קרובים…|Locating you and nearby places…
+מה יוצא|What comes out
+מה יוצא?|What comes out?
+מה לעשות אם יורד גשם היום?|What to do if it rains today?
+מהבקשה|From the request
+מוסיפים את האפליקציה למסך הבית|Adding the app to the Home Screen
+מוצעים|Suggested
+מזג אוויר משתנה|Changeable weather
+מחיקת הזמנה|Delete booking
+מחפשים את ההזמנה…|Looking for the invitation…
+מחק|Delete
+מטבע בסיס קבוע|Fixed base currency
+מטבע הבית|Home currency
+מטייל אחד|1 traveller
+מי אני|Who am I
+מיקום המלון לא ידוע|Hotel location unknown
+מיקום המלון לא ידוע — מחושב ממרכז האזור|Hotel location unknown — calculated from the area centre
+מכינים את האימות…|Preparing verification…
+מכשיר חדש|New device
+מלון מתוכנן|Planned hotel
+מלונות|Hotels
+ממתינות|Pending
+ממתינים לאישור|Waiting for approval
+מנהל|Manager
+מנהל המערכת|System administrator
+מנהל/ת|Manager
+מנהל/ת אחד/ת|1 manager
+מנהל/ת טיול|Trip manager
+מנהלים בלבד|Managers only
+מסונכרן|Synced
+מסירים…|Removing…
+מסמך|Document
+מסמך ב-Drive|Document on Drive
+מסמכים|Documents
+מעבר בין טיולים|Switch between trips
+מעדכן שערים…|Updating rates…
+מצב מקומי בלבד|Local-only mode
+מקום|Place
+מקום ללא שם|Unnamed place
+מקומי בלבד|Local only
+מרץ|March
+משהו השתבש בחישוב. אפשר לנסות שוב.|Something went wrong in the calculation. You can try again.
+משהו השתבש. נסו שוב.|Something went wrong. Try again.
+נא להזין שערים תקינים וחיוביים|Enter valid, positive rates
+נובמבר|November
+נווט ›|Navigate ›
+נוסף ידנית|Added manually
+נוסף על ידי|Added by
+נוצר קישור חדש|A new link was created
+ניהול מערכת → בקשות|System administration → Requests
+ניהול ← משתמשים|Management → Users
+ניווט|Navigation
+ניווט לנקודה|Navigate to the point
+נכנסים…|Entering…
+נסו שוב|Try again
+נפוצות|Common
+נפוצים למטיילים|Popular with travellers
+נפתחו אוטומטית|Opened automatically
+נקודה|Point
+נקודה מקישור Google Maps|Point from a Google Maps link
+נקודות שמורות|Saved points
+נראה שמשהו השתבש בדרך -- ננסה שוב בעוד רגע?|Looks like something went wrong along the way -- try again in a moment?
+נשלחה|Sent
+נשלחה אתמול|Sent yesterday
+נשלחה היום|Sent today
+נשלחה לפני יומיים|Sent two days ago
+נשלחו יותר מדי מיילים. נסו שוב בעוד כמה דקות.|Too many emails were sent. Try again in a few minutes.
+סופת רעמים|Thunderstorm
+סינון|Filter
+סנכרון-ענן לא הגיב בזמן|Cloud sync didn't respond in time
+ספטמבר|September
+ינואר|January
+פברואר|February
+אפריל|April
+אוגוסט|August
+אוקטובר|October
+דצמבר|December
+בהיר|Clear
+בהיר ברובו|Mostly clear
+גשם|Rain
+גשם חזק|Heavy rain
+גשם קל|Light rain
+טפטוף|Drizzle
+ממטרים|Showers
+ממטרים חזקים|Heavy showers
+מעונן|Cloudy
+מעונן חלקית|Partly cloudy
+אתמול|Yesterday
+דקות|minutes
+שעות|hours
+עברית|Hebrew
+עברית – כמו הבקשה|Hebrew – like the request
+עדיין לא|Not yet
+עדכון קישור Drive|Update Drive link
+עדכן הוצאה|Update expense
+עוד לא יודעים מתי|Don't know when yet
+עוד לא יודעים – בוחרים באשף|Don't know yet – pick in the wizard
+עוד לא נכנס/ה|Hasn't joined yet
+עוד מקומות|More places
+עוד → אני|More → Me
+עוד → מדינות לפי ימים|More → Countries by day
+עורך|Editor
+עורך/ת|Editor
+עכשיו|Now
+עלות בפועל (₪)|Actual cost (₪)
+עלות מתוכננת (₪)|Planned cost (₪)
+ענן פעיל|Cloud active
+עריכה|Edit
+עריכת הזמנה|Edit booking
+עריכת היעדים|Edit destinations
+עריכת הערה|Edit note
+עריכת התאריכים|Edit dates
+עריכת יום|Edit day
+עריכת פרטי היום|Edit day details
+עריכת שם הטיול|Edit trip name
+ערפל|Fog
+פג תוקף · הטיול לא הוקם|Expired · the trip wasn't set up
+פותחים את Lonely Planner ממסך הבית|Opening Lonely Planner from the Home Screen
+פותחים את הטיול…|Opening the trip…
+פעולות|Actions
+פעולות על ההוצאה|Expense actions
+פעולות על ההזמנה|Booking actions
+פעולות על הנקודה|Point actions
+פעיל/ה אתמול|Active yesterday
+פעיל/ה היום|Active today
+פעילה|Active
+פעילויות|Activities
+פעילות|Activity
+פעם אחת|Once
+פרטי ההזמנה ›|Booking details ›
+פרטי הטיול|Trip details
+פרטי נקודה לא תקינים|Invalid point details
+פתח PDF|Open PDF
+פתח ב-Google Drive|Open in Google Drive
+פתחו את ההזמנה במכשיר אחר, או בקשו לשלוח אותה למייל שמקושר כאן.|Open the invitation on another device, or ask for it to be sent to the email linked here.
+פתיחה ב-Google Maps|Open in Google Maps
+פתיחה במסלול|Open in itinerary
+צופה|Viewer
+צפייה בלבד – השינוי לא נשמר|View only – the change wasn't saved
+צריך לבחור לפחות מדינה אחת.|Pick at least one country.
+צריך לבחור תאריך חזרה.|Pick a return date.
+צריך לבחור תאריך יציאה.|Pick a departure date.
+צריך למלא את השם שלך בקבוצה.|Fill in your name in the group.
+צריך לתת שם זמני לטיול.|Give the trip a temporary name.
+צריך לתת שם לטיול.|Give the trip a name.
+קבוצה ללא שם|Unnamed group
+קבוצות והזמנות|Groups & invitations
+קו אורך (lng)|Longitude (lng)
+קו רוחב (lat)|Latitude (lat)
+קובץ JSON לא תקין|Invalid JSON file
+קובץ PDF|PDF file
+קוד למייל|Code by email
+קיבלת הזמנה לנהל טיול?|Got an invitation to manage a trip?
+קישור האימות כבר לא בתוקף. שלחו מייל אימות חדש.|The verification link is no longer valid. Send a new verification email.
+קישור הצטרפות לקבוצה|Link to join the group
+קישור מוגדר · לחצו לפתיחה או עדכון|Link set · tap to open or update
+קניות|Shopping
+קניות ופנאי|Shopping & leisure
+קרוז|Cruise
+רכבת|Train
+רכבת לילה / אוטובוס סליפר|Night train / sleeper bus
+רעיון! הכנתי לכם הצעה:|Idea! I prepared a suggestion for you:
+רק מנהל הטיול יכול להוסיף, להחליף או להסיר מטבעות.|Only the trip manager can add, replace or remove currencies.
+רק מנהל הטיול יכול לשנות מטבעות|Only the trip manager can change currencies
+רק מנהלים יכולים לאשר|Only managers can approve
+רק מנהלים יכולים לנהל חברים|Only managers can manage members
+רק מנהלים יכולים לשנות|Only managers can change this
+שולחים…|Sending…
+שינוי אחד שעשית בלי רשת לא נשמר.|One change you made offline wasn't saved.
+שינוי מייל|Change email
+שלג|Snow
+שלג כבד|Heavy snow
+שלום, לאן נכנסים?|Hello, where are you entering?
+שליחה חוזרת|Send again
+שליחת הזמנה במייל|Send an invitation by email
+שליחת המייל נכשלה בצד השרת. נסו שוב בעוד כמה דקות.|Sending the email failed on the server side. Try again in a few minutes.
+שליחת המייל נכשלה ולא נשמר שום שינוי. נסו שוב.|Sending the email failed and nothing was saved. Try again.
+שליחת המייל נכשלה, וההזמנה לא נשמרה. נסו שוב.|Sending the email failed, and the invitation wasn't saved. Try again.
+שליחת המייל נכשלה. הקישור הקודם עדיין בתוקף.|Sending the email failed. The previous link is still valid.
+שליחת מייל אימות|Send verification email
+שליחת קוד|Send code
+שם בקבוצה|Name in the group
+שם הטיול ארוך מדי (עד 80 תווים).|The trip name is too long (up to 80 characters).
+שמרו את ההזמנה תחילה|Save the booking first
+שערים חיים · לא נשמרו|Live rates · not saved
+שערים חיים נמשכו מהרשת — לחצו "שמור שערים" כדי לשתף עם המשפחה|Live rates were fetched from the web — tap "Save rates" to share with the family
+שערים שמורים (הוזנו ידנית)|Saved rates (entered manually)
+שפת המייל|Email language
+שפת הקבוצה|Group language
+שתף את החוויות שלך...|Share your experiences...
+שקלים|Shekels
+תאריך החזרה|Return date
+תאריך החזרה לפני תאריך היציאה.|The return date is before the departure date.
+תאריך היציאה|Departure date
+תוצאות|Results
+תחבורה|Transport
+תמונה|Photo
+תצוגה|View
+₪ $ € קבועים ולא מופיעים כאן.|₪ $ € are fixed and don't appear here.
+₪ שקל · ILS|₪ Shekel · ILS
+€ יורו · EUR|€ Euro · EUR
+$ דולר · USD|$ Dollar · USD
+⏳ מוחק ומעביר…|⏳ Deleting and moving…
+⏳ מוחק…|⏳ Deleting…
+⏳ סורק…|⏳ Scanning…
+▴ הסתר|▴ Hide
+▾ הצג/הסתר|▾ Show/hide
+☀️ מזג אוויר נעים לפעילות בחוץ|☀️ Pleasant weather for outdoor activities
+⚠️ Google Maps סירב להיטען (בעיית מפתח/חיוב) — עברנו למפה הסכמטית.|⚠️ Google Maps refused to load (key/billing issue) — switched to the schematic map.
+⚠️ אין שער|⚠️ No rate
+⚠️ בחרו מטבע מקור ומטבע יעד|⚠️ Pick a source and a target currency
+⚠️ ההורדה נכשלה — יש להעתיק את הטקסט למטה ולשמור ידנית|⚠️ Download failed — copy the text below and save it manually
+⚠️ העתקה אוטומטית נכשלה — הטקסט מסומן, אפשר להעתיק ידנית (Ctrl+C)|⚠️ Automatic copy failed — the text is selected, copy it manually (Ctrl+C)
+⚠️ השמירה נכשלה|⚠️ Saving failed
+⚠️ יצירת האקסל נכשלה — אפשר להוריד/להעתיק כ-JSON במקום|⚠️ Creating the Excel failed — you can download / copy as JSON instead
+⚠️ כדאי להאט|⚠️ Slow down
+⚠️ לא הצלחנו לאתר את המיקום המדויק|⚠️ Couldn't locate the exact position
+⚠️ לא הצלחנו לזהות את המיקום — נסו כתובת מדויקת יותר|⚠️ Couldn't identify the location — try a more exact address
+⚠️ לא נמצא גיליון בשם "מסלול" בקובץ|⚠️ No sheet named "מסלול" found in the file
+⚠️ לא נמצאו ימים בטווח הזה — ניתן לבחור ידנית למטה|⚠️ No days found in this range — you can pick manually below
+⚠️ לא נמצאו קואורדינטות|⚠️ No coordinates found
+⚠️ סכום לא תקין|⚠️ Invalid amount
+⚠️ קובץ אקסל לא תקין או שהמבנה שונה מהצפוי|⚠️ Invalid Excel file, or the structure isn't as expected
+✅ אם ההורדה לא התחילה, אפשר להוריד/להעתיק כ-JSON במקום|✅ If the download didn't start, you can download / copy as JSON instead
+✅ אם ההורדה לא התחילה, אפשר להעתיק את הטקסט למטה במקום|✅ If the download didn't start, you can copy the text below instead
+✅ ביקרתם בכל הנקודות של היום|✅ You visited all of today's points
+✅ הועתק ללוח|✅ Copied to clipboard
+✅ היום עודכן|✅ The day was updated
+✅ המסלול יובא בהצלחה|✅ Itinerary imported successfully
+✅ הקישור נשמר ומשותף לכל המשפחה|✅ The link was saved and is shared with the whole family
+✅ השערים נשמרו ומשותפים לכל בני המשפחה|✅ Rates saved and shared with the whole family
+✅ נשמר|✅ Saved
+✅ קואורדינטות זוהו|✅ Coordinates identified
+✅ תאריך תחילת המסע עודכן וכל שאר הימים הוזזו בהתאם|✅ The trip start date was updated and all other days were shifted accordingly
+✈️ יום מעבר|✈️ Transit day
+✓ הועתק|✓ Copied
+✓ מתוכנן|✓ Planned
+✕ הסר שיוך ליום|✕ Remove day link
+➕ הוספת הזמנת טיסה ›|➕ Add a flight booking ›
+➕ הוספת שעת המראה ›|➕ Add departure time ›
+🌦️ ייתכן גשם קל באזור|🌦️ Light rain possible in the area
+🌧️ סיכוי גבוה לגשם — ייתכן שכדאי לתכנן חלופת פנים|🌧️ High chance of rain — you may want to plan an indoor alternative
+👣 ביקרנו בפועל|👣 Actually visited
+📄 פתח מסמך|📄 Open document
+📅 הטיול הסתיים|📅 The trip has ended
+📋 העתקה|📋 Copy
+📍 המיקום שלכם|📍 Your location
+📍 מיקום מדויק|📍 Exact location
+📱 שמור במכשיר · זמין אופליין|📱 Saved on device · available offline
+🔍 מאתר מיקום מדויק…|🔍 Locating exact position…
+🔍 מחפש…|🔍 Searching…
+🔗 קישור Drive|🔗 Drive link
+🔗 קישור ל-Drive|🔗 Link to Drive
+🔴 חריגה|🔴 Over budget
+💱 מטבעות · {n} מתוך 10|💱 Currencies · {n} of 10
