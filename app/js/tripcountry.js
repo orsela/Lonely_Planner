@@ -1,4 +1,5 @@
-/* Lonely Planner · TRIP-COUNTRY-A – country-aware search text and booking link (no Vietnam hard-coding for other trips) · version 3.0.0-alpha.18.1
+/* Lonely Planner · TRIP-COUNTRY-A – country-aware search text and booking link (no Vietnam hard-coding for other trips) · version 3.0.0-alpha.18.3
+   CHANGE 2026-11-24 TC-B-01: what changed from alpha.18.2 (alpha.18.1 here) (Or's choice A of the mockup, with the offline-maps hint): fallbackMap(el) swaps the Vietnam outline of the home-screen fallback map for a neutral grid and adds a chip "מפה פשוטה · אין חיבור למפה" with the line "לניווט בלי רשת: Google Maps ← מפות אופליין ← הורדת האזור" (shown only after the real map image failed: mapFailed(true)); region(d) gives the Static Maps `region=` parameter of the trip's country instead of a fixed VN. Same activation rule as before; inactive = the Vietnam map exactly as it was (and a swap made earlier is undone).
    CHANGE 2026-11-24 TC-A-01: new file (no previous version). Why: a trip that is not Vietnam (the Romania pilot) got ", Vietnam" appended to the place search
    (waypoint lookup), to the hotel navigation query and to the airport-address fallback, and its Booking.com link was fixed to "Vietnam", 2 adults, 3 children
    (17/15/11) and 2 rooms. Here: suffix(d) gives ", <English country name of the day>" (Intl.DisplayNames, no file needed); booking(stay, day) gives the Booking.com
@@ -7,7 +8,7 @@
    ", Vietnam" and booking() is null (the caller keeps its own old parameters), so the Vietnam trip is byte-identical to alpha.18. Pure helpers, no DOM. */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.18.1';
+  const VERSION = '3.0.0-alpha.18.3';
   const VN_TRIP = 'f0200000-0000-4000-8000-000000000001';   /* the Vietnam trip id (same as app/js/f13.js FORCED_HE_TRIPS) */
   const env = {};   /* feature() → 'on'|'off', backend() → 'cloud'|…, tripId() → string, travelers() → number */
   function tcConfigure(o) { Object.assign(env, o || {}); }
@@ -42,7 +43,34 @@
       group_adults: String(n), group_children: '0', no_rooms: String(Math.max(1, Math.ceil(n / 2))) };
   }
 
-  const api = { version: VERSION, tcConfigure, tcActive, tcCountryName, tcSuffix, tcBooking };
+  /* ---- TC-B-01: home-screen fallback map ---- */
+  const NEUTRAL = '<rect width="300" height="230" fill="#eef1de"/>' +
+    [30, 60, 90, 120, 150, 180, 210, 240, 270].map(x => '<path d="M' + x + ' 0 V230" stroke="#dfe5c6" stroke-width=".6"/>').join('') +
+    [23, 46, 69, 92, 115, 138, 161, 184, 207].map(y => '<path d="M0 ' + y + ' H300" stroke="#dfe5c6" stroke-width=".6"/>').join('');
+  const CHIP_STYLE = 'position:absolute;top:10px;inset-inline-start:10px;max-width:72%;display:none;flex-direction:column;gap:2px;background:#ffffffe6;border-radius:12px;padding:6px 10px;box-sizing:border-box;font-size:11px;line-height:1.35;color:#3d4a3f;pointer-events:none';
+  const CHIP_HTML = '<b style="font-weight:800">מפה פשוטה · אין חיבור למפה</b><span>לניווט בלי רשת: Google Maps ← מפות אופליין ← הורדת האזור</span>';
+  /* el = #hv2MapSchematic. Returns true when the neutral map is in place. Idempotent; called on every redraw. */
+  function tcFallbackMap(el) {
+    try {
+      if (!el) return false;
+      const bg = el.querySelector('.hv2-map-bg'); if (!bg) return false;
+      const on = tcActive(), done = el.getAttribute('data-tc') === '1';
+      if (on && !done) {
+        el.__tcOrig = bg.innerHTML; bg.innerHTML = NEUTRAL; el.setAttribute('data-tc', '1');
+        const chip = document.createElement('div'); chip.id = 'hv2TcChip'; chip.setAttribute('style', CHIP_STYLE); chip.innerHTML = CHIP_HTML; el.appendChild(chip);
+      } else if (!on && done) {
+        if (typeof el.__tcOrig === 'string') bg.innerHTML = el.__tcOrig;
+        el.removeAttribute('data-tc'); const c = document.getElementById('hv2TcChip'); if (c && c.parentNode) c.parentNode.removeChild(c);
+      }
+      return on;
+    } catch (e) { return false; }
+  }
+  /* the chip is only for a real failure: the fallback is also visible while the image is still loading */
+  function tcMapFailed(failed) { try { const c = document.getElementById('hv2TcChip'); if (c) c.style.display = failed ? 'flex' : 'none'; } catch (e) { } }
+  /* Static Maps `region=` parameter: the trip's country when active, else the old fixed VN */
+  function tcRegion(d) { if (!tcActive()) return 'region=VN'; const c = dayCountry(d); return c ? 'region=' + c : ''; }
+
+  const api = { version: VERSION, tcConfigure, tcActive, tcCountryName, tcSuffix, tcBooking, tcFallbackMap, tcMapFailed, tcRegion };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  else { root.__ptTC = { version: VERSION, configure: tcConfigure, active: tcActive, countryName: tcCountryName, suffix: tcSuffix, booking: tcBooking }; }
+  else { root.__ptTC = { version: VERSION, configure: tcConfigure, active: tcActive, countryName: tcCountryName, suffix: tcSuffix, booking: tcBooking, fallbackMap: tcFallbackMap, mapFailed: tcMapFailed, region: tcRegion }; }
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1,5 +1,10 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.3 — TRIP-COUNTRY-B · neutral home fallback map + offline-maps hint (2026-11-24)
+- Home screen, non-Vietnam cloud trip with `TRIPCOUNTRY_FEATURE='on'`: when the real map image does not load, the fallback shows a neutral grid (no Vietnam / Laos outline) with the same route line, dots and labels, plus a chip "מפה פשוטה · אין חיבור למפה" and the hint "Google Maps ← מפות אופליין ← הורדת האזור" (chip only after a real failure, not while loading). Mockup option A, approved by Or 24/11.
+- The Static Maps request names the trip's country (`region=`) instead of a fixed `VN`. Vietnam, local storage and `'off'` = exactly alpha.18.2.
+- Tests: `tests/tripcountry/run.sh` 6/6. Not checked on a phone. Still open in TRIP-COUNTRY: Timeline import time zone (low priority for Romania), `FC_VN` international/local flight label.
+
 ## 3.0.0-alpha.18.2 — F08 fix · the "✈ יום טיסה" switch is back in "✎ עריכת יום" (2026-11-24)
 - Since NOTES-RICH (alpha.17) the F08 box in the day edit form never appeared (`insertBefore` threw: the save-button lookup matched a button inside the images editor). `app/js/f08.js` now takes the save button from the form's direct children. Affects every trip; no data change. Test: `tests/f08/run_browser.sh` (failed since alpha.17, passes again).
 

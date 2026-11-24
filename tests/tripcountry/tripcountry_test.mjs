@@ -63,3 +63,29 @@ test("flight search · a booked flight, the flag off, the Vietnam trip, marked f
   const il = roDays().map(d => ({ ...d, country: "IL" })); setup(il); assert.equal(F.f24FlightSearch(0), null, "a trip inside Israel: no flight card");
   setup([roDays()[0]]); assert.equal(F.f24FlightSearch(0), null, "a one-day trip: no card");
 });
+
+// ---- TC-B-01: neutral fallback map, hint chip, Static Maps region ----
+function fakeDom() {
+  const made = {}, mk = () => ({ attrs: {}, style: {}, children: [], parentNode: null, innerHTML: "", setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k] ?? null; }, removeAttribute(k) { delete this.attrs[k]; }, appendChild(c) { c.parentNode = this; this.children.push(c); made[c.id] = c; return c; }, removeChild(c) { this.children = this.children.filter(x => x !== c); delete made[c.id]; } });
+  const bg = mk(); bg.innerHTML = "<VIETNAM-OUTLINE/>";
+  const el = mk(); el.querySelector = q => (q === ".hv2-map-bg" ? bg : null);
+  globalThis.document = { createElement: mk, getElementById: id => made[id] || null };
+  return { el, bg };
+}
+test("fallback map · neutral grid + hint chip for an active trip, chip only after a failure; Vietnam keeps its outline; switching back restores it", () => {
+  const { el, bg } = fakeDom(); setup(roDays());
+  assert.equal(TC.tcFallbackMap(el), true); assert.ok(!bg.innerHTML.includes("VIETNAM") && bg.innerHTML.includes("stroke"), "outline replaced by the grid");
+  const chip = globalThis.document.getElementById("hv2TcChip"); assert.ok(chip && /אין חיבור למפה/.test(chip.innerHTML) && /מפות אופליין/.test(chip.innerHTML));
+  assert.equal(chip.style.display, undefined, "created hidden through the style attribute");
+  assert.match(chip.attrs.style, /display:none/);
+  TC.tcMapFailed(true); assert.equal(chip.style.display, "flex"); TC.tcMapFailed(false); assert.equal(chip.style.display, "none");
+  TC.tcFallbackMap(el); assert.equal(el.children.length, 1, "idempotent: one chip");
+  setup(roDays(), { trip: VN_TRIP }); assert.equal(TC.tcFallbackMap(el), false); assert.equal(bg.innerHTML, "<VIETNAM-OUTLINE/>", "restored for Vietnam"); assert.equal(el.children.length, 0);
+  const v = fakeDom(); setup(roDays(), { trip: VN_TRIP }); assert.equal(TC.tcFallbackMap(v.el), false); assert.equal(v.bg.innerHTML, "<VIETNAM-OUTLINE/>", "Vietnam never touched");
+  const o = fakeDom(); setup(roDays(), { flag: "off" }); assert.equal(TC.tcFallbackMap(o.el), false); assert.equal(o.bg.innerHTML, "<VIETNAM-OUTLINE/>");
+});
+test("region · trip country when active, the old fixed VN otherwise", () => {
+  setup(roDays()); assert.equal(TC.tcRegion(days[0]), "region=RO");
+  setup(roDays(), { trip: VN_TRIP }); assert.equal(TC.tcRegion(days[0]), "region=VN");
+  setup(roDays(), { flag: "off" }); assert.equal(TC.tcRegion(days[0]), "region=VN");
+});
