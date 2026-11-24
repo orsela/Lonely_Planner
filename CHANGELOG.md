@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.20.1 — OFFMAP · manual download window (2026-11-24)
+- Opening the app with `#offmapdownload` at the end of the address shows a window that prepares the offline map tiles of the open trip on this device (progress, stop, resume, reasons in Hebrew, keeps the screen on, asks for persistent storage). Only for a trip listed in OFFMAP_TRIPS; the flag stays 'off'. No map display yet (conversation 2): the tiles are stored, not drawn.
+
 ## 3.0.0-alpha.20.0 — OFFMAP (core + shared key window) merged after F13-TR (2026-11-24)
 - Same content as the OFFMAP sections below (built as alpha.19 / 19.1 / 19.2 on its own branch); renumbered to 20.0 because F13-TR took alpha.19.0 on main. OFFMAP_FEATURE stays 'off': no behaviour change for travelers.
 

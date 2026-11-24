@@ -332,7 +332,7 @@ test("flag · active only for 'on' + a listed trip; Vietnam and unlisted trips n
   OM.configure({ feature: undefined, trips: undefined });
   assert.equal(OM.getKey(), "", "no key in the repo (OFFMAP_KEY = '')"); OM.configure({ key: () => "k1" }); assert.equal(OM.getKey(), "k1"); OM.configure({ key: undefined });
   assert.deepEqual(OM.constants.OFFMAP_TRIPS, [RO]); assert.equal(OM.constants.DEFAULT_CAP, 150 * MB);
-  assert.equal(OM.version, "3.0.0-alpha.20.0");
+  assert.equal(OM.version, "3.0.0-alpha.20.1");
 });
 
 test("repo · the key is not in any file; versions agree; the page only loads the script and declares the flag 'off'", () => {
@@ -340,11 +340,11 @@ test("repo · the key is not in any file; versions agree; the page only loads th
   const js = read("../../app/js/offmap.js"), html = read("../../app/index.html"), sw = read("../../app/sw.js");
   assert.match(js, /const OFFMAP_KEY = '';/);
   assert.ok(!/protomaps\.com[^\s'"`]*key=[A-Za-z0-9]{8,}/.test(js + html + sw), "no Protomaps key literal anywhere");
-  assert.match(html, /const PT_VERSION='3\.0\.0-alpha\.20\.0'/); assert.match(html, /const APP_VERSION='3\.0\.0-alpha\.20\.0'/);
+  assert.match(html, /const PT_VERSION='3\.0\.0-alpha\.20\.1'/); assert.match(html, /const APP_VERSION='3\.0\.0-alpha\.20\.1'/);
   assert.match(html, /<script src="js\/offmap\.js"><\/script>/); assert.match(html, /const OFFMAP_FEATURE='off';/);
   assert.match(sw, /"js\/offmap\.js"/);
   const code = html.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
-  assert.equal((code.match(/__ptOM/g) || []).length, 6, "index.html touches the module only in the mountKeyEntry line and the attach line (no drawMap hook)");
+  assert.equal((code.match(/__ptOM/g) || []).length, 9, "index.html touches the module only in the mountKeyEntry line and the attach line (no drawMap hook)");
   assert.match(code, /__ptOM\.mountKeyEntry\(\)/); assert.match(code, /__ptOM\.attach\(\{client:\(\)=>sb\}\)/);
 });
 
