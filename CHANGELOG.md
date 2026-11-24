@@ -1,5 +1,9 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.19 — OFFMAP core · offline map tiles from the trip's own route (2026-11-24)
+- New app/js/offmap.js (core only, no screens, no map drawing): per-day corridor and tile list from tripData, space budget (cap 150 MB + free space), download queue with the order of sacrifice, IndexedDB store per trip (`pt-<trip>-offmap`), download engine (stops on 429/403, resumes), `offmap://z/x/y` tile reader. Loaded by index.html and cached in sw.js; `OFFMAP_FEATURE='off'`, nothing calls it yet, drawMap() untouched: the app behaves exactly as alpha.18.12. The Protomaps key is not in the repo.
+- Tests: tests/offmap/run.sh (Node, 20 tests).
+
 ## 3.0.0-alpha.18.13 — F13 stage 4d · after the first phone check (2026-11-24)
 - Catalog +~420 entries: members and join link, account / sign-in, device linking, document vault, flight search card (F24), country ranges (F08), chat errors, currencies sheet, budget per-person lines.
 - Fix: a pattern "יום {n}" swallowed a full date line ("יום רביעי, 26 במאי 2027" showed as "Day 2027 …"); {n} placeholders now match digits only.
