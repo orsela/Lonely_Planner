@@ -118,11 +118,12 @@
   function dropFriendly(history) { return Array.isArray(history) ? history.filter(h => !(h && h.role === 'assistant' && FRIENDLY.has(String(h.text || '').trim()))) : history; }
 
   /* ---- 3. the fetch to the chat endpoint, rewritten and answered (realFetch = the page's own fetch) ---- */
+  function f14Lang() { try { return (window.__ptF13 && window.__ptF13.active && window.__ptF13.active()) ? 'en' : 'he'; } catch (e) { return 'he'; } }
   async function f14Fetch(realFetch, input, init) {
     const token = await jwt(); if (!token) return synth('unauthorized');     // no session → no call, no retry
     const t = tid(); if (!t) return synth('not_member');
     let body; try { body = JSON.parse((init && init.body) || '{}'); } catch (e) { return new Response('{}', { status: 400 }); }   // not our request: the page's usual error line
-    body.trip_id = t; body.lang = 'he';
+    body.trip_id = t; body.lang = f14Lang();   /* CHANGE 2026-11-24 F13-CHAT-01: was 'he' — English when F13 English is active, so the assistant answers in English */
     body.tripInfo = await f14TripInfo();
     body.trip = f14EnrichTrip(body.trip);
     body.history = dropFriendly(body.history);

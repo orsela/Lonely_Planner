@@ -1950,6 +1950,10 @@
   {
    "he": "{x} הוצאות נשמרו ב{y} – הן יישארו כמו שהן (הסכום שמור גם במטבע הבית).",
    "en": "{x} expenses were kept in {y} – they stay as they are (the amount is also saved in the home currency)."
+  },
+  {
+   "he": "מה השעות הכי טובות לבקר ב{x}?",
+   "en": "What are the best hours to visit {x}?"
   }
  ],
  "keys": {}

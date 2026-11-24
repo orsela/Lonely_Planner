@@ -995,3 +995,6 @@ $ דולר · USD|$ Dollar · USD
 נוסף|Added
 הוסר|Removed
 אין שער|No rate
+מה השעות הכי טובות לבקר ב{x}?|What are the best hours to visit {x}?
+כמה מתוכנן להוציא היום?|How much is planned to be spent today?
+מה לעשות אם יורד גשם היום?|What should we do if it rains today?

@@ -1,5 +1,9 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.14 — F13 stage 5 · the chat in English (2026-11-24)
+- app/js/f14.js: the chat request carries `lang` = 'en' when English is active (was always 'he'), so the assistant answers in English; the server (chat-assistant) already supported it. Suggestion chips and chat messages are in the catalog.
+- No server change.
+
 ## 3.0.0-alpha.18.13 — F13 stage 4d · after the first phone check (2026-11-24)
 - Catalog +~420 entries: members and join link, account / sign-in, device linking, document vault, flight search card (F24), country ranges (F08), chat errors, currencies sheet, budget per-person lines.
 - Fix: a pattern "יום {n}" swallowed a full date line ("יום רביעי, 26 במאי 2027" showed as "Day 2027 …"); {n} placeholders now match digits only.

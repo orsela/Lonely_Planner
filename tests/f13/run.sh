@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lonely Planner F13 developer test runner · version 3.0.0-alpha.18.13
+# Lonely Planner F13 developer test runner · version 3.0.0-alpha.18.14
 # CHANGE 2026-11-24 F13-QA-03: new file (no previous version). Stage 0: Node tests of app/js/f13.js + the coverage report; add "browser" to also run the 390px browser test.
 # CHANGE 2026-11-24 F13-QA-07: + stage 1 — the dictionary test always runs; "join" / "invite" / "all" run the 390px browser tests of /join/ and /invite/ (each in its own pytest process: they load different harnesses called `harness`).
 # CHANGE 2026-11-24 F13-QA-10: + stage 3 — f13_stage3_test.mjs (css freshness + mirror rules) always runs; "stage3" / "browser" / "all" run the app-page browser test.

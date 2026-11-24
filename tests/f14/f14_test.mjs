@@ -186,3 +186,15 @@ test("the page's html carries no anon key outside the gate: f14.js itself never 
   const src = readFileSync(new URL("../../app/js/f14.js", import.meta.url), "utf8");
   assert.ok(!/apikey['"]?\s*:/i.test(src) && !/SUPABASE_ANON_KEY|sb_publishable/.test(src));
 });
+
+test("F13-CHAT-01 · lang follows F13: 'en' when English is active, 'he' otherwise", async () => {
+  setup({ home: { city: "תל אביב", airport: "tlv" } });
+  try {
+    globalThis.window = { __ptF13: { active: () => true } };
+    await F.f14Fetch(answer(200, { answer: "ok", action: null }), ENDPOINT, pageRequest());
+    assert.equal(JSON.parse(calls[0].init.body).lang, "en");
+    globalThis.window = { __ptF13: { active: () => false } };
+    await F.f14Fetch(answer(200, { answer: "ok", action: null }), ENDPOINT, pageRequest());
+    assert.equal(JSON.parse(calls[1].init.body).lang, "he");
+  } finally { delete globalThis.window; }
+});
