@@ -131,8 +131,9 @@ const RICHNOTES_FEATURE='on';
 const RICHNOTES_TRIPS=['fd5c2b13-cdc0-455e-9c12-b52f2e45a334'];
 /* CHANGE 2026-11-24 F12-FLAG-01: new flags (no alpha.17.1 equivalent). 'on' = app/js/f12.js: the shared document vault ("כספת משותפת" in "עוד", upload / view / rename / delete; server = migration 0023 + vault-delete).
    It acts ONLY on the trips listed in VAULT_TRIPS (the Romania pilot; Vietnam never is). 'off' (default until the end of conversation 3) = exactly alpha.17.1. */
-const VAULT_FEATURE='off';
-const VAULT_TRIPS=['fd5c2b13-cdc0-455e-9c12-b52f2e45a334'];
+/* CHANGE 2026-11-24 F12-FLAG-02: was VAULT_FEATURE='off' and VAULT_TRIPS=[Romania pilot]. Now 'on', but only for the test trip "בדיקה04" until Or's phone check passes; Romania is added after that (one line). Other trips = exactly alpha.17.2. */
+const VAULT_FEATURE='on';
+const VAULT_TRIPS=['3d0a8b30-cb6b-4e6e-85cd-6aa647c88389'];
 /* CHANGE 2026-11-17 BUDGETPP-FLAG-01: new flag (no alpha.17 equivalent). 'on' = app/js/budgetpp.js: the budget screen gets the card "לפי סעיף · לאדם" (expected cost per person per budget item vs actual per person, plus a flights row
    whose actual is typed by hand). Acts ONLY on the trips in BUDGETPP_TRIPS (the Romania pilot; Vietnam is never listed). 'off' = exactly 3.0.0-alpha.17. */
 const BUDGETPP_FEATURE='on';

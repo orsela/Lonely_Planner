@@ -1,5 +1,10 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18 — F12 · shared document vault (2026-11-24)
+- Server: migrations 0023 + 0024, private bucket `trip-docs`, Edge Function `vault-delete`. Page: new `app/js/f12.js` ("כספת משותפת" in "עוד": upload PDF / JPG / PNG / WEBP up to 10 MB, 100 MB per trip, view, rename, delete by manager, "שמור לאופליין" per document, "שמור גם במכשיר שלי" on upload; copies on the device in Cache API `pt-docs-v1`, deleted after a server delete, member removal, `device_revoked` and sign-out).
+- Flag `VAULT_FEATURE='on'`, `VAULT_TRIPS` = only the test trip "בדיקה04" until the phone check passes; Romania is added afterwards. Vietnam is never listed. Not listed / `'off'` = exactly alpha.17.2.
+- Tests: `tests/f12/run.sh --only page` (Node 15/15 + browser at 390px), DB `qa.f12_run()` 48/48.
+
 ## 3.0.0-alpha.17.2 — F13 stage 0 · English foundation, nothing visible (2026-11-24)
 - New `app/js/f13.js` + empty catalog `app/i18n/en.json` (both cached offline in `sw.js`), flag `LANG_FEATURE='beta'`: language state (device choice → trip default → browser → he), `lang`/`dir` on `<html>`, `translate()` (Hebrew-source catalog: exact + patterns), `t('key')` for new code, an additive en-GB wrapper of `toLocale*String`, `__ptF13.setTrip()` hooks in `setTrip`/`stopTrip`. No screen is translated yet.
 - Personal test switch: open the app with `#f13beta` (then `#f13en` / `#f13he`); `#f13beta-off` clears both. Other devices are unchanged. The Vietnam trip and a non-cloud backend are always Hebrew/RTL.
