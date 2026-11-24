@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.20.0 — OFFMAP (core + shared key window) merged after F13-TR (2026-11-24)
+- Same content as the OFFMAP sections below (built as alpha.19 / 19.1 / 19.2 on its own branch); renumbered to 20.0 because F13-TR took alpha.19.0 on main. OFFMAP_FEATURE stays 'off': no behaviour change for travelers.
+
 ## 3.0.0-alpha.19.2 — OFFMAP · one shared key, set once (2026-11-24)
 - The `#offmapkey` window now writes the Protomaps key ONCE to the server (table `platform_config`, function `set_offmap_key`, platform admin only, write-once: no update or delete is possible, enforced in the database). The field is masked, the key is never shown. After that the window is locked for everyone.
 - Every traveler gets the key automatically from the server when tiles are prepared (and keeps a device copy for offline); nobody sees a window or is asked for a key. Still inert while OFFMAP_FEATURE='off'.
@@ -11,6 +14,12 @@
 ## 3.0.0-alpha.19 — OFFMAP core · offline map tiles from the trip's own route (2026-11-24)
 - New app/js/offmap.js (core only, no screens, no map drawing): per-day corridor and tile list from tripData, space budget (cap 150 MB + free space), download queue with the order of sacrifice, IndexedDB store per trip (`pt-<trip>-offmap`), download engine (stops on 429/403, resumes), `offmap://z/x/y` tile reader. Loaded by index.html and cached in sw.js; `OFFMAP_FEATURE='off'`, nothing calls it yet, drawMap() untouched: the app behaves exactly as alpha.18.12. The Protomaps key is not in the repo.
 - Tests: tests/offmap/run.sh (Node, 20 tests).
+
+## 3.0.0-alpha.19.0 — F13-TR · AI translation of trip content (2026-11-24)
+- DB: migration 0026 (private.tr_usage, tr_take / tr_refund, service role only) applied live. Edge Function `translate-content` deployed (verify_jwt=false; Haiku; max 3 runs per trip per UTC day; a failed run is refunded).
+- app/js/f13tr.js (new): "Translate trip content" row in More (only while English is active, cloud trips; never Vietnam), collects Hebrew itinerary + booking texts without a translation (journal excluded), one-time privacy prompt, friendly errors, the answer is a separate layer kept in planner:i18n_en (+ local cache).
+- app/js/f13.js: addLayer()/layerSize() — layer entries translate user text through the DOM layer; catalog entries win; Hebrew source untouched.
+- Flag TRANSLATE_FEATURE='on' (index.html); sw.js caches f13tr.js. Tests: f13tr_test.mjs (5), browser case J, translate-content test.ts (5).
 
 ## 3.0.0-alpha.18.14 — F13 stage 5 · the chat in English (2026-11-24)
 - app/js/f14.js: the chat request carries `lang` = 'en' when English is active (was always 'he'), so the assistant answers in English; the server (chat-assistant) already supported it. Suggestion chips and chat messages are in the catalog.

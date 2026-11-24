@@ -22,7 +22,7 @@
    Language order (spec §4): the device choice (pt:_device:lang) → the trip's default_lang → the browser language → 'he'. Everything inside try/catch: a failure here never breaks the app. */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.18.14';   /* CHANGE 2026-11-24 F13-VER-10: was '3.0.0-alpha.18.13' (version only; the chat change is in f14.js). */   /* CHANGE 2026-11-24 F13-FN-09: was '3.0.0-alpha.18.12' (number-only {n} placeholders; <textarea> placeholders are translated). */   /* CHANGE 2026-11-24 F13-FN-08: was '3.0.0-alpha.18.11' (pattern values that are Hebrew are translated too, e.g. "לפני שעה" inside a sentence). */   /* CHANGE 2026-11-24 F13-FN-07: was '3.0.0-alpha.18.10' (heText helper for code that reads DOM text). */ const _PREV_VERSION = '3.0.0-alpha.18.10';   /* CHANGE 2026-11-24 F13-FN-06: was '3.0.0-alpha.18.9' (a "שפה · Language" row in "עוד"). Earlier: CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
+  const VERSION = '3.0.0-alpha.19.0';   /* CHANGE 2026-11-24 F13-TR-VER-01: was '3.0.0-alpha.18.14'. Adds addLayer() (AI translation layer of trip content, F13-TR) and a call to F13TR.row() from apply(); nothing else changes. */   /* CHANGE 2026-11-24 F13-VER-10: was '3.0.0-alpha.18.13' (version only; the chat change is in f14.js). */   /* CHANGE 2026-11-24 F13-FN-09: was '3.0.0-alpha.18.12' (number-only {n} placeholders; <textarea> placeholders are translated). */   /* CHANGE 2026-11-24 F13-FN-08: was '3.0.0-alpha.18.11' (pattern values that are Hebrew are translated too, e.g. "לפני שעה" inside a sentence). */   /* CHANGE 2026-11-24 F13-FN-07: was '3.0.0-alpha.18.10' (heText helper for code that reads DOM text). */ const _PREV_VERSION = '3.0.0-alpha.18.10';   /* CHANGE 2026-11-24 F13-FN-06: was '3.0.0-alpha.18.9' (a "שפה · Language" row in "עוד"). Earlier: CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
   const LANGS = ['he', 'en'];
   const LOCALES = { he: 'he-IL', en: 'en-GB' };            /* D4 */
   const FORCED_HE_TRIPS = ['f0200000-0000-4000-8000-000000000001'];   /* the Vietnam trip: never English (spec §2) */
@@ -118,7 +118,7 @@
   const FLAG = (function () { try { return typeof LANG_FEATURE === 'undefined' ? 'off' : String(LANG_FEATURE); } catch (e) { return 'off'; } })();
   const MODE = (FLAG === 'on' || FLAG === 'beta') ? FLAG : 'off';
 
-  const S = { lang: 'he', trip: null, tripLang: null, catalog: null, tr: makeTranslator(null), loaded: false, loading: null,
+  const S = { layer: {}, lang: 'he', trip: null, tripLang: null, catalog: null, tr: makeTranslator(null), loaded: false, loading: null,
               changedDoc: false, miss: {}, missN: 0, patched: false };
 
   /* the browser's own Storage methods, captured before the F02 gate wraps Storage.prototype (same technique as F22a) */
@@ -200,14 +200,24 @@
     applyDoc();
     if (l === 'en') { loadCatalog(); domStart(); } else if (changed) domStop();   /* F13-FN-04 */
     langRow();
+    try { if (root.__ptF13TR) { if (root.__ptF13TR.sync) root.__ptF13TR.sync(); if (root.__ptF13TR.row) root.__ptF13TR.row(); } } catch (e) { /* F13-TR optional */ }
     if (changed) { try { root.dispatchEvent(new root.CustomEvent('pt:langchange', { detail: { lang: l } })); } catch (e) { /* no CustomEvent */ } }
     return l;
   }
 
+  /* F13-TR-FN-01: the AI translation layer of trip content ({hebrew: english}); catalog entries win over layer entries */
+  function withLayer(cat) { const c = cat || {}; return Object.assign({}, c, { exact: Object.assign({}, S.layer, c.exact || {}) }); }
+  function addLayer(map, replace) {
+    if (!map || typeof map !== 'object') return 0;
+    if (replace) S.layer = {};
+    let n = 0; Object.keys(map).forEach(function (k) { const v = map[k]; if (typeof v === 'string' && v) { S.layer[String(k).trim().replace(/\s+/g, ' ')] = v; n++; } });
+    S.tr = makeTranslator(withLayer(S.catalog)); domRefresh(); return n;
+  }
+  function layerSize() { return Object.keys(S.layer).length; }
   function loadCatalog() {
     if (S.loaded || S.loading || typeof root.fetch !== 'function') return S.loading || Promise.resolve(S.catalog);
     S.loading = root.fetch(CATALOG_URL, { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      if (j && typeof j === 'object') { S.catalog = j; S.tr = makeTranslator(j); }
+      if (j && typeof j === 'object') { S.catalog = j; S.tr = makeTranslator(withLayer(j)); }
       S.loaded = true; S.loading = null; domRefresh(); return S.catalog;   /* F13-FN-04: translate what was drawn before the catalog arrived */
     }).catch(function () { S.loading = null; return null; });   /* offline without a cached copy: stay with the Hebrew text */
     return S.loading;
@@ -319,7 +329,7 @@
     VERSION: VERSION, mode: MODE,
     lang: function () { return S.lang; }, enabled: function () { return enabled(); }, active: function () { return MODE !== 'off' && S.lang === 'en'; },
     locale: function () { return ptLocale(S.lang); },
-    heText: heText, translate: translate, t: t, refresh: domRefresh, setTrip: setTrip, setLang: setLang, loadCatalog: loadCatalog,
+    heText: heText, translate: translate, t: t, refresh: domRefresh, setTrip: setTrip, setLang: setLang, loadCatalog: loadCatalog, addLayer: addLayer, layerSize: layerSize,
     stats: function () { return { lang: S.lang, loaded: S.loaded, missing: S.missN, missingList: Object.keys(S.miss) }; },
     _pure: { normLang: normLang, pickLang: pickLang, isForcedHebrew: isForcedHebrew, ptLocale: ptLocale, makeTranslator: makeTranslator, compilePattern: compilePattern, fill: fill }
   };
