@@ -4,6 +4,7 @@
    to en-GB in English, and wraps String.prototype.localeCompare the same way (no locale or he/he-IL → en-GB), so dates, numbers and sort order follow the language. 'en-US'/'en-GB' calls in the app are deliberate and untouched.
    Flag 'off' = unchanged (nothing is patched, no link).
    CHANGE 2026-11-24 F13-FN-03: version 3.0.0-alpha.18.8 — API + enabled() (true when the flag is 'on', or 'beta' on a beta device): the trip wizard uses it to offer "English" as the group language (stage 2).
+   CHANGE 2026-11-24 F13-FN-09: version 3.0.0-alpha.18.13 — a catalog placeholder named n / n1 matches digits only (a pattern "יום {n}" no longer swallowed "יום רביעי, 26 במאי 2027"); placeholder / title / aria-label of a <textarea> are translated (its value never).
    CHANGE 2026-11-24 F13-FN-08: version 3.0.0-alpha.18.12 — a Hebrew value captured by a catalog pattern is translated through the catalog as well.
    CHANGE 2026-11-24 F13-FN-07: version 3.0.0-alpha.18.11 — API heText(el): the element's text as the Hebrew source, for code that compares DOM text with Hebrew.
    CHANGE 2026-11-24 F13-FN-06: version 3.0.0-alpha.18.10 — a "שפה · Language" row in "עוד" (only where F13 is enabled and the trip is not forced Hebrew) switches this device between עברית and English.
@@ -21,7 +22,7 @@
    Language order (spec §4): the device choice (pt:_device:lang) → the trip's default_lang → the browser language → 'he'. Everything inside try/catch: a failure here never breaks the app. */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.18.12';   /* CHANGE 2026-11-24 F13-FN-08: was '3.0.0-alpha.18.11' (pattern values that are Hebrew are translated too, e.g. "לפני שעה" inside a sentence). */   /* CHANGE 2026-11-24 F13-FN-07: was '3.0.0-alpha.18.10' (heText helper for code that reads DOM text). */ const _PREV_VERSION = '3.0.0-alpha.18.10';   /* CHANGE 2026-11-24 F13-FN-06: was '3.0.0-alpha.18.9' (a "שפה · Language" row in "עוד"). Earlier: CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
+  const VERSION = '3.0.0-alpha.18.13';   /* CHANGE 2026-11-24 F13-FN-09: was '3.0.0-alpha.18.12' (number-only {n} placeholders; <textarea> placeholders are translated). */   /* CHANGE 2026-11-24 F13-FN-08: was '3.0.0-alpha.18.11' (pattern values that are Hebrew are translated too, e.g. "לפני שעה" inside a sentence). */   /* CHANGE 2026-11-24 F13-FN-07: was '3.0.0-alpha.18.10' (heText helper for code that reads DOM text). */ const _PREV_VERSION = '3.0.0-alpha.18.10';   /* CHANGE 2026-11-24 F13-FN-06: was '3.0.0-alpha.18.9' (a "שפה · Language" row in "עוד"). Earlier: CHANGE 2026-11-24 F13-FN-04: was '3.0.0-alpha.18.8' */   /* CHANGE 2026-11-24 F13-FN-03: was '3.0.0-alpha.18.7' */   /* CHANGE 2026-11-24 F13-FN-02: was '3.0.0-alpha.17.2' */
   const LANGS = ['he', 'en'];
   const LOCALES = { he: 'he-IL', en: 'en-GB' };            /* D4 */
   const FORCED_HE_TRIPS = ['f0200000-0000-4000-8000-000000000001'];   /* the Vietnam trip: never English (spec §2) */
@@ -51,7 +52,7 @@
     const names = [];
     const src = String(p.he).split(/(\{[a-zA-Z0-9_]+\})/).map(function (part) {
       const m = /^\{([a-zA-Z0-9_]+)\}$/.exec(part);
-      if (m) { names.push(m[1]); return '([\\s\\S]+?)'; }
+      if (m) { names.push(m[1]); return /^n\d*$/.test(m[1]) ? '(\\d[\\d,.]*)' : '([\\s\\S]+?)'; }   /* F13-FN-09: a placeholder named n / n1… matches a number only ("יום {n}" must not swallow "יום רביעי, 26 במאי") */
       return escRe(part);
     }).join('');
     return { re: new RegExp('^' + src + '$'), names: names, en: String(p.en) };
@@ -240,7 +241,8 @@
     } catch (e) { return el.textContent || ''; }
   }
   function trAttrs(el) {
-    if (skipEl(el)) return;
+    if (el.hasAttribute && el.hasAttribute('data-f13-skip')) return;   /* F13-FN-09: attributes (placeholder…) of a <textarea> are UI text too; only the value is the user's */
+    for (let e = el.parentNode; e && e.nodeType === 1; e = e.parentNode) { if (e.hasAttribute && e.hasAttribute('data-f13-skip')) return; }
     const names = ATTRS.slice();
     if (el.tagName === 'INPUT' && /^(button|submit|reset)$/i.test(el.type || '')) names.push('value');
     for (let i = 0; i < names.length; i++) {

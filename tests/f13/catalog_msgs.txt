@@ -569,3 +569,429 @@ $ דולר · USD|$ Dollar · USD
 {a} · היום|{a} · Today
 {a} · אתמול|{a} · Yesterday
 סה״כ|Total
+בטיול|On the trip
+הבנתי|Got it
+בתוקף עד|Valid until
+חיפוש מדינה|Search a country
+המשך|Continue
+רק מנהלים רואים|Only managers can see this
+שמירה|Save
+אוכל ושתייה|Food & drinks
+אטרקציות וספא|Attractions & spa
+כולל בילויים|Includes entertainment
+בלי טיסות|Excluding flights
+לא תוכנן|Not planned
+תל אביב – בוקרשט – תל אביב|Tel Aviv – Bucharest – Tel Aviv
+מתוכנן לאדם (€)|Planned per person (€)
+עוד לא נרכש|Not purchased yet
+בפועל לאדם (€), מוזן ידנית אחרי רכישת הכרטיסים|Actual per person (€), entered manually after buying the tickets
+מספר נוסעים לחישוב|Number of travellers for the calculation
+עודכן ידנית|Updated manually
+מתוכנן לאדם: {a} · {h}|Planned per person: {a} · {h}
+מתוכנן לאדם: {a}|Planned per person: {a}
+בפועל לאדם: טרם נרכש|Actual per person: not purchased yet
+בפועל לאדם: {a} · סה"כ לקבוצה: {b}|Actual per person: {a} · group total: {b}
+בפועל לאדם: {a}|Actual per person: {a}
+לקבוצה {a} · {n} נוסעים · {b} מתוכנן לאדם|Group {a} · {n} travellers · {b} planned per person
+{n} · חברים|{n} · members
+{n} מנהלים|{n} managers
+אני חדש/ה בטיול|I'm new to the trip
+מי אתם ברשימה?|Who are you on the list?
+המנהל יאשר שזה אתם. השם, התפקיד והרשומות שלכם נשמרים.|The manager will confirm it's you. Your name, role and entries are kept.
+בחרו את השם שלכם מהרשימה.|Pick your name from the list.
+בקשה לחבר את הטלפון הזה|Request to link this phone
+השם הזה כבר לא ברשימה. בחרו שוב.|This name is no longer on the list. Pick again.
+מסמכים ושינויים שנשמרו רק בטלפון הקודם לא עוברים.|Documents and changes saved only on the previous phone are not carried over.
+בקשה לחבר מכשיר חדש לחבר קיים. אשרו רק אם זה באמת הוא/היא – השם והתפקיד נשמרים.|A request to link a new device to an existing member. Approve only if it's really them – the name and role are kept.
+סוג ההצטרפות|Type of joining
+הבקשה נשלחה למנהל|The request was sent to the manager
+אחרי האישור הטיול ייפתח כאן לבד, עם אותו שם ואותו תפקיד. אפשר לסגור ולחזור לאותו קישור.|After approval the trip will open here by itself, with the same name and role. You can close this and come back to the same link.
+שליחת הודעה למנהל בווטסאפ|Message the manager on WhatsApp
+ביטול הבקשה|Cancel the request
+הבקשה פגה|The request expired
+לא אושרה תוך 24 שעות. אפשר לשלוח בקשה חדשה.|Wasn't approved within 24 hours. You can send a new request.
+הבקשה לא אושרה תוך 24 שעות. אפשר לשלוח בקשה חדשה.|The request wasn't approved within 24 hours. You can send a new request.
+בקשה חדשה|New request
+חזרה לבחירת שם|Back to picking a name
+אישור המכשיר|Approve the device
+אין חיבור – אפשר לנתק כשהרשת תחזור.|No connection – you can disconnect when the network is back.
+ניתוק|Disconnect
+לנתק? לחצו שוב|Disconnect? Tap again
+המכשיר נותק|The device was disconnected
+זה המכשיר היחיד של החבר – אי אפשר לנתק אותו|This is the member's only device – it can't be disconnected
+רק מנהלים יכולים לנתק מכשיר של חבר אחר|Only managers can disconnect another member's device
+ניתוק מכשיר לא מסיר את החבר מהטיול. שינוי תפקיד או הסרה חלים על כל המכשירים.|Disconnecting a device doesn't remove the member from the trip. A role change or removal applies to all devices.
+זה המכשיר היחיד שלך בטיול. אפשר לחבר מכשיר נוסף דרך קישור ההצטרפות ("כבר הייתי בטיול") או דרך חשבון כניסה.|This is your only device on the trip. You can link another device through the join link ("I've already been on the trip") or through a sign-in account.
+ניתוק מכשיר לא מסיר אותך מהטיול. מסמכים שנשמרו רק במכשיר שמנותק לא יועברו.|Disconnecting a device doesn't remove you from the trip. Documents saved only on the disconnected device won't be transferred.
+כניסה ממכשיר חדש|Sign-in from a new device
+זה לא הוא/היא · ניתוק|It's not them · disconnect
+המכשיר הזה נותק מהטיול|This device was disconnected from the trip
+המכשיר נותק – על ידי מנהל הטיול או על ידי החבר עצמו מטלפון אחר. כדי לחזור לטיול אפשר להיכנס שוב עם החשבון, או לבקש חיבור מחדש מהקישור.|The device was disconnected – by the trip manager or by the member from another phone. To return to the trip, sign in again with the account, or request a new connection from the link.
+לאשר או לנתק|Approve or disconnect
+צפייה בלבד – רק מנהלים ועורכים משנים מדינות וימים.|View only – only managers and editors can change countries and days.
+אוטומטי|Automatic
++ טווח ימים חדש|+ New day range
+אין חיבור לרשימת המדינות – נסו שוב כשיש רשת.|No connection to the country list – try again when there's a network.
+לא נמצאה מדינה|No country found
+לכל שאר המדינות – חפשו בשם.|For all other countries – search by name.
+עריכת טווח|Edit range
+טווח ימים חדש|New day range
+· ימי טיסה בטווח לא משתנים|· flight days within the range don't change
+מדינה|Country
+בחירת מדינה|Pick a country
+מיום|From day
+עד יום|To day
+אזור זמן|Time zone
+לאשר מחיקה? הימים יחזרו לברירת המחדל|Confirm deletion? The days will return to the default
+מחיקת הטווח|Delete range
+כל המדינות|All countries
+מוצא|Origin
+המוצא ברירת מחדל = היום הקודם, היעד = היום הבא. שעת ההמראה לפי שעון המוצא, הנחיתה לפי שעון היעד.|The origin defaults to the previous day, the destination to the next day. Departure time is by the origin clock, landing by the destination clock.
+מדינות|Countries
+ימי טיסה|Flight days
+הטווח נשמר|The range was saved
+הטווח נמחק|The range was deleted
+במכשיר – יישלח כשיחזור חיבור|On the device – will be sent when the connection returns
+בטווח יש רק ימי טיסה|The range has flight days only
+צריך לבחור מדינה|Pick a country
+השמירה נכשלה – נסו שוב|Saving failed – try again
+זהות|Identity
+אפשר להעלות רק PDF או תמונה (JPG, PNG, WEBP).|Only a PDF or an image (JPG, PNG, WEBP) can be uploaded.
+הקובץ גדול מ-10MB.|The file is larger than 10MB.
+הקובץ ריק.|The file is empty.
+כתבו שם למסמך (עד 80 תווים).|Write a name for the document (up to 80 characters).
+אין מספיק מקום בכספת של הטיול (100MB).|Not enough space in the trip's vault (100MB).
+ההעלאה לא הושלמה. נסו שוב.|The upload wasn't completed. Try again.
+הקובץ לא עבר בדיקה בשרת. נסו קובץ אחר.|The file didn't pass the server check. Try another file.
+אין לכם הרשאה לפעולה הזאת.|You don't have permission for this action.
+אין חיבור. נסו שוב כשיש רשת.|No connection. Try again when there's a network.
+מסמכי הטיול לכל החברים|Trip documents for all members
+עוד אין מסמכים|No documents yet
+בשימוש|In use
+מתוך 100MB|of 100MB
+הכספת מתמלאת. מחקו מסמכים ישנים לפני שתעלו חדשים.|The vault is filling up. Delete old documents before uploading new ones.
+הכספת מלאה. אי אפשר להעלות עד שתמחקו מסמך.|The vault is full. You can't upload until you delete a document.
+אין חיבור לרשת. נפתחים רק מסמכים שסומנו ✅ (שמורים במכשיר). השאר מעומעמים.|No network connection. Only documents marked ✅ (saved on the device) can be opened. The rest are dimmed.
+אין מסמכים בקטגוריה הזאת.|No documents in this category.
+עוד לא הועלו מסמכים לטיול.|No documents have been uploaded to the trip yet.
+כאן שומרים טיסות, ביטוח והזמנות כדי שכל החברים יוכלו לפתוח אותם.|Keep flights, insurance and bookings here so all members can open them.
+＋ העלאת מסמך|＋ Upload a document
+✅ שמור במכשיר|✅ Saved on device
+הסרה מהמכשיר|Remove from device
+שמירה לאופליין|Save for offline
+עוד פעולות|More actions
+אין מקום פנוי במכשיר.|No free space on the device.
+לא הצלחנו לשמור במכשיר. נסו שוב.|Couldn't save on the device. Try again.
+הוסר מהמכשיר|Removed from the device
+✅ נשמר במכשיר|✅ Saved on the device
+✏️ שינוי שם וקטגוריה|✏️ Rename and change category
+המסמך לא שמור במכשיר. צריך חיבור לרשת כדי לפתוח אותו.|The document isn't saved on the device. A network connection is needed to open it.
+פתיחת ה-PDF|Open the PDF
+נפתח בצופה של המכשיר.|Opens in the device's viewer.
+לא הצלחנו להציג את התמונה.|Couldn't display the image.
+ההעתק שבמכשיר נמחק על ידי הדפדפן. צריך חיבור לרשת.|The copy on the device was deleted by the browser. A network connection is needed.
+הכספת מלאה. מחקו מסמך כדי להעלות.|The vault is full. Delete a document to upload.
+העלאה|Upload
+העלאת מסמך|Upload a document
+קובץ (PDF או תמונה, עד 10MB)|File (PDF or image, up to 10MB)
+שם להצגה|Display name
+שמור גם במכשיר שלי|Also save on my device
+בחרו קובץ.|Pick a file.
+מעלים…|Uploading…
+✅ המסמך נשמר בכספת|✅ The document was saved in the vault
+✅ נשמר גם במכשיר|✅ Also saved on the device
+המסמך הועלה, אבל לא נשמר במכשיר.|The document was uploaded, but not saved on the device.
+שינוי שם וקטגוריה|Rename and change category
+מוחקים…|Deleting…
+המסמך נמחק|The document was deleted
+צריך להתחבר מחדש כדי לשאול אותי. אפשר לרענן את האפליקציה ולנסות שוב.|You need to sign in again to ask me. You can refresh the app and try again.
+נראה שאין לך גישה לטיול הזה, אז אני לא יכול לענות עליו.|It looks like you don't have access to this trip, so I can't answer about it.
+הגענו למכסת השאלות היומית של הטיול. אפשר להמשיך מחר 🌙|We've reached the trip's daily question limit. You can continue tomorrow 🌙
+שאלות מהר מדי 🙂 אפשר לנסות שוב בעוד רגע.|Questions coming too fast 🙂 Try again in a moment.
+העוזר לא הצליח לענות כרגע. אפשר לנסות שוב בעוד כמה רגעים.|The assistant couldn't answer right now. Try again in a few moments.
+זה לקח יותר מדי זמן. אפשר לנסות שוב, אולי עם שאלה קצרה יותר.|That took too long. Try again, maybe with a shorter question.
+השאלה גדולה מדי, כנראה בגלל התמונה. אפשר לנסות עם תמונה קטנה יותר או בלי תמונה.|The question is too big, probably because of the photo. Try a smaller photo or none.
+אין חיבור – אפשר לחפש כשהרשת תחזור.|No connection – you can search when the network is back.
+אורח אחד|1 guest
+נוסע אחד|1 traveller
+✈️ חיפוש טיסה|✈️ Flight search
+מ:|From:
+אל:|To:
+· הלוך|· outbound
+· כיוון אחד|· one way
+חיפוש ב-Google Flights|Search on Google Flights
+חיפוש ב-Skyscanner|Search on Skyscanner
+🏨 חיפוש לינה|🏨 Lodging search
+לילה אחד|1 night
+באיזו עיר ולאילו תאריכים לחפש לינה? (למשל 17/05/2027)|Which city and dates should I search lodging for? (e.g. 17/05/2027)
+באיזו עיר לחפש לינה?|Which city should I search lodging in?
+מאיזה תאריך לחפש לינה? (למשל 17/05/2027)|From what date should I search lodging? (e.g. 17/05/2027)
+לאן ובאיזה תאריך לחפש טיסה? (למשל 17/05/2027)|Where to, and on what date should I search for a flight? (e.g. 17/05/2027)
+לאן לחפש טיסה?|Where should I search a flight to?
+באיזה תאריך לחפש טיסה? (למשל 17/05/2027)|On what date should I search for a flight? (e.g. 17/05/2027)
+הנה הקישורים 👇|Here are the links 👇
+תל אביב|Tel Aviv
+נבחר ידנית|Chosen manually
+ניחוש לפי המדינה|Guessed from the country
+ברירת מחדל|Default
+עוד אין טיסה ליום הזה|No flight for this day yet
+שינוי נקודת מוצא|Change origin
+שינוי|Change
+שינוי יעד|Change destination
+הפרטים כבר ממולאים. באתר אפשר למיין לפי הכי זול, הכי מהיר או הכי משתלם. כשמזמינים, מעלים את הכרטיס לכספת והכרטיס הזה מתחלף בפרטי הטיסה.|The details are already filled in. On the site you can sort by cheapest, fastest or best value. When you book, upload the ticket to the vault and this card is replaced by the flight details.
+עד|Until
+שדה נוסף בישראל|Another airport in Israel
+חיפשתם מכאן קודם|You searched from here before
+טסים אל…|Flying to…
+טסים מ…|Flying from…
+עיר או שדה תעופה|City or airport
+למשל: אתונה, LCA|e.g. Athens, LCA
+לא נמצא שדה תעופה. אפשר לנסות שם עיר באנגלית או קוד של שלוש אותיות.|No airport found. Try a city name in English or a three-letter code.
+אין חיבור לרשימת שדות התעופה – נסו שוב כשיש רשת.|No connection to the airport list – try again when there's a network.
+ביום טיסה באמצע הטיול, המוצא הוא העיר של היום הקודם.|On a flight day in the middle of the trip, the origin is the previous day's city.
+נקודת מוצא|Origin
+להמשך קריאה|Keep reading
+הצגת פחות|Show less
+פתיחת תמונה|Open photo
+עוד תמונות|More photos
+רק כתובות שמתחילות ב-https מתקבלות|Only addresses starting with https are accepted
+מפה פשוטה · אין חיבור למפה|Simple map · no map connection
+לניווט בלי רשת: Google Maps ← מפות אופליין ← הורדת האזור|For navigation without a network: Google Maps → Offline maps → Download the area
+אין חיבור. צריך חיבור כדי לחבר או להסיר חשבון – הפרטים מוצגים כפי שנשמרו.|No connection. A connection is needed to link or remove an account – details are shown as saved.
+ווטסאפ|WhatsApp
+מדיניות פרטיות|Privacy policy
+תנאי שימוש|Terms of use
+חבר|Member
+חברים|Members
+מסמכים ושינויים שנשמרו רק בטלפון הקודם לא עוברים לכאן. כל מה שסונכרן – כבר כאן.|Documents and changes saved only on the previous phone don't carry over. Everything that was synced is already here.
+יציאה מהחשבון|Sign out
+החשבון הזה עוד לא בטיול|This account isn't on a trip yet
+מה אפשר לעשות|What you can do
+לנסות חשבון אחר|Try another account
+אולי חיברת בטלפון הקודם חשבון אחר או קוד מייל|Maybe you linked a different account or an email code on the previous phone
+פתיחת קישור ההצטרפות|Open the join link
+בקשו מהמנהל בווטסאפ. החשבון יחובר לטיול אחרי האישור|Ask the manager on WhatsApp. The account will be linked to the trip after approval
+בקשה לפתיחת טיול חדש|Request to open a new trip
+שולחים בקשה, ומנהל המערכת פותח את הטיול|You send a request, and the system administrator opens the trip
+ברוכים הבאים|Welcome
+הטלפון הזה עוד לא מחובר לטיול.|This phone isn't connected to a trip yet.
+מנהלים וחברים. נכנסים עם החשבון שחיברת בטלפון הקודם, והטיול נפתח בלי לחכות לאישור.|Managers and members. Sign in with the account you linked on the previous phone, and the trip opens without waiting for approval.
+או|or
+מוגן|Protected
+לא חובה|Optional
+חברו חשבון לטלפון הזה. אם תחליפו טלפון, תיכנסו איתו לטיול מיד, בלי לחכות לאישור של המנהל. החשבון לא מוצג לשאר החברים.|Link an account to this phone. If you change phones, you'll enter the trip with it right away, without waiting for the manager's approval. The account isn't shown to other members.
+מקושר|Linked
+דרך נוספת · קוד למייל|Another way · code by email
+המייל|The email
+החשבון הזה כבר שייך למישהו אחר באפליקציה|This account already belongs to someone else in the app
+אם זה החשבון שלך מטלפון אחר – נכנסים איתו מטלפון ריק (בלי טיולים).|If this is your account from another phone – sign in with it from an empty phone (no trips).
+אם זו טעות – בחר/י חשבון Google אחר.|If this is a mistake – choose a different Google account.
+בחירת חשבון אחר|Choose another account
+להסיר את חשבון ה-Google?|Remove the Google account?
+זו דרך הכניסה היחידה שלך. בלי חשבון, טלפון חדש יצטרך אישור מנהל כדי להיכנס לטיול.|This is your only way to sign in. Without an account, a new phone will need manager approval to enter the trip.
+עוד אי אפשר להסיר את החשבון|The account can't be removed yet
+זו דרך הכניסה היחידה, ובינתיים השרת לא מאפשר להסיר אותה.|This is the only sign-in method, and the server doesn't allow removing it for now.
+השרת לא הסיר את החשבון.|The server didn't remove the account.
+קוד:|Code:
+הקישור כבר לא בתוקף|The link is no longer valid
+ייתכן שפג תוקפו, שנשלח במקומו קישור חדש, או שההזמנה בוטלה.|It may have expired, a new link may have been sent instead, or the invitation was cancelled.
+בקש/י ממי שהזמין אותך לשלוח את ההזמנה שוב, ופתח/י את הקישור מהמייל האחרון.|Ask whoever invited you to send the invitation again, and open the link from the latest email.
+בודקים את ההזמנה…|Checking the invitation…
+ההזמנה שלך אומתה|Your invitation was verified
+אשף הקמת הטיול עוד לא זמין.|The trip setup wizard isn't available yet.
+מה יקרה כשהאשף ייפתח|What will happen when the wizard opens
+התחברות עם המייל הזה|Sign in with this email
+שם הטיול, תאריכים ושפה|Trip name, dates and language
+מדינות ומטבעות|Countries and currencies
+קישור הצטרפות לשליחה בווטסאפ|Join link to send on WhatsApp
+מייל מקושר|Linked email
+המכשיר הזה מקבל כתובת מייל. השם, התפקיד והחברות בטיול נשארים בדיוק כמו שהם.|This device gets an email address. The name, role and trip membership stay exactly as they are.
+כתובת מייל|Email address
+נשלח אליך מייל אימות לכתובת הזו.|A verification email was sent to this address.
+פותחים את הקישור מהמייל|Open the link from the email
+בטלפון הזה|On this phone
+המייל לא מוצג לחברי הטיול|The email isn't shown to trip members
+ממתין למנהל|Waiting for the manager
+פג תוקף|Expired
+שליחה מחדש|Send again
+הסרה מהרשימה|Remove from the list
+בוטלה|Cancelled
+שם זמני לטיול|Temporary trip name
+מטיילים|Travellers
+נשלח קוד בן 6 ספרות למייל שאליו נשלחה ההזמנה.|A 6-digit code was sent to the email the invitation went to.
+המייל שאליו נשלחה ההזמנה|The email the invitation was sent to
+שלחנו קוד בן 6 ספרות. מקלידים אותו כאן, בטלפון הזה – לא צריך ללחוץ על קישור במייל.|We sent a 6-digit code. Type it here, on this phone – no need to click a link in the email.
+קוד אימות|Verification code
+הקוד בתוקף שעה. הדבקה מהמייל ממלאת את כל התיבות.|The code is valid for an hour. Pasting from the email fills all the boxes.
+לא הגיע? בדקו בספאם|Didn't arrive? Check spam
+חפשו מייל מ-Lonely Planner בספאם או בקידומי מכירות, וודאו שהכתובת למעלה נכונה.|Look for an email from Lonely Planner in spam or promotions, and make sure the address above is correct.
+המייל אומת. נקים את הקבוצה בשלושה צעדים.|The email was verified. We'll set up the group in three steps.
+מולא מההזמנה, אפשר לשנות|Filled from the invitation, you can change it
+מטבע הבית (לתקציב)|Home currency (for the budget)
+מילאנו מה שכתבת בבקשה, כולל היעדים בשלב 2. נשאר לבחור תאריכים.|We filled in what you wrote in the request, including the destinations in step 2. You just need to pick dates.
+המטבע|The currency
+אפשר לבחור כמה מדינות, לפי סדר הטיול.|You can pick several countries, in trip order.
+לא נמצאה מדינה בשם הזה.|No country with this name found.
+מטבעות בטיול|Currencies on the trip
+שקל, דולר ויורו קבועים. מטבע של מדינה נוסף כשבוחרים אותה ויוצא כשמסירים אותה.|Shekel, dollar and euro are fixed. A country's currency is added when you pick it and removed when you remove it.
+חיפוש מטבע|Search a currency
+בהגעה ל-10 מטבעות, צריך להסיר מטבע כדי להוסיף אחר|At 10 currencies, you need to remove one to add another
+מתוך 10 נבחרו|of 10 selected
+אחרי היצירה אפשר לשנות הכול מהגדרות הטיול.|After creating, you can change everything from the trip settings.
+תאריכים|Dates
+את/ה בקבוצה|You're in the group
+הרשאה למצטרפים חדשים|Permission for new joiners
+עורך יכול להוסיף נקודות, הוצאות ומסמכים. צופה רק רואה. אפשר לשנות לכל חבר בהמשך.|An editor can add points, expenses and documents. A viewer can only view. You can change this for each member later.
+יש פרט שצריך לתקן:|There's a detail to fix:
+שולחים לקבוצת הווטסאפ של הטיול. מי שפותח אותו כותב את שמו ומחכה לאישור שלך.|Send it to the trip's WhatsApp group. Whoever opens it writes their name and waits for your approval.
+העתקה|Copy
+ההצטרפות תיפתח בקרוב|Joining will open soon
+הקישור נשמר גם בהגדרות הטיול, אין צורך לשמור אותו עכשיו.|The link is also saved in the trip settings, no need to save it now.
+אחר כך – כניסה לטיול כאן|Then – enter the trip here
+האפליקציה הותקנה – אפשר לפתוח אותה ממסך הבית|The app is installed – you can open it from the Home Screen
+אפליקציה במסך הבית נפתחת מהר, בלי דפדפן.|An app on the Home Screen opens fast, without a browser.
+התקנת אפליקציה|Install the app
+נאמת את המייל שאליו נשלחה ההזמנה, ותקים את הטיול מכאן.|We'll verify the email the invitation was sent to, and you'll set up the trip from here.
+קיבלת הזמנה במייל, או שכבר הקמת טיול בדפדפן? נשלח קוד למייל שלך, ותמשיך/י בדיוק מאיפה שעצרת.|Got an invitation by email, or already set up a trip in the browser? We'll send a code to your email, and you'll continue exactly where you stopped.
+יש הזמנה פתוחה – ממשיכים להקמת הטיול|There's an open invitation – continuing to set up the trip
+כבר הקמת טיול – הוא נפתח|You already set up a trip – opening it
+שליחה בווטסאפ או העתקה|Send on WhatsApp or copy
+אותו קישור שנוצר בהקמת הטיול.|The same link created when the trip was set up.
+הזמנות ממתינות|Pending invitations
+שלום|Hello
+אחרון|Latest
+זה לא נראה כמו קישור הצטרפות. הדביקו את הקישור מהווטסאפ או את 8 התווים שבסופו.|This doesn't look like a join link. Paste the link from WhatsApp or the 8 characters at its end.
+השם שלך בטיול נקבע לפי החברות בקבוצה|Your name on the trip is set by your group membership
+הטלפון הזה עוד לא מחובר לטיול. הצטרפת בספארי? מקלידים את קוד ההעברה שקיבלת שם.|This phone isn't connected to a trip yet. Did you join in Safari? Type the transfer code you got there.
+קוד העברה|Transfer code
+הדבקה ממלאת את כל התיבות. אם הקוד פג – פותחים שוב את קישור ההצטרפות בספארי ומקבלים קוד חדש.|Pasting fills all the boxes. If the code expired – open the join link in Safari again to get a new code.
+מדביקים אותו כאן ומצטרפים מתוך האפליקציה|Paste it here and join from inside the app
+הקישור או הקוד|The link or code
+פתיחה|Open
+כן, לדחות|Yes, reject
+אין חיבור – אפשר לאשר כשהרשת תחזור.|No connection – you can approve when the network is back.
+קישור הצטרפות|Join link
+מי שפותח – ממתין לאישורך|Whoever opens it waits for your approval
+איפוס|Reset
+לאישור בבית|For approval at home
+מנהלים|Managers
+(את/ה)|(you)
+שינוי תפקיד או הסרה נכנסים לתוקף מיד, גם בטלפון של החבר.|A role change or removal takes effect immediately, also on the member's phone.
+תפקיד|Role
+צופה: רואה הכול, לא משנה. עורך: מסלול, הוצאות, מסמכים. מנהל: גם חברים, קישור והגדרות.|Viewer: sees everything, changes nothing. Editor: itinerary, expenses, documents. Manager: also members, link and settings.
+1–40 תווים, שם שלא קיים כבר בטיול.|1–40 characters, a name that doesn't already exist on the trip.
+את/ה המנהל/ת היחיד/ה בטיול|You're the only manager on the trip
+בטיול תמיד יש לפחות מנהל אחד. כדי לרדת בתפקיד או לצאת מהטיול, קודם ממנים מנהל נוסף.|A trip always has at least one manager. To step down or leave the trip, appoint another manager first.
+למנות מנהל אחר|Appoint another manager
+אין בטיול חברים אחרים? פונים למנהל המערכת.|No other members on the trip? Contact the system administrator.
+הסרה מהטיול|Remove from the trip
+מה שהוסיף/ה – נקודות, הוצאות, יומן – נשאר בטיול.|What they added – points, expenses, journal – stays on the trip.
+אם יפתח/תפתח שוב את קישור ההצטרפות, תקבל/י בקשה חדשה לאישור.|If they open the join link again, a new approval request will arrive.
+לאפס את קישור ההצטרפות?|Reset the join link?
+הקישור כבר לא פעיל|The link is no longer active
+אחרי האיפוס שולחים את הקישור החדש לקבוצה.|After the reset, send the new link to the group.
+איפוס הקישור|Reset the link
+הטיול יימחק מהטלפון שלך.|The trip will be deleted from your phone.
+מה שהוספת נשאר אצל הקבוצה.|What you added stays with the group.
+כדי לחזור – פותחים שוב את קישור ההצטרפות, והמנהל מאשר.|To return – open the join link again, and the manager approves.
+כבר אינך חבר/ה בטיול|You're no longer a member of the trip
+מנהל הטיול הסיר אותך. הנתונים של הטיול נמחקו מהטלפון הזה.|The trip manager removed you. The trip's data was deleted from this phone.
+בקשו מהמנהל את קישור ההצטרפות|Ask the manager for the join link
+בקשה להצטרף שוב|Request to join again
+המכשיר עדיין לא מחובר לטיול|The device isn't connected to a trip yet
+שלחו למנהל הטיול את קוד המכשיר:|Send the trip manager the device code:
+🔁 עדכון קטגוריות ישנות|🔁 Update old categories
+דולרים|Dollars
+אירו|Euros
+מטבעות נוספים|More currencies
+טיסה להאנוי|Flight to Hanoi
+פעולות|Actions
+⚠️ Google Maps לא נטען בזמן — עברנו למפה הסכמטית. אפשר לנסות שוב מהכפתור שמעל המפה.|⚠️ Google Maps didn't load in time — switched to the schematic map. You can retry with the button above the map.
+אין נתוני מיקום להצגה|No location data to show
+מפה סכמטית|Schematic map
+✅ זוהה:|✅ Identified:
+📍 נקודות שמורות בטיול|📍 Points saved on the trip
+מחפש…|Searching…
+אין תוצאות|No results
+🔍 הצעות כתובת|🔍 Address suggestions
+✅ אושר|✅ Confirmed
+⏳ ממתין|⏳ Pending
+אין עדיין הזמנות בקטגוריה זו|No bookings in this category yet
+🎫 הזמנות מקושרות ליום זה|🎫 Bookings linked to this day
+השיתוף הישיר אינו זמין במכשיר זה. אפשר לפתוח את הקובץ או לשמור אותו במקום זאת.|Direct sharing isn't available on this device. You can open the file or save it instead.
+שמרו את ההזמנה כדי לצרף מסמכים|Save the booking to attach documents
+אין עדיין מסמכים מצורפים|No attached documents yet
+— ללא —|— None —
+קשר להזמנה זו|Link to this booking
+אין עדיין מסמכים בכספת|No documents in the vault yet
+לא נמצאו תמונות לניקוי — הענן כבר נקי.|No photos to clean up — the cloud is already clean.
+🗑️ מחיקה סופית|🗑️ Delete permanently
+אין עדיין מסמכים בתקייה זו|No documents in this folder yet
+✓ תחזית מהימנה|✓ Reliable forecast
+⚠ טווח ארוך · לא סופי|⚠ Long range · not final
+היום הזה כבר מאחורינו בטיול|This day is already behind us on the trip
+התחזית עדיין לא זמינה. היא תתעדכן בקרוב.|The forecast isn't available yet. It will update soon.
+⚠️ לא הצלחנו למשוך שערים חיים כרגע (בעיית רשת) — אפשר להזין ידנית או לנסות שוב|⚠️ Couldn't fetch live rates right now (network problem) — you can enter manually or try again
++ שם המקום מולא אוטומטית|+ The place name was filled in automatically
+⏳ טוען אלבום…|⏳ Loading album…
+עדיין אין תמונות|No photos yet
+כן|Yes
+לא|No
+✅ בוצע ונשמר|✅ Done and saved
+בוטל|Cancelled
+⚠️ לא הצלחתי לבצע את הפעולה -- ייתכן שהיום המבוקש לא קיים, או שחסר פרט נדרש|⚠️ I couldn't do the action -- the requested day may not exist, or a required detail is missing
+אופס, השיחה הזו עדיין לא מחוברת לענן 🙈 מי שמתחזק את האפליקציה צריך להפעיל את זה קודם.|Oops, this chat isn't connected to the cloud yet 🙈 Whoever maintains the app needs to turn that on first.
+לא זיהיתי נתוני מיקום מוכרים בקובץ הזה. ודאו שזה קובץ Timeline שיוצא מהטלפון (הגדרות ← מיקום ← Timeline ← ייצוא נתוני Timeline).|I didn't recognise any known location data in this file. Make sure it's a Timeline file exported from the phone (Settings → Location → Timeline → Export Timeline data).
++ לא מתוכנן|+ Unplanned
+אין עדיין נתוני Timeline ליום זה — מוצג התכנון|No Timeline data for this day yet — showing the plan
+מתוכנן|Planned
+ביקור|Visit
+🧭 זמן נסיעה|🧭 Travel time
+מחשב מסלול ב-Google Maps…|Calculating a route in Google Maps…
+נסיעה ברכב / Grab|Drive / Grab
+מ-{x}|From {x}
+לא הצלחנו לקבל את המיקום של הטלפון. צריך לאשר גישה למיקום בדפדפן ולנסות שוב.|Couldn't get the phone's location. Allow location access in the browser and try again.
+רגע…|One moment…
+לא נמצאו מקומות בשם בקרבת מקום.|No places by that name nearby.
+חיפוש המקומות לא זמין כרגע — אפשר לשמור את המיקום המדויק.|Place search isn't available right now — you can save the exact location.
+בלי שם מקום · אפשר לכתוב הערה|No place name · you can write a note
+מיקום מדויק|Exact location
+בשמחה! איזה מהמקומות הקרובים? 👇|Gladly! Which of the nearby places? 👇
+מחפש ב-Google…|Searching on Google…
+לא נמצאו מקומות. אפשר לנסות שם באנגלית, או להדביק קישור/קואורדינטות למטה.|No places found. Try a name in English, or paste a link / coordinates below.
+⚠️ חסר מיקום: בחרו מקום מהחיפוש, או הדביקו קישור Google Maps / קואורדינטות.|⚠️ Location missing: pick a place from the search, or paste a Google Maps link / coordinates.
+📍 לא מצאתי את המקום במפה — אפשר להוסיף מיקום ידנית במסך המסלול|📍 I couldn't find the place on the map — you can add a location manually on the itinerary screen
+⚠️ לא הצלחנו לטעון את רכיב האקסל (בדקו חיבור לרשת) — אפשר להוריד/להעתיק כ-JSON במקום|⚠️ Couldn't load the Excel component (check your network) — you can download / copy as JSON instead
+גרסה|Version
+📱 במכשיר + 🔗 Drive|📱 On device + 🔗 Drive
+🔗 Drive · לא זמין אופליין|🔗 Drive · not available offline
+🔗 קישור ל-Drive · דורש רשת|🔗 Link to Drive · needs a network
+⚠️ צריך קישור שמתחיל ב-https://drive.google.com או https://docs.google.com|⚠️ A link starting with https://drive.google.com or https://docs.google.com is needed
+קישור לקובץ ב-Google Drive (ריק = הסרת הקישור):|Link to a file in Google Drive (empty = remove the link):
+צריך קישור שמתחיל ב-https://drive.google.com או https://docs.google.com|A link starting with https://drive.google.com or https://docs.google.com is needed
+למסמך הזה אין קובץ במכשיר — אי אפשר להסיר את הקישור היחיד. אפשר למחוק את המסמך.|This document has no file on the device — the only link can't be removed. You can delete the document.
+גרסה חדשה זמינה|A new version is available
+רענון|Refresh
+✈️ הלילה בטיסה|✈️ The night is in flight
+🛂 כרטיסי טיסה בכספת|🛂 Flight tickets in the vault
+עוד לא סומנה הזמנה מאושרת ליום הזה|No confirmed booking has been marked for this day yet
+🧭 ניווט למלון|🧭 Navigate to the hotel
+🔗 פרטי ההזמנה|🔗 Booking details
+📄 מסמכי מלונות בכספת|📄 Hotel documents in the vault
+— ניווט למלון|— Navigate to the hotel
+שעות להמראה|Hours to takeoff
+טיסה נעימה!|Have a pleasant flight!
+🎫 כרטיסי עלייה|🎫 Boarding passes
+🧭 ניווט לשדה|🧭 Navigate to the airport
+שערים|Rates
+🔒 קבוע|🔒 Fixed
+עוד אין – רק מטבעות הבסיס.|None yet – only the base currencies.
+מוצעים · מדינות בטיול בלי המטבע שלהן|Suggested · trip countries without their currency
+כל המטבעות|All currencies
+יש כבר 10 מטבעות – בחרו אחד שיוצא במקומו|There are already 10 currencies – pick one to take out
+⇄ החלפה במטבע אחר|⇄ Replace with another currency
+✕ הסרה מהטיול|✕ Remove from the trip
+{x} הוצאות נשמרו ב{y} – הן יישארו כמו שהן (הסכום שמור גם במטבע הבית).|{x} expenses were kept in {y} – they stay as they are (the amount is also saved in the home currency).
+נוסף|Added
+הוסר|Removed
+אין שער|No rate

@@ -1,5 +1,11 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.18.13 — F13 stage 4d · after the first phone check (2026-11-24)
+- Catalog +~420 entries: members and join link, account / sign-in, device linking, document vault, flight search card (F24), country ranges (F08), chat errors, currencies sheet, budget per-person lines.
+- Fix: a pattern "יום {n}" swallowed a full date line ("יום רביעי, 26 במאי 2027" showed as "Day 2027 …"); {n} placeholders now match digits only.
+- Fix: the placeholder of the journal text box (textarea) was not translated.
+- Known: Google Maps tiles and place names follow the map script's language (still Hebrew); trip content (names, notes, hotels) stays as written.
+
 ## 3.0.0-alpha.18.12 — F13 stage 4c · composed messages and budget texts (2026-11-24)
 - Catalog patterns for texts built from a Hebrew fragment + a value ("{name} הוסר/ה מהטיול", "ביקש/ה להצטרף · {when}", expense toasts, currency messages, "לפני N שעות"…); Hebrew values inside a pattern are translated too.
 - The WhatsApp invitation text is English when English is active (otherwise unchanged).
