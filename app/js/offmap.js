@@ -1,4 +1,4 @@
-/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core) · version 3.0.0-alpha.20.0
+/* Lonely Planner · OFFMAP – automatic offline map tiles prepared on the device from the traveler's own route (core) · version 3.0.0-alpha.20.1
    CHANGE 2026-11-24 OFFMAP-KEY-01: what changed from alpha.19: an in-app window to enter / replace / delete the Protomaps key on THIS device (setKey, clearKey, keyHint, openKeyDialog, mountKeyEntry). It opens only when the address ends with #offmapkey (like #f22beta); the key is saved in a small device-level IndexedDB ("pt-_device-offmap": the app wraps localStorage per trip and drops writes before the trip is known, so localStorage cannot hold it), loaded at start into memory so getKey() stays synchronous (never in the address, never sent anywhere, never in the repo). Without that hash nothing is shown: the app is as alpha.19.
    CHANGE 2026-11-24 OFFMAP-01: new file (no previous version). Conversation 1 of 3 (spec: claude/Plan_Travel_OFFMAP_spec.md draft 2, approved 24/11). Contains ONLY the core, no screens and no map drawing:
    (1) pure functions: tile math, per-day corridor + tile list from tripData (planTrip), space budget (computeBudget), download queue with the sacrifice order (buildQueue), clean-up / route-change diff (cleanupPlan),
@@ -9,7 +9,7 @@
    The Protomaps key is NOT in this file (public repo): OFFMAP_KEY stays '' until Or approves; on a device it is entered through the key window (#offmapkey) and kept in the device IndexedDB (never committed). */
 (function (root) {
   'use strict';
-  const VERSION = '3.0.0-alpha.20.0';
+  const VERSION = '3.0.0-alpha.20.1';
 
   /* ---------- constants ---------- */
   const OFFMAP_KEY = '';                                   /* Protomaps API key. EMPTY on purpose: not committed without Or's explicit approval (see report). */
@@ -234,7 +234,8 @@
   function keyHint() { const k = getKey(); return k ? '••••' + k.slice(-4) : ''; }   /* the last 4 characters only, for the screen */
   /* ---------- the shared key (OFFMAP-KEY-04): one write-once row in Supabase, set by a platform admin through the window ---------- */
   let clientGet = null;
-  function attach(o) { if (o && typeof o.client === 'function') clientGet = o.client; }
+  const host = {};
+  function attach(o) { if (!o) return; if (typeof o.client === 'function') clientGet = o.client; ['days', 'tripId'].forEach(function (k) { if (typeof o[k] === 'function') host[k] = o[k]; }); }
   function sbc() { try { return clientGet ? clientGet() : null; } catch (e) { return null; } }
   /* RPC / select with a short timeout; never throws */
   function withTimeout(p, ms) { return Promise.race([p, new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, ms || 8000); })]); }
@@ -296,10 +297,57 @@
     keyState().then(function (st) { if (wrap.isConnected) paint(st); });
     return wrap;
   }
+  /* ---------- the manual download window (#offmapdownload): prepares the offline tiles of the open trip on this device, with progress; works only for a trip listed in OFFMAP_TRIPS (the flag itself stays off) ---------- */
+  const REASON_HE = { rate_limited: 'Protomaps הגביל את הקצב. מה שירד נשמר, נסה שוב בעוד כמה דקות.', forbidden: 'המפתח נדחה (403). בדוק שהמפתח תקין ושהוא מותר לדומיין orsela.github.io.', auth: 'המפתח נדחה (401).', network: 'אין רשת יציבה. מה שירד נשמר, אפשר להמשיך אחר כך.', cap: 'הגעת לתקרת 150MB. הימים הרחוקים ביותר לא ירדו.', budget: 'אין מספיק מקום פנוי במכשיר. הימים הרחוקים ביותר לא ירדו.', aborted: 'נעצר. מה שירד נשמר.', no_key: 'אין מפתח מפות במערכת (או שאין חיבור לשרת).' };
+  const fmtMB = function (b) { return (b / 1048576).toFixed(1) + ' MB'; };
+  function openDownloadDialog(doc) {
+    doc = doc || root.document; if (!doc || !doc.body) return null;
+    const old = doc.getElementById('ptOmDlDlg'); if (old) old.remove();
+    const el = function (tag, css, text) { const n = doc.createElement(tag); if (css) n.style.cssText = css; if (text != null) n.textContent = text; return n; };
+    const wrap = el('div', 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;direction:rtl;font-family:inherit');
+    wrap.style.setProperty('display', 'flex', 'important'); wrap.id = 'ptOmDlDlg'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true');
+    const box = el('div', 'background:#fff;color:#17211b;border-radius:14px;padding:18px 16px;max-width:360px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.3)');
+    box.appendChild(el('h2', 'margin:0 0 6px;font-size:17px', 'הורדת מפות לשימוש אופליין'));
+    const info = el('p', 'margin:0 0 8px;font-size:13px;line-height:1.5', 'בודק…');
+    const bar = el('div', 'height:8px;border-radius:4px;background:#e6eadf;overflow:hidden;margin:6px 0'); const fill = el('div', 'height:100%;width:0;background:#2f6f4f;transition:width .2s'); bar.appendChild(fill);
+    const msg = el('p', 'margin:8px 0 0;min-height:18px;font-size:12.5px;color:#5f6861;line-height:1.5');
+    const row = el('div', 'display:flex;gap:8px;margin-top:10px');
+    const btn = function (t, bg, fg) { const b = el('button', 'flex:1;padding:11px 6px;border:0;border-radius:8px;font-size:14px;background:' + bg + ';color:' + fg + ';cursor:pointer', t); b.type = 'button'; return b; };
+    const go = btn('הורד', '#2f6f4f', '#fff'), stop = btn('עצור', '#f1ece4', '#8a2b1f'), close = btn('סגור', '#eef1de', '#17211b');
+    stop.style.display = 'none'; let ctl = null, store = null, wake = null, running = false;
+    const trip = function () { try { return host.tripId ? host.tripId() : null; } catch (e) { return null; } };
+    const days = function () { try { return host.days ? (host.days() || []) : []; } catch (e) { return []; } };
+    const refresh = async function () {
+      const t = trip(), ok = !!t && trips().indexOf(String(t)) >= 0 && String(t) !== VN_TRIP;
+      if (!ok) { info.textContent = 'הטיול הפתוח לא ברשימת מפות האופליין.'; go.disabled = true; go.style.opacity = '.4'; return; }
+      const d = days(), withPts = d.filter(function (x) { return dayPoints(x).points.length; }).length;
+      try { store = store || createIdbStore(t); const ix = await store.index(); info.textContent = 'ימים עם מסלול: ' + withPts + ' מתוך ' + d.length + '. שמור במכשיר: ' + ix.size + ' אריחים (' + fmtMB(usedBytes(ix)) + ').'; } catch (e) { info.textContent = 'ימים עם מסלול: ' + withPts + ' מתוך ' + d.length + '.'; }
+    };
+    const done = function () { if (ctl) ctl.abort(); try { if (wake) wake.release(); } catch (e) { /* ignore */ } wrap.remove(); try { if (root.location && /offmapdownload/.test(root.location.hash)) root.history.replaceState(null, '', root.location.pathname + root.location.search); } catch (e) { /* ignore */ } };
+    go.onclick = async function () {
+      if (running) return; running = true; go.disabled = true; go.style.opacity = '.4'; stop.style.display = ''; msg.textContent = 'מתחיל…'; fill.style.width = '0';
+      ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      try { if (root.navigator && root.navigator.wakeLock) wake = await root.navigator.wakeLock.request('screen'); } catch (e) { /* optional */ }
+      const t = trip(), d = days();
+      try {
+        store = store || createIdbStore(t); await persist();
+        const r = await prepare({ days: d, store: store, storage: await deviceStorage(), ahead: d.length, signal: ctl && ctl.signal, onProgress: function (p) { fill.style.width = Math.round(100 * p.done / Math.max(1, p.total)) + '%'; msg.textContent = 'ירדו ' + p.done + ' מתוך ' + p.total + ' אריחים · ' + fmtMB(p.bytes); } });
+        fill.style.width = r.status === 'done' || r.status === 'nothing' ? '100%' : fill.style.width;
+        const head = r.status === 'done' ? 'הסתיים ✓ ' : r.status === 'nothing' ? 'הכול כבר שמור ✓ ' : '';
+        msg.textContent = head + 'ירדו ' + r.downloaded + ' אריחים (' + fmtMB(r.bytes) + ')' + (r.failed ? ', נכשלו ' + r.failed : '') + '. סה"כ שמור: ' + fmtMB(r.used) + '. ' + (r.reason ? (REASON_HE[r.reason] || r.reason) : '');
+      } catch (e) { msg.textContent = 'שגיאה: ' + (e && e.message || e); }
+      running = false; stop.style.display = 'none'; go.disabled = false; go.style.opacity = '1'; go.textContent = 'הורד שוב / המשך'; try { if (wake) wake.release(); } catch (e) { /* ignore */ } refresh();
+    };
+    stop.onclick = function () { if (ctl) ctl.abort(); };
+    close.onclick = done; wrap.addEventListener('click', function (e) { if (e.target === wrap) done(); });
+    row.appendChild(go); row.appendChild(stop); row.appendChild(close);
+    [info, bar, msg, row].forEach(function (n) { box.appendChild(n); }); wrap.appendChild(box); doc.body.appendChild(wrap); refresh();
+    return wrap;
+  }
   /* opens the window when the address carries #offmapkey (now and on later hash changes); otherwise nothing at all */
   function mountKeyEntry() {
     loadKey();   /* the saved key (if any) into memory so getKey() answers synchronously */
-    const check = function () { try { if (root.location && /(^|[#&])offmapkey$/.test(root.location.hash)) openKeyDialog(root.document); } catch (e) { /* never break the page */ } };
+    const check = function () { try { if (root.location && /(^|[#&])offmapkey$/.test(root.location.hash)) openKeyDialog(root.document); else if (root.location && /(^|[#&])offmapdownload$/.test(root.location.hash)) openDownloadDialog(root.document); } catch (e) { /* never break the page */ } };
     try { root.addEventListener('hashchange', check); } catch (e) { /* none */ }
     if (root.document && root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', check); else check();
   }
@@ -484,7 +532,7 @@
 
   const api = {
     version: VERSION, constants: { OFFMAP_TRIPS: OFFMAP_TRIPS, DEFAULT_CAP: DEFAULT_CAP, DEFAULTS: DEFAULTS, DEFAULT_AVG_KB: DEFAULT_AVG_KB, TILE_URL: TILE_URL, VN_TRIP: VN_TRIP },
-    configure: configure, active: active, getKey: getKey, setKey: setKey, clearKey: clearKey, attach: attach, ensureKey: ensureKey, fetchRemoteKey: fetchRemoteKey, keyState: keyState, saveSharedKey: saveSharedKey, loadKey: loadKey, setKeyAdapter: setKeyAdapter, keyHint: keyHint, openKeyDialog: openKeyDialog, mountKeyEntry: mountKeyEntry,
+    configure: configure, active: active, getKey: getKey, setKey: setKey, clearKey: clearKey, attach: attach, openDownloadDialog: openDownloadDialog, ensureKey: ensureKey, fetchRemoteKey: fetchRemoteKey, keyState: keyState, saveSharedKey: saveSharedKey, loadKey: loadKey, setKeyAdapter: setKeyAdapter, keyHint: keyHint, openKeyDialog: openKeyDialog, mountKeyEntry: mountKeyEntry,
     lon2x: lon2x, lat2y: lat2y, tileKey: tileKey, parseKey: parseKey, tileNW: tileNW, tileSizeKm: tileSizeKm, distKm: distKm, coord: coord,
     dayPoints: dayPoints, coveringTiles: coveringTiles, planTrip: planTrip, avgBytes: avgBytes, computeBudget: computeBudget, currentDayIndex: currentDayIndex,
     buildQueue: buildQueue, cleanupPlan: cleanupPlan, dayCoverage: dayCoverage,
