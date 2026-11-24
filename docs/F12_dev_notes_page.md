@@ -32,3 +32,4 @@ Offline cache + `index.json`, local cleanup (delete / member removal / `device_r
 - **Not covered by the clean-up (decide with Or):** a normal sign-out ("יציאה", `signOutClean` in F22) leaves the saved copies on the device.
 - **Tests:** `tests/f12/run.sh --only page` = Node 15/15 + browser (stub page with a fake Cache Storage, because `file://` pages cannot use the real one) all passed; F13 12/12; F07 page 9 + 4 + 2.
 - **Still open:** Or's Android phone check (PDF, image, airplane mode, "no space"), then `VAULT_FEATURE='on'`, merge to `main`, STATUS + LEAN_RULES update. Real server and real Cache API on a device are untested.
+- **Sign-out clean-up (Or approved, 24/11):** `signOutClean` in `index.html` now awaits `__ptF12.clearAll()` before the reload (F12-SIGNOUT-01). Replaces the "not covered" note above.

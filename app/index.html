@@ -567,6 +567,8 @@ async function signOutClean(){
  const c=api&&api.client();
  try{if(c)await api.withTimeout(c.auth.signOut({scope:'local'}),api.timeoutMs)}catch{}
  try{api.clearCached()}catch{}
+ /* CHANGE 2026-11-24 F12-SIGNOUT-01: new line (no alpha.17.1 equivalent), additive. Signing out also deletes the shared-vault copies saved on this device (Cache API pt-docs-v1, F12). Awaited before the reload so it is not cut off. f12.js missing: nothing happens. */
+ try{if(window.__ptF12&&typeof window.__ptF12.clearAll==='function')await window.__ptF12.clearAll()}catch{}
  try{location.replace(location.pathname)}catch{location.reload()}
 }
 /* C10: opened from /invite/ with a Google account whose email is not the invite's → the F04 "no active invite" texts; nothing created */
