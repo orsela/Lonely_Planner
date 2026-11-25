@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.21.7 — TC-NAME · the home header of a cloud trip keeps its name offline (2026-11-25)
+- Found in the phone test of TC-BUG-01 (Romania, airplane mode): all content was Romanian but the header read "🇻🇳 ויאטנם". The trip name is now saved on the device after every successful read and used when the read fails; with no name at all the header says "הטיול".
+
 ## 3.0.0-alpha.21.6 — TC-EMPTY · a trip with no days no longer breaks the journal; the "no local copy" toast is offline-only (2026-11-25)
 - Journal save on a trip with 0 days: was a TypeError (currentDayNum), now a toast "אין עדיין ימים בטיול" and nothing is saved.
 - The toast "אין עותק של הטיול במכשיר" (cloud trip without a stored copy) is shown only when the device is offline (online it was misleading).

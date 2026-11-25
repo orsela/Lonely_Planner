@@ -40,12 +40,16 @@ with sync_playwright() as pw:
         try:
             tid = make(env)
             dev = h10.boot(env, tid, role='manager'); pg = dev.page; errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
+            pg.wait_for_timeout(1500); HDR = "()=>{const h=document.getElementById('hv2TripTitle');return h?h.textContent:null}"
+            hdr_on = pg.evaluate(HDR)  # CHANGE 2026-11-25 TC-NAME-T-01: header name online vs offline
             on = pg.evaluate(STATE)
             h10.go_offline(env, dev, True); st = h10.reboot(dev); off = pg.evaluate(STATE)
             if flag == 'on':
                 check('1 online load = 10 days', on['n'] == 10, on['n'])
                 check('1 offline start (opened before) = the trip\'s own 10 days, no Vietnam', st == 'app' and off['n'] == 10 and not any(w in off['body'] for w in VN_WORDS), (st, off['n']))
                 check('1 a copy of the days is on the device', off['ls'] == 10, off['ls'])
+                pg.wait_for_timeout(2500); hdr_off = pg.evaluate(HDR)
+                check('1 home header offline = same name as online, never the Vietnam default', hdr_off is not None and 'ויאטנם' not in hdr_off and hdr_off == hdr_on, (hdr_on, hdr_off).filter(x=>/tripname/.test(x))]")))
                 check('4 no horizontal scroll at 390px', not off['hscroll'])
                 svg = pg.evaluate(MAPJS); check('5 route map offline: no Vietnam outline / river / Tonkin Gulf', '<svg' in svg and '<polygon' not in svg and 'טונקין' not in svg, svg[:120])
                 # 2: a second device that never opened the trip online
