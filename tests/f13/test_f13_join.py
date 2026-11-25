@@ -1,4 +1,5 @@
-"""Lonely Planner F13 stage 1 · /join/ browser test (390x844, fake backend, no network) · version 3.0.0-alpha.18.6
+"""Lonely Planner F13 stage 1 · /join/ browser test (390x844, fake backend, no network) · version 3.0.0-alpha.21.8
+CHANGE 2026-11-25 F13-QA-13: was 3.0.0-alpha.18.6; + test_english_error_screen_title (flow.js blocked: the English error screen also sets the English tab title).
 CHANGE 2026-11-24 F13-QA-04: new file (no previous version). LEAN rule 5: one browser pass at the end of the stage.
 Covers: flag off = Hebrew/RTL/no switch (= alpha.16); beta without the key = Hebrew; beta with the key / 'on' = switch, English screens (form, pending, relink pending, expired),
 dir/lang on <html> + the mount root, no horizontal scroll, touch targets >= 44px, the choice survives a reload, names inside English sentences.
@@ -157,3 +158,16 @@ def test_english_relink_screens(env):
     if s["sw"] > s["iw"] or s["small"]: P.append("layout %r" % s)
     assert not P, "\n".join(P)
 
+
+
+def test_english_error_screen_title(env):
+    """CHANGE 2026-11-25 F13-JOIN-04: when flow.js cannot load, the English error screen sets the English tab title (was Hebrew); Hebrew device unchanged."""
+    serve(env, "on"); tid, code = T5.new_trip(env)
+    for lang, title, h1 in (("en", "Join the trip \u00b7 Lonely Planner", "Couldn't load the page"), ("he", "הצטרפות לטיול · Lonely Planner", "לא הצלחנו לטעון את הדף")):
+        d = dev_with(env, "E" + lang, lang=lang); pg = d.page
+        pg.route("**/join/flow.js", lambda r: r.abort())
+        pg.goto(env.server.origin + H.JOIN + "#code=" + code, wait_until="domcontentloaded")
+        pg.wait_for_selector("#joinTitle", timeout=15000)
+        pg.wait_for_function("()=>document.getElementById('joinTitle')&&document.getElementById('joinTitle').textContent.length>0&&!document.getElementById('lpjTitle')")
+        got = pg.evaluate("()=>({t:document.title,h1:document.getElementById('joinTitle').textContent,lang:document.documentElement.lang})")
+        assert got["t"] == title and got["h1"] == h1 and got["lang"] == lang, (lang, got)

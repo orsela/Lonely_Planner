@@ -124,7 +124,9 @@ function fatal(){
  const en=window.LPJoin&&window.LPJoin.lang?window.LPJoin.lang()==='en':fatalEn();
  root.innerHTML='<main><div class="brand">Lonely Planner</div><section class="card center" role="alert"><h1 id="joinTitle">'+(en?"Couldn't load the page":'לא הצלחנו לטעון את הדף')+'</h1>'+
   '<p>'+(en?'Check your connection and try again.':'בדקו את החיבור ונסו שוב.')+'</p><button type="button" id="lpReload" style="min-height:44px;padding:0 18px;border:0;border-radius:12px;background:#0f6b4f;color:#fff;font-weight:800;font-size:14px">'+(en?'Try again':'נסו שוב')+'</button></section></main>';
- if(en){document.documentElement.lang='en';document.documentElement.dir='ltr'}
+ if(en){document.documentElement.lang='en';document.documentElement.dir='ltr';
+  /* CHANGE 2026-11-25 F13-JOIN-04: was no title change here, so when flow.js failed to load the tab kept the Hebrew title on the English error screen (now 'Join the trip · Lonely Planner', same text flow.js applyDoc uses) */
+  document.title='Join the trip \u00b7 Lonely Planner'}
  document.getElementById('lpReload').onclick=()=>location.reload();
 }
 Promise.all([window.supabase?Promise.resolve():load(SUPABASE_JS),window.LPJoin?Promise.resolve():load('flow.js'),

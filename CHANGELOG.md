@@ -1,5 +1,11 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.21.8 — F13-JOIN-04 / F13-CAT-01 · English tab title on the /join/ error screen; 11 catalog entries found by a runtime crawl (2026-11-25)
+- join/index.html: when flow.js fails to load, the English error screen also sets the English tab title (was Hebrew). New test test_english_error_screen_title (fails without the fix).
+- app/i18n/en.json: + "הגדרות וניהול", "כספת", check-in texts, "מקומות קרובים לפי Google", "הוספת נקודת עניין · יום N", "N מסמכים", "ספרה N" (code boxes).
+- tests/f13/collect_deep.py: new dev tool (clicks two levels deep, scenarios manager / viewer / gate) listing visible Hebrew without a catalog entry. The static count of coverage.mjs is not a coverage measure (see F13_decisions).
+- Tests: tests/f13/run.sh all PASS; tests/run_all.sh -j 2 all jobs PASS (f05 and f03off need history depth >= 1000, a shallow clone fails their baseline comparisons).
+
 ## 3.0.0-alpha.21.7 — TC-NAME · the home header of a cloud trip keeps its name offline (2026-11-25)
 - Found in the phone test of TC-BUG-01 (Romania, airplane mode): all content was Romanian but the header read "🇻🇳 ויאטנם". The trip name is now saved on the device after every successful read and used when the read fails; with no name at all the header says "הטיול".
 
