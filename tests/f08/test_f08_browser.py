@@ -47,9 +47,15 @@ def test_f08_stage_a_in_the_real_app(env):
     # 1 · version + more row + screen
     ver = page.evaluate("()=>window.__ptF08&&window.__ptF08.version")
     if ver != "3.0.0-alpha.13.1": P.append("f08 version: %r" % ver)
-    if "3.0.0-alpha.14" not in page.content(): P.append("app version string alpha.14 missing")  # CHANGE 2026-11-14 F24-A2-05: was alpha.13.1 (app version bumped by F24)
+    # CHANGE 2026-11-25 QA-TRIAGE-04: was the literal "3.0.0-alpha.14" (F24-A2-05); the page version comes from tests/qa_versions.json
+    import json as _j, pathlib as _p
+    _cur = _j.loads((_p.Path(__file__).resolve().parents[1] / "qa_versions.json").read_text(encoding="utf-8"))["app"]
+    if _cur not in page.content(): P.append("app version string %s missing" % _cur)
     page.evaluate("()=>document.querySelector('.tab[data-panel=more]').click()")
     page.wait_for_timeout(400)
+    # CHANGE 2026-11-25 QA-MORE-05: with MORE_LAYOUT='compact' the row lives in the panel "הגדרות וניהול" (#mcSettingsRow opens it)
+    if page.locator("#mcSettingsRow").count() and page.locator("#mcSettingsRow").first.is_visible():
+        page.locator("#mcSettingsRow").first.click(); page.wait_for_timeout(400)
     if not page.locator("#ptF08Row").is_visible(): P.append("עוד → מדינות לפי ימים row not visible")
     page.locator("#ptF08Row").click(); page.wait_for_timeout(600)
     if not page.locator("#ptF08Panel").is_visible(): P.append("screen not open")

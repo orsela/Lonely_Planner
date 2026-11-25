@@ -156,8 +156,9 @@ run_job() {
            --deselect "test_f03.py::test_ac10_landing_network_error_and_retry" --deselect "test_f03.py::test_ac12_token_not_kept[valid]" \
            --deselect "test_f03.py::test_ac10_invite_link_while_app_open" --deselect "test_f03.py::test_ac10_invite_link_encoded_and_query" \
            --deselect "test_f03.py::test_ac10_invite_via_launch_queue" --deselect "test_f03.py::test_ac17_390_rtl_touch[landing-valid]";;
-    f03off) pyjob f03off "$WORK/wiz_off" tests/f03 test_f03.py "WIZARD off copy; desel: 1 F04 §8, 1 F04 §1.1" \
-           --deselect "test_f03.py::test_ac18_static[title_version]" --deselect "test_f03.py::test_ac10_invite_page_outside_app";;
+    f03off) pyjob f03off "$WORK/wiz_off" tests/f03 test_f03.py "WIZARD off copy; desel: 1 F04 §8, 1 F04 §1.1, 3 MORE-COMPACT" \
+           --deselect "test_f03.py::test_ac18_static[title_version]" --deselect "test_f03.py::test_ac10_invite_page_outside_app" \
+           --deselect "test_f03.py::test_ac15_account_section_position" --deselect "test_f03.py::test_ac16_off_more_panel_identical_to_alpha2" --deselect "test_f03.py::test_ac18_static[more_rest_unchanged]";;  # CHANGE 2026-11-25 QA-TRIAGE-05: same 3 MORE-COMPACT deselects as f03on
     f04) pyjob f04 "$REPO" tests/f04 test_f04.py "desel: 3 superseded by F05, 3 by F06 D1, 1 by F04-HOME C1 (sup_*), 1 by F08 (precached json)" \
            --deselect "test_f04.py::test_c01_gate_button_email_entry" \
            --deselect "test_f04.py::test_c21_static[sw_no_precache_of_json]" \
@@ -190,10 +191,12 @@ run_job() {
            "test_f20.py::test_c02_pending_badge[two]" "test_f20.py::test_d01_network_reads_only_spec_tables";;  # CHANGE 2026-10-30 F21-QA-08: new job
     f04h) pyjob f04h "$REPO" tests/f04home test_f04home.py "desel: 1 version pin (/invite/ comment; F21 leaves /invite/ unchanged)" \
            --deselect "test_f04home.py::test_f4h_13_static[invite_version_comment]";;  # CHANGE 2026-10-30 F21-QA-08
-    f21) pyjob f21 "$REPO" tests/f21 test_f21.py "";;  # CHANGE 2026-10-30 F21-QA-08
+    f21) pyjob f21 "$REPO" tests/f21 test_f21.py "desel: 4 superseded (F23 texts/resume 'u', invite+join pages changed after alpha.7.2)" \
+           --deselect "test_f21.py::test_c06_code_screen_texts_and_inputs" --deselect "test_f21.py::test_c07_resume_within_10_min_no_send" \
+           --deselect "test_f21.py::test_c20_static[invite_unchanged]" --deselect "test_f21.py::test_c20_static[join_unchanged]";;  # CHANGE 2026-11-25 QA-TRIAGE-08: was no deselects  # CHANGE 2026-10-30 F21-QA-08
     static)
       local log="$OUT/static.txt"
-      (cd "$REPO" && $PY scripts/dev/f21_static_check.py && $PY scripts/dev/f21_request_static_check.py) >"$log" 2>&1  # CHANGE 2026-10-30 F21-QA-08: F21 dev checks (was fix772_static_check.py d148d74, alpha.7.2). CHANGE 2026-10-26 FIX-RUN-01: was f04home_static_check.py ee5c723
+      (cd "$REPO" && $PY scripts/dev/f21_request_static_check.py) >"$log" 2>&1  # CHANGE 2026-11-25 QA-TRIAGE-06: f21_static_check.py removed from this job: it diffs the app against the F21 base 313eb14 ("only version lines changed", "sw.js unchanged") and cannot hold after F22-F24/MORE-COMPACT/OFFMAP; the protected-function check lives in tests/vnparity. # CHANGE 2026-10-30 F21-QA-08: F21 dev checks (was fix772_static_check.py d148d74, alpha.7.2). CHANGE 2026-10-26 FIX-RUN-01: was f04home_static_check.py ee5c723
       local rc=$?
       echo "$([ $rc = 0 ] && echo PASS || echo FAIL)|1|$([ $rc = 0 ] && echo 1 || echo 0)|$([ $rc = 0 ] && echo 0 || echo 1)|0|0|0|f21_static_check.py + f21_request_static_check.py" >"$OUT/static.res";;
     fn)

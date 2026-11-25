@@ -306,7 +306,7 @@ begin
         ('end_date',      jsonb_set(pay, '{end_date}', '"2027-08-01"')),
         ('home_currency', jsonb_set(pay, '{home_currency}', '"JPY"')),
         ('home_currency', pay - 'home_currency'),
-        ('default_lang',  jsonb_set(pay, '{default_lang}', '"en"')),
+        ('default_lang',  jsonb_set(pay, '{default_lang}', '"fr"')), -- CHANGE 2026-11-25 QA-F04-02: was '"en"'; F13 stage 2 (0025_f13) accepts 'he' and 'en', so the invalid sample is now '"fr"'
         ('default_role',  jsonb_set(pay, '{default_role}', '"manager"')),
         ('countries',     jsonb_set(pay, '{countries}', '[]')),
         ('countries',     jsonb_set(pay, '{countries}', '["JP","JP"]')),

@@ -821,6 +821,11 @@ def boot(env, name="A", role="manager", admin=False, email=None, display="אור
     be = env.backend
     tid = trip or be.add_trip_full("ויאטנם 2026", "2026-09-15", "2026-10-06", countries=["VN"])
     be.set_kv(tid, "tripname", "טיול QA")
+    # CHANGE 2026-11-25 QA-F03-01: was no 'trip' key; since TC-BUG-01 (alpha.18.4) a cloud trip with no stored 'trip' is empty and the home never opens
+    # (seen on the WIZARD-off copy), so the fixture stores 3 empty days like a trip created by the F04 wizard.
+    import json as _json
+    be.set_kv(tid, "trip", _json.dumps([{"day": i + 1, "date": "%02d/09/2026" % (15 + i), "region": "", "title": "", "activities": "", "hotel": "",
+                                          "cost": 0, "notes": "", "lat": 21.03, "lng": 105.85, "zoom": 5, "waypoints": []} for i in range(3)], ensure_ascii=False))
     be.auto_link = {"trip_id": tid, "role": role, "status": "active", "display_name": display}
     be.auto_admin, be.auto_email = admin, email
     dev = env.new_device(name)
@@ -1812,6 +1817,10 @@ def test_ac16_off_ignores_invite_hash_and_admin(env):
     iid, token = be.add_invite("dana@example.com", "יפן 2027")
     tid = be.add_trip_full("ויאטנם 2026", "2026-09-15", "2026-10-06")
     be.set_kv(tid, "tripname", "טיול QA")
+    # CHANGE 2026-11-25 QA-F03-02: stored 3-day 'trip' (see boot(), QA-F03-01)
+    import json as _json
+    be.set_kv(tid, "trip", _json.dumps([{"day": i + 1, "date": "%02d/09/2026" % (15 + i), "region": "", "title": "", "activities": "", "hotel": "",
+                                          "cost": 0, "notes": "", "lat": 21.03, "lng": 105.85, "zoom": 5, "waypoints": []} for i in range(3)], ensure_ascii=False))
     be.auto_link = {"trip_id": tid, "role": "manager", "status": "active", "display_name": "אור"}
     be.auto_admin = True
     serve_admin_off(env)

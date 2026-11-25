@@ -53,16 +53,19 @@ def main():
 
     print("storage:")
     keys = sorted(set(re.findall(r"'(pt:[^']*)'", js)))
-    check("device keys exactly rq_lang + rq_resume", keys == ["pt:_device:rq_lang", "pt:_device:rq_resume"], keys)
+    # CHANGE 2026-11-25 QA-TRIAGE-07: was exactly rq_lang + rq_resume; F23 added rq_ready (sessionStorage, ready screen), so the F23 set is expected
+    check("device keys exactly rq_lang + rq_ready + rq_resume (F23)", keys == ["pt:_device:rq_lang", "pt:_device:rq_ready", "pt:_device:rq_resume"], keys)
     raw = re.findall(r"localStorage\.\w+\(", js)
     check("localStorage used only inside the three try/catch wrappers", len(raw) == 3, raw)
     for fn in ("lsGet", "lsSet", "lsDel"):
         check("%s wraps storage in try/catch" % fn, re.search(r"function %s\([^)]*\)\{try\{(?:return )?localStorage\." % fn, js) is not None)
-    check("no sessionStorage / IndexedDB", "sessionStorage" not in js and "indexedDB" not in js)
+    # CHANGE 2026-11-25 QA-TRIAGE-07: was "no sessionStorage"; F23 keeps the ready screen in sessionStorage on purpose (same tab only). IndexedDB still forbidden.
+    check("no IndexedDB (sessionStorage allowed since F23)", "indexedDB" not in js)
     w = re.search(r"function writeResume\(\)\{(.*?)\}\n", js)
     body = w.group(1) if w else ""
     fields = re.findall(r"(\w+):", re.search(r"JSON\.stringify\(\{(.*?)\}\)", body).group(1)) if w else []
-    check("resume entry fields = request_id,email,sentAt,lang,v", fields == ["request_id", "email", "sentAt", "lang", "v"], fields)
+    # CHANGE 2026-11-25 QA-TRIAGE-07: regex now also catches the F23 'u:1' marker; the real entry is request_id,email,sentAt,lang,u,v
+    check("resume entry fields = request_id,email,sentAt,lang,(u:1),v", [f for f in fields if f != "1"] == ["request_id", "email", "sentAt", "lang", "u", "v"], fields)
     check("resume never mentions the code", "code" not in body.lower(), body)
 
     print("network / secrets:")
