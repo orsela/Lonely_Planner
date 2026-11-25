@@ -11,7 +11,7 @@
    4. Vault clean-up: category chips and the quota bar are hidden (the quota bar shows again from 80 %). */
 (function (root) {
   'use strict';
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1'; /* CHANGE 2026-11-25 MC-BACK-01: was '1.0.0' (back button of the settings panel is 44x44) */
   const B = { mounted: false, dep: {}, flag: false };
   const d = () => root.document;
   const $ = id => d().getElementById(id);
@@ -24,6 +24,8 @@
     '.mc-badge[hidden]{display:none}',
     '.mc-sync{margin:14px 0 4px;text-align:center;font-size:.75rem;font-weight:500;color:#0f6b4f}',
     '#moreSettings .mc-body{padding:0 var(--sp-3,12px) 90px;max-width:1100px;margin:auto}',
+    /* CHANGE 2026-11-25 MC-BACK-01: was no rule (the back arrow measured 19x26 px, below the 44 px touch minimum found by QA, f06 test_l01_layout_390[more]). Only this panel's own back button; the other screens' back arrows are unchanged. */
+    '#moreSettings .topbar-back{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;font-size:1.5rem}',
     '#moreSettings #vaultBtn{display:none}',
     '.mc-tabs{display:flex;gap:4px;padding:4px;margin:6px 0 12px;background:#e7ebe6;border-radius:13px}',
     '.mc-tabs button{flex:1;min-height:44px;border:0;border-radius:10px;background:transparent;color:#5b6472;font:inherit;font-size:.9rem;font-weight:500;cursor:pointer}',

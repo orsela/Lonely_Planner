@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.21.4 — MORE-COMPACT · the back button of "הגדרות וניהול" is 44x44 px (2026-11-25)
+- morec.js 1.0.1: CSS only, found by the QA pass (was 19x26 px). No other screen changes.
+
 ## 3.0.0-alpha.21.3 — MORE-COMPACT · fix: the compact "עוד" now actually starts (2026-11-24)
 - alpha.21.0 passed the F06-private `go()` to morec.js (not global in the real page → ReferenceError, caught, nothing compacted). Now `switchPanel`. The stub test defined `go` itself, so it did not catch this; the test now defines only `switchPanel`.
 
