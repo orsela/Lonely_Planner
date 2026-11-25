@@ -267,7 +267,7 @@
     if (!node) return;
     if (node.nodeType === 3) { trText(node); return; }
     if (node.nodeType !== 1 && node.nodeType !== 11) return;
-    if (node.nodeType === 1) { if (SKIP_TAG[node.tagName]) return; trAttrs(node); }
+    if (node.nodeType === 1) { if (SKIP_TAG[node.tagName]) { if (node.tagName === 'TEXTAREA') trAttrs(node); return; } trAttrs(node); }   /* CHANGE 2026-11-25 F13-S2-01: a <textarea> is not descended into (its value is the user's) but its placeholder / title / aria-label ARE translated on the first pass too (the observer already did it for later changes) — the journal placeholder stayed Hebrew */
     for (let c = node.firstChild; c; c = c.nextSibling) trTree(c);
   }
   function trTitle() { try { const d = W.document, v = d.title; if (v && HE.test(v)) { const o = translate(v); if (o !== v) { D.title = v; d.title = o; } } } catch (e) { /* no document */ } }
