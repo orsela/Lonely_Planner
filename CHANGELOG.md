@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.21.5 — BUDGET-PP · a saved traveler count below 1 is repaired to the default 10 (2026-11-25)
+- budgetpp.js: was clamped to 1 (a stored 0 would have made the per-person actual 10x too high). Not reachable from the screen (input min 1). Found by the QA pass.
+
 ## 3.0.0-alpha.21.4 — MORE-COMPACT · the back button of "הגדרות וניהול" is 44x44 px (2026-11-25)
 - morec.js 1.0.1: CSS only, found by the QA pass (was 19x26 px). No other screen changes.
 

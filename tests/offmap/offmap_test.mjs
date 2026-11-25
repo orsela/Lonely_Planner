@@ -341,7 +341,9 @@ test("repo · the key is not in any file; versions agree; the page only loads th
   const js = read("../../app/js/offmap.js"), html = read("../../app/index.html"), sw = read("../../app/sw.js");
   assert.match(js, /const OFFMAP_KEY = '';/);
   assert.ok(!/protomaps\.com[^\s'"`]*key=[A-Za-z0-9]{8,}/.test(js + html + sw), "no Protomaps key literal anywhere");
-  assert.match(html, /const PT_VERSION='3\.0\.0-alpha\.21\.2'/); assert.match(html, /const APP_VERSION='3\.0\.0-alpha\.21\.2'/);
+  // CHANGE 2026-11-25 QA-TRIAGE-02: was the literal alpha.21.2; the page version now comes from tests/qa_versions.json (one place per release). OM.version (the module's own) stays as is.
+  const cur = JSON.parse(read("../qa_versions.json")).app.replace(/\./g, "\\.");
+  assert.match(html, new RegExp("const PT_VERSION='" + cur + "'")); assert.match(html, new RegExp("const APP_VERSION='" + cur + "'"));
   assert.match(html, /<script src="js\/offmap\.js"><\/script>/); assert.match(html, /const OFFMAP_FEATURE='off';/);
   assert.match(sw, /"js\/offmap\.js"/);
   const code = html.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");

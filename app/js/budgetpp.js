@@ -1,4 +1,4 @@
-/* Lonely Planner · BUDGET-PP – expected cost PER PERSON for each budget item, next to the actual · version 3.0.0-alpha.17.1
+/* Lonely Planner · BUDGET-PP – expected cost PER PERSON for each budget item, next to the actual · version 3.0.0-alpha.21.5 (BPP-FIX-01: travelers below 1 -> default 10; was alpha.17.1)
    CHANGE 2026-11-17 BUDGETPP-01: new file (no previous version). Approved by Or 2026-11-17 (mockup boards 7–8 of the NOTES-RICH canvas). The budget screen gets a card "לפי סעיף · לאדם" under the category tiles:
    one row per existing budget item (לינה, אוכל, נסיעות, שווקים וקניות, אטרקציות, אחר) with "מתוכנן לאדם" (editable by managers, in €) and "בפועל לאדם" (the item's actual spending ÷ travelers, shown in €),
    plus a ✈️ flights row (Tel Aviv – Bucharest – Tel Aviv): planned = an estimate from flight sites (with its date), actual = typed by hand after the tickets are bought (it is NOT taken from expenses).
@@ -21,7 +21,10 @@
     const s = stored && typeof stored === 'object' ? stored : {}, pp = {};
     Object.keys(DEFAULTS.pp).forEach(function (k) { pp[k] = num(s.pp && s.pp[k], DEFAULTS.pp[k]); });
     const fa = s.flightsActual == null || s.flightsActual === '' ? null : num(s.flightsActual, null);
-    return { travelers: Math.max(1, Math.round(num(s.travelers, DEFAULTS.travelers))), pp: pp,
+    /* CHANGE 2026-11-25 BPP-FIX-01: was Math.max(1, Math.round(num(s.travelers, 10))), so a stored 0 / negative became 1 traveler (and the per-person actual 10x too high);
+       now a stored value below 1 is repaired to the default (10), like the other bad values (found by tests/budgetpp case 3). Saved values >= 1 are unchanged. */
+    const tv = Math.round(num(s.travelers, DEFAULTS.travelers));
+    return { travelers: tv >= 1 ? tv : DEFAULTS.travelers, pp: pp,
       flightsNote: typeof s.flightsNote === 'string' && s.flightsNote ? s.flightsNote : DEFAULTS.flightsNote, flightsActual: fa };
   }
   function bpTotal(plan) { return Object.keys(plan.pp).reduce(function (t, k) { return t + plan.pp[k]; }, 0); }
