@@ -961,6 +961,10 @@ def linked_setup(env, role="editor", status="active", tripname="טיול QA"):
     tid = be.add_trip("QA trip")
     if tripname:
         be.set_kv(tid, "tripname", tripname)
+    # CHANGE 2026-11-25 QA-F02-01: was no 'trip' key. Since TRIP-COUNTRY TC-BUG-01 (alpha.18.4) a cloud trip without a stored 'trip' is an EMPTY trip,
+    # never the Vietnam seed, and journal / expense saves need a day; the fixture now stores 3 empty days (a trip made by the F04 wizard looks the same).
+    be.set_kv(tid, "trip", json.dumps([{"day": i + 1, "date": "%02d/09/2026" % (15 + i), "region": "", "title": "", "activities": "", "hotel": "", "cost": 0,
+                                        "notes": "", "lat": 21.03, "lng": 105.85, "zoom": 5, "waypoints": []} for i in range(3)], ensure_ascii=False))
     be.auto_link = {"trip_id": tid, "role": role, "status": status, "display_name": "QA"}
     return tid
 
@@ -1696,7 +1700,8 @@ def test_ac11_two_trips_do_not_mix(env):
     dbs = dev.idb_names()
     if not f06:  # CHANGE 2026-10-26 QA-DEBT-02: with F06 the removed trip's vault DB goes too (§3.4 clean-up)
         assert "pt-vault-" + tb in dbs, "trip B vault DB pt-vault-<B> missing: %r" % dbs
-    assert all(d.startswith("pt-vault-") for d in dbs), "unexpected IndexedDB names: %r" % dbs
+    # CHANGE 2026-11-25 QA-F02-02: was d.startswith("pt-vault-") only. OFFMAP (alpha.19+) keeps ONE device-level store "pt-_device-offmap" (the shared map key, not trip data).
+    assert all(d.startswith("pt-vault-") or d == "pt-_device-offmap" for d in dbs), "unexpected IndexedDB names: %r" % dbs
     assert "QA only-B" not in (be.kv(ta, "expenses") or "") and "QA only-B" in (be.kv(tb, "expenses") or "")
 
 
@@ -1705,6 +1710,8 @@ def test_ac11_two_trips_do_not_mix(env):
 # =====================================================================================================
 def test_ac12_chat_soon_zero_network(env):
     """C12: chat button shows 'בקרוב' (toast `הצ'אט יחזור בקרוב`), zero network calls; CHAT_FEATURE='soon', CHAT_ENDPOINT=''."""
+    # CHANGE 2026-11-25 QA-F02-03: the chat was switched on again by F14 (CHAT_FEATURE='on'); this case tests the 'soon' behaviour, so the page is served with the flag 'soon'.
+    env.server.overrides[APP_PATH] = re.sub(r"(const\s+CHAT_FEATURE\s*=\s*)['\"]on['\"]", r"\1'soon'", read_app("index.html"), count=1).encode("utf-8")
     tid, dev, state = boot_linked(env)
     page, be = dev.page, env.backend
     assert state == "app"

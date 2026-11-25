@@ -2364,10 +2364,18 @@ def trip_name_problems(dev, want, label):
     if has(page, TXT["tripname_fallback"]):
         P.append("%s: fallback %r shown" % (label, TXT["tripname_fallback"]))
     f03.open_more(page)
-    if not visible(page, TXT["mgmt_row"], "#more"):
+    # CHANGE 2026-11-25 QA-MORE-03: was scope "#more" only; with MORE_LAYOUT='compact' f03.open_more enters #moreSettings, where the row now lives
+    scope = "#moreSettings" if page.locator("#mcSettingsRow").count() else "#more"
+    if not visible(page, TXT["mgmt_row"], scope):
         P.append("%s: row %r not in 'עוד'" % (label, TXT["mgmt_row"]))
         return P
-    click_text(page, TXT["mgmt_row"])
+    # CHANGE 2026-11-25 QA-MORE-04: was click_text(page, TXT["mgmt_row"]). With MORE_LAYOUT='compact' the word also sits in the row "הגדרות וניהול" and the real row
+    # has a sub-caption, so the row is clicked by its label element (.lbl STARTING with the text) inside #moreSettings.
+    if page.locator("#mcSettingsRow").count():
+        page.locator("#moreSettings .listitem").filter(has=page.locator(".lbl", has_text=re.compile("^\\s*" + re.escape(TXT["mgmt_row"])))).first.click()
+        page.wait_for_timeout(350)
+    else:
+        click_text(page, TXT["mgmt_row"])
     if not wait_has(page, TXT["trip_settings"], 6):
         P.append("%s: %r not shown under %r" % (label, TXT["trip_settings"], TXT["mgmt_row"]))
         return P
@@ -2837,6 +2845,10 @@ def test_c19_boot_prefers_cached_trip_only_when_on(env, state):
     b = be.add_trip_full("טיול ב", "2026-11-01", "2026-11-10")
     be.set_kv(a, "tripname", "טיול א")
     be.set_kv(b, "tripname", "טיול ב")
+    # CHANGE 2026-11-25 QA-F04-01: was no 'trip' keys. Since TC-BUG-01 (alpha.18.4) a cloud trip without stored days is an empty trip with a notice; give both 3 days.
+    for _t in (a, b):
+        be.set_kv(_t, "trip", json.dumps([{"day": i + 1, "date": "%02d/10/2026" % (1 + i), "region": "", "title": "", "activities": "", "hotel": "", "cost": 0,
+                                           "notes": "", "lat": 21.03, "lng": 105.85, "zoom": 5, "waypoints": []} for i in range(3)], ensure_ascii=False))
     be.auto_link = {"trip_id": b, "role": "editor", "status": "active", "display_name": "QA"}
     dev = env.new_device("A")
     assert dev.goto(APP_PATH) == "app"

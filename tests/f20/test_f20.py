@@ -309,6 +309,10 @@ def make_trips(be, keys=ORDER, foreign=True):
             be.add_member(tid, "00000000-0000-4000-8000-%012d" % 900001, "editor", "pending", "ממתין")
             be.add_member(tid, "00000000-0000-4000-8000-%012d" % 900002, "viewer", "removed", "הוסר")
         be.set_kv(tid, "tripname", name)
+        # CHANGE 2026-11-25 QA-F20-01: was no 'trip' key. Since TC-BUG-01 (alpha.18.4) a cloud trip without stored days is an empty trip and the app shows the toast
+        # "אין עותק של הטיול במכשיר" (#ciToast, pointer-events auto) which covers the home avatar; the fixture now stores 3 empty days like a wizard-made trip.
+        be.set_kv(tid, "trip", json.dumps([{"day": i + 1, "date": "%02d/10/2026" % (1 + i), "region": "", "title": "", "activities": "", "hotel": "", "cost": 0,
+                                            "notes": "", "lat": 21.03, "lng": 105.85, "zoom": 5, "waypoints": []} for i in range(3)], ensure_ascii=False))
         ids[k] = tid
         be.links.append({"trip_id": tid, "role": role, "display_name": display, "joined_at": joined})
     if foreign:  # not a member: never listed (criterion 13)
@@ -1587,7 +1591,8 @@ def test_s08_more_has_no_admin_row_linked_email_stays(env):
     P = []
     if exists(page, SEL["more_admin_row"]):
         P.append("#ptAdminRow in the DOM")
-    more = page.evaluate("()=>{const m=document.getElementById('more');return m?m.innerText:''}")
+    # CHANGE 2026-11-25 QA-MORE-02: was only #more; with MORE_LAYOUT='compact' the rows live in the panel #moreSettings (opened by f03.open_more)
+    more = page.evaluate("()=>['more','moreSettings'].map(i=>{const m=document.getElementById(i);return m?m.innerText:''}).join('\\n')")
     if TXT["admin_row"] in norm(more):
         P.append("'ניהול מערכת' in 'עוד'")
     if TXT["more_linked"] not in norm(more):

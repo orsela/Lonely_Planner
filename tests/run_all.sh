@@ -8,6 +8,9 @@
 # CHANGE 2026-10-26 QA-DEBT-11: new file (no previous version). Replaces running tests/f0x/run.sh one by one for the full
 #   regression. Offline: no Supabase, no network (the v2.15.2 protected-function baseline is read from git, tests/qa_refs.py).
 #
+# CHANGE 2026-11-25 QA-TRIAGE-01: new deselects, each superseded on purpose: f03on test_ac15_account_section_position + test_ac16_off_more_panel_identical_to_alpha2 +
+#   test_ac18_static[more_rest_unchanged] — MORE-COMPACT (alpha.21) moved the rows of "עוד" into the panel "הגדרות וניהול" (the compact screen is tested by tests/morec);
+#   f04 test_c21_static[sw_no_precache_of_json] — F08 precaches countries.json / currencies.json on purpose (F08 §4 replaced F04 §4).
 # usage: tests/run_all.sh [-j N] [--only "job job …"] [--list]
 #   -j N      parallel jobs (default 2; each browser suite drives its own Chromium, ~1 CPU each; full run ≈18 min at -j 2)
 #   --only    a subset of jobs (names below); --list prints them
@@ -146,16 +149,18 @@ run_job() {
            --deselect "tests/test_f02.py::test_ac05_parity_with_v2152_rendering" \
            --deselect "tests/test_f02.py::test_ac15_static[title_version]" \
            --deselect "tests/test_f02.py::test_ac15_static[manifest_visible_fields_unchanged]";;
-    f03on) pyjob f03on "$REPO" tests/f03 test_f03.py "WIZARD on; desel: 1 F04 §8, 1 F04 §1.1, 8 F04 §4" \
+    f03on) pyjob f03on "$REPO" tests/f03 test_f03.py "WIZARD on; desel: 1 F04 §8, 1 F04 §1.1, 8 F04 §4, 3 MORE-COMPACT" \
            --deselect "test_f03.py::test_ac18_static[title_version]" --deselect "test_f03.py::test_ac10_invite_page_outside_app" \
+           --deselect "test_f03.py::test_ac15_account_section_position" --deselect "test_f03.py::test_ac16_off_more_panel_identical_to_alpha2" --deselect "test_f03.py::test_ac18_static[more_rest_unchanged]" \
            --deselect "test_f03.py::test_ac10_landing_valid[fresh-device]" --deselect "test_f03.py::test_ac10_landing_valid[linked-device]" \
            --deselect "test_f03.py::test_ac10_landing_network_error_and_retry" --deselect "test_f03.py::test_ac12_token_not_kept[valid]" \
            --deselect "test_f03.py::test_ac10_invite_link_while_app_open" --deselect "test_f03.py::test_ac10_invite_link_encoded_and_query" \
            --deselect "test_f03.py::test_ac10_invite_via_launch_queue" --deselect "test_f03.py::test_ac17_390_rtl_touch[landing-valid]";;
     f03off) pyjob f03off "$WORK/wiz_off" tests/f03 test_f03.py "WIZARD off copy; desel: 1 F04 §8, 1 F04 §1.1" \
            --deselect "test_f03.py::test_ac18_static[title_version]" --deselect "test_f03.py::test_ac10_invite_page_outside_app";;
-    f04) pyjob f04 "$REPO" tests/f04 test_f04.py "desel: 3 superseded by F05, 3 by F06 D1, 1 by F04-HOME C1 (sup_*)" \
+    f04) pyjob f04 "$REPO" tests/f04 test_f04.py "desel: 3 superseded by F05, 3 by F06 D1, 1 by F04-HOME C1 (sup_*), 1 by F08 (precached json)" \
            --deselect "test_f04.py::test_c01_gate_button_email_entry" \
+           --deselect "test_f04.py::test_c21_static[sw_no_precache_of_json]" \
            --deselect "test_f04.py::test_c11_c12_done_link_whatsapp_copy" --deselect "test_f04.py::test_c16_join_page_coming_soon_clears_hash" \
            --deselect "test_f04.py::test_n01_no_old_name_rendered[join]" \
            --deselect "test_f04.py::test_c15_more_join_link_row[manager]" --deselect "test_f04.py::test_n01_no_old_name_rendered[more_sheet]" \
