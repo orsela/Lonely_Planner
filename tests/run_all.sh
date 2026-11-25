@@ -79,7 +79,7 @@ REPO="$(cd "$HERE/.." && pwd)"
 PY=${PYTHON:-python3}
 NODE=${NODE:-node}
 JOBS=2; ONLY=""
-ALL_JOBS="f04 f05 f20 f03on f03off f02 f04h f06 f21 sup_f02_flags_off sup_f04_members sup_f04_home sup_f05_home sup_f20_req_off fn static db db21"  # CHANGE 2026-10-30 F21-QA-08: + f21, sup_f20_req_off, db21
+ALL_JOBS="f04 f05 f20 f03on f03off f02 f04h f06 f21 sup_f02_flags_off sup_f04_members sup_f04_home sup_f05_home sup_f20_req_off fn static vnparity db db21"  # CHANGE 2026-11-25 VNPAR-03: + vnparity (permanent). CHANGE 2026-10-30 F21-QA-08: + f21, sup_f20_req_off, db21
 while [ $# -gt 0 ]; do
   case "$1" in
     -j) JOBS=$2; shift 2;;
@@ -199,6 +199,11 @@ run_job() {
       (cd "$REPO" && $PY scripts/dev/f21_request_static_check.py) >"$log" 2>&1  # CHANGE 2026-11-25 QA-TRIAGE-06: f21_static_check.py removed from this job: it diffs the app against the F21 base 313eb14 ("only version lines changed", "sw.js unchanged") and cannot hold after F22-F24/MORE-COMPACT/OFFMAP; the protected-function check lives in tests/vnparity. # CHANGE 2026-10-30 F21-QA-08: F21 dev checks (was fix772_static_check.py d148d74, alpha.7.2). CHANGE 2026-10-26 FIX-RUN-01: was f04home_static_check.py ee5c723
       local rc=$?
       echo "$([ $rc = 0 ] && echo PASS || echo FAIL)|1|$([ $rc = 0 ] && echo 1 || echo 0)|$([ $rc = 0 ] && echo 0 || echo 1)|0|0|0|f21_static_check.py + f21_request_static_check.py" >"$OUT/static.res";;
+    vnparity)  # CHANGE 2026-11-25 VNPAR-03: Vietnam behavioural parity (schematic map + bookingUrl) vs the v2.15.2 app, replaces byte-identity of drawMap/drawSchematicMap/bookingUrl
+      local log="$OUT/vnparity.txt"
+      (cd "$REPO" && $PY -I tests/vnparity/test_vn_parity.py) >"$log" 2>&1
+      local rc=$?
+      echo "$([ $rc = 0 ] && echo PASS || echo FAIL)|1|$([ $rc = 0 ] && echo 1 || echo 0)|$([ $rc = 0 ] && echo 0 || echo 1)|0|0|0|test_vn_parity.py" >"$OUT/vnparity.res";;
     fn)
       local log="$OUT/fn.txt" P=0 F=0 X=0 rc=0
       : >"$log"
