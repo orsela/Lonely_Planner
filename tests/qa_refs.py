@@ -26,7 +26,9 @@ VERSIONS = json.loads((TESTS_DIR / "qa_versions.json").read_text(encoding="utf-8
 CURRENT_VERSION = os.environ.get("QA_EXPECTED_VERSION", VERSIONS["app"])
 FN_VERSIONS = VERSIONS["functions"]
 
-PROTECTED = ["drawMap", "drawGoogleMap", "drawSchematicMap", "fallbackToSchematic", "SEED_DATA", "stayBlock", "bookingUrl"]
+# CHANGE 2026-11-25 VNPAR-02: was ["drawMap", "drawGoogleMap", "drawSchematicMap", "fallbackToSchematic", "SEED_DATA", "stayBlock", "bookingUrl"]. drawMap (OFFMAP-VIEW), drawSchematicMap (TRIP-COUNTRY neutral grid) and bookingUrl (TRIP-COUNTRY-A) were changed on purpose by approved features, flagged and commented; their Vietnam behaviour is now checked by tests/vnparity (same output as e711542 on every day).
+PROTECTED = ["drawGoogleMap", "fallbackToSchematic", "SEED_DATA", "stayBlock"]
+INTENTIONALLY_CHANGED = ["drawMap", "drawSchematicMap", "bookingUrl"]
 
 V2152_REF = os.environ.get("V2152_REF", "e711542")   # protected-function baseline (== v2.15.2, see header)
 REFS = {                                             # last app commit of each version used as a "before" by a suite

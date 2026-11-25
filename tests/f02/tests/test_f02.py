@@ -103,7 +103,9 @@ NC_TITLE = "המכשיר עדיין לא מחובר לטיול"
 NC_BODY = "שלחו למנהל הטיול את קוד המכשיר:"
 NC_RETRY = "נסו שוב"
 CHAT_TOAST = "הצ'אט יחזור בקרוב"
-PROTECTED = ["drawMap", "drawGoogleMap", "drawSchematicMap", "fallbackToSchematic", "SEED_DATA", "stayBlock", "bookingUrl"]
+# CHANGE 2026-11-25 VNPAR-02: was ["drawMap", "drawGoogleMap", "drawSchematicMap", "fallbackToSchematic", "SEED_DATA", "stayBlock", "bookingUrl"]. drawMap (OFFMAP-VIEW), drawSchematicMap (TRIP-COUNTRY neutral grid) and bookingUrl (TRIP-COUNTRY-A) were changed on purpose by approved features, flagged and commented; their Vietnam behaviour is now checked by tests/vnparity (same output as e711542 on every day).
+PROTECTED = ["drawGoogleMap", "fallbackToSchematic", "SEED_DATA", "stayBlock"]
+INTENTIONALLY_CHANGED = ["drawMap", "drawSchematicMap", "bookingUrl"]
 
 VIEWPORT = {"width": 390, "height": 844}
 HEADFUL = os.environ.get("QA_HEADFUL") == "1"
