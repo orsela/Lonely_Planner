@@ -1,5 +1,9 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.21.10 — F13-F24-01 / F13-CAT-03 · English airport and city names in the flight / lodging cards and the chat card (2026-11-25)
+- app/js/f24.js: with English active the card, the origin sheet and the chat flight card show the English names from airports.json ("TLV · Tel Aviv"); Hebrew unchanged. The F24 VERSION constant is untouched.
+- app/i18n/en.json: origin / destination labels, the origin-sheet note, "N more: …", "Cost (…)", "· one way", "N travelers · from the trip members", "From the itinerary · Day N". New dev tool tests/f13/collect_chat.py (chat + F24 crawl).
+
 ## 3.0.0-alpha.21.9 — F13-CAT-02 · English for the invite wizard's code screen, step tags and install hint (2026-11-25)
 - app/i18n/en.json: resend timer, the email-subject example, two notes on the code screen, "· home" / "· manager" tags, the browser install hint. No code change. New dev tool tests/f13/collect_wizard.py (wizard + gate crawl).
 

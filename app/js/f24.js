@@ -1,4 +1,5 @@
-/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.18.1
+/* Lonely Planner · F24 – flight and hotel search from the trip, stage 1: smart links · version 3.0.0-alpha.21.10
+   CHANGE 2026-11-25 F13-F24-01: what changed from alpha.18.1: when English is active (window.__ptF13.lang()==='en') the airport / city names on the card, in the origin sheet and in the lodging line use the English name from airports.json (a.en / place.city) and the country its English form; before, they stayed Hebrew ("TLV · תל אביב"). Hebrew devices are unchanged (the same expressions are used when the language is not English). The VERSION constant below stays (the F24 tests pin it).
    CHANGE 2026-11-24 TC-A-F24-01: what changed from alpha.16.4 (Or's phone check: the Romania trip has no flight search on its first and last day because those days are not marked as flight days): when
    app/js/tripcountry.js is active (TRIPCOUNTRY_FEATURE='on', cloud, not the Vietnam trip) f24FlightSearch also answers for the FIRST day (from Tel Aviv to the day's country, main airport unless the day's city is an
    airport; round trip when the last day is also unmarked and not booked) and the LAST day (from the day's country to Tel Aviv) of a trip with at least 2 days, when no day within 2 days of that end is marked as a flight
@@ -42,6 +43,9 @@
   function feature() { return env.feature ? env.feature() : (typeof TRAVELSEARCH_FEATURE !== 'undefined' ? TRAVELSEARCH_FEATURE : 'on'); }
   function off() { return feature() === 'off' || !F8(); }
   function countryEn(code) { const m = env.countries ? env.countries() : null; const r = m && m[code]; return (r && r.en) || ''; }
+  /* CHANGE 2026-11-25 F13-F24-01: new — English display names when F13 English is active */
+  function isEn() { try { const F = window.__ptF13; return !!(F && F.lang && F.lang() === 'en'); } catch (e) { return false; } }
+  function cityName(p) { return isEn() && p.city ? p.city : (p.cityHe || p.city); }
   function countryHe(code) { const m = env.countries ? env.countries() : null; const r = m && m[code]; return (r && r.he) || countryEn(code); }
 
   /* ---- small helpers ---- */
@@ -86,7 +90,7 @@
   /* F24-FIX-01: a place with neither an airport code nor a city (only a country, or nothing) */
   function isVague(p) { return !!p && !p.iata && !p.city; }
   function skyCode(p) { return (p.iata || p.country || '').toLowerCase(); }
-  function f24PlaceLabel(p) { return p ? (p.iata ? p.iata + ' · ' + (p.cityHe || p.city) : (p.cityHe || p.city || countryHe(p.country) || '')) : ''; }
+  function f24PlaceLabel(p) { return p ? (p.iata ? p.iata + ' · ' + cityName(p) : (cityName(p) || (isEn() ? countryEn(p.country) : countryHe(p.country)) || '')) : ''; }
 
   /* origin sheet (FB_Origin): pinned TLV + ETM, the last origins used on this device, and the search results */
   function f24AirportSearch(q, recents) {
@@ -319,15 +323,15 @@ button.p24-leg{cursor:pointer}
     const link = (u, cls, label) => on ? '<a class="p24-go ' + cls + '" href="' + escH(u) + '" target="_blank" rel="noopener">' + escH(label) + ' <span aria-hidden="true">↗</span></a>'
       : '<span class="p24-go ' + cls + ' dis" role="link" aria-disabled="true">' + escH(label) + ' <span aria-hidden="true">↗</span></span>';
     return '<b class="t">עוד אין לינה ל-' + dm(c.checkin) + ' עד ' + dm(c.checkout) + '</b>' +
-      '<div class="p24-meta"><span>' + escH(c.cityHe || c.city) + '</span><span>' + (c.nights === 1 ? 'לילה אחד' : c.nights + ' לילות') + '</span><span>' + escH(travelersLabel(c.adults, true)) + '</span></div>' +
+      '<div class="p24-meta"><span>' + escH(cityName(c)) + '</span><span>' + (c.nights === 1 ? 'לילה אחד' : c.nights + ' לילות') + '</span><span>' + escH(travelersLabel(c.adults, true)) + '</span></div>' +
       link(c.links.booking, 'p', 'חיפוש ב-Booking') + link(c.links.googleHotels, 's', 'חיפוש ב-Google Hotels') +
       (on ? '' : '<p class="p24-off" role="status">' + OFFLINE_LINE + '</p>') +
       '<p class="p24-hint">העיר והלילות נלקחים מטווח הימים של המסלול. באתר אפשר למיין לפי מחיר או דירוג.</p>';
   }
   /* pure: the origin sheet body. s = {sel, q}, recents = [iata…] */
   function f24OriginSheetHtml(s, recents) {
-    const r = f24AirportSearch(s.q, recents), row = (a, sub) => '<button type="button" class="p24-ap' + (a.iata === s.sel ? ' on' : '') + '" data-p24-ap="' + a.iata + '" aria-pressed="' + (a.iata === s.sel ? 'true' : 'false') + '"><span class="p24-code">' + a.iata + '</span><span style="flex-grow:1"><b>' + escH(a.he) + '</b><small>' + escH(sub) + '</small></span>' + (a.iata === s.sel ? '<span aria-hidden="true">✓</span>' : '') + '</button>';
-    const sub = a => a.iata === 'TLV' ? 'ברירת מחדל' : a.iata === 'ETM' ? 'שדה נוסף בישראל' : (r.recent.indexOf(a) >= 0 ? 'חיפשתם מכאן קודם' : (countryHe(a.cc) || a.en));
+    const r = f24AirportSearch(s.q, recents), row = (a, sub) => '<button type="button" class="p24-ap' + (a.iata === s.sel ? ' on' : '') + '" data-p24-ap="' + a.iata + '" aria-pressed="' + (a.iata === s.sel ? 'true' : 'false') + '"><span class="p24-code">' + a.iata + '</span><span style="flex-grow:1"><b>' + escH(isEn() && a.en ? a.en : a.he) + '</b><small>' + escH(sub) + '</small></span>' + (a.iata === s.sel ? '<span aria-hidden="true">✓</span>' : '') + '</button>';
+    const sub = a => a.iata === 'TLV' ? 'ברירת מחדל' : a.iata === 'ETM' ? 'שדה נוסף בישראל' : (r.recent.indexOf(a) >= 0 ? 'חיפשתם מכאן קודם' : ((isEn() ? countryEn(a.cc) : countryHe(a.cc)) || a.en));
     let h = '<div class="p24-grab"></div><div class="p24-hd"><h2>' + (s.side === 'to' ? 'טסים אל…' : 'טסים מ…') + '</h2><button type="button" class="p24-x" data-p24-close aria-label="סגירה">×</button></div>' +
       '<label class="p24-lbl" for="ptF24Q" style="margin-top:0">עיר או שדה תעופה</label><input id="ptF24Q" class="p24-in" placeholder="למשל: אתונה, LCA" value="' + escH(s.q) + '" autocomplete="off">';
     if (!s.q.trim()) h += '<div class="p24-lbl">מוצעים</div><div class="p24-list">' + r.pinned.concat(r.recent).map(a => row(a, sub(a))).join('') + '</div>';
