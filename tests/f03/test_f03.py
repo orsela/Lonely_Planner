@@ -851,6 +851,15 @@ def fresh_load(dev, path, ready=True):
 def open_more(page):
     f02.tab(page, "more")
     page.wait_for_timeout(500)
+    # CHANGE 2026-11-25 QA-MORE-01: was only the two lines above. With MORE_LAYOUT='compact' (MORE-COMPACT, alpha.21) the old rows live in the panel
+    # "הגדרות וניהול" (#moreSettings) behind the row #mcSettingsRow; the helper opens it so every row the old tests click by text/id is reachable.
+    # 'v1' layout (or a page without the row) = unchanged behaviour.
+    try:
+        if page.locator("#mcSettingsRow").count() and page.locator("#mcSettingsRow").first.is_visible():
+            page.locator("#mcSettingsRow").first.click()
+            page.wait_for_timeout(400)
+    except Exception:
+        pass
 
 
 def open_admin(page, wait_list=True):
