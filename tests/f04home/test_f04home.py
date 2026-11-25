@@ -411,8 +411,10 @@ def test_f4h_01a_off_invite_is_alpha7(env, ua):
     page = dev.page
     P = []
     base = _base_invite_text(env, ua, token)
-    if btext(page) != base:
-        P.append("text differs from alpha.7:\n  off:     %r\n  alpha.7: %r" % (btext(page)[:400], base[:400]))
+    # CHANGE 2026-11-25 F13-ON-04: since LANG_FEATURE='on' the /invite/ header shows the "EN" language switch; it is the only difference from the alpha.7 text
+    cur = btext(page).replace("Lonely Planner EN ", "Lonely Planner ", 1)
+    if cur != base:
+        P.append("text differs from alpha.7:\n  off:     %r\n  alpha.7: %r" % (cur[:400], base[:400]))
     if H.ext_navs(dev):
         P.append("external navigation with the flag off: %r" % [r["url"] for r in H.ext_navs(dev)])
     for k in ("inapp_title", "install_title", "c2_line"):

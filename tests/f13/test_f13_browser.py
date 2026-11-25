@@ -8,6 +8,7 @@ the beta key and English stored = still Hebrew/RTL, no catalog request, storage 
 import functools
 import http.server
 import os
+import re
 import shutil
 import tempfile
 import threading
@@ -37,11 +38,16 @@ def servers():
     off = tmp / "app_off"
     shutil.copytree(REPO / "app", off)
     html = (off / "index.html").read_text(encoding="utf-8")
-    assert "const LANG_FEATURE='beta';" in html, "shipped flag is not 'beta'"
-    (off / "index.html").write_text(html.replace("const LANG_FEATURE='beta';", "const LANG_FEATURE='off';"), encoding="utf-8")
-    a, b = _serve(REPO / "app"), _serve(off)
-    yield {"shipped": "http://127.0.0.1:%d/index.html" % a.server_port, "off": "http://127.0.0.1:%d/index.html" % b.server_port}
-    a.shutdown(); b.shutdown(); shutil.rmtree(tmp, ignore_errors=True)
+    # CHANGE 2026-11-25 F13-ON-03: the shipped flag is 'on' since alpha.21.12 (was 'beta'). "shipped" (cases A-J, written for the beta flag) is now a copy built with 'beta'; the real app is "live" (test_k); "off" is built from whichever flag is shipped.
+    m = re.search(r"const LANG_FEATURE='(beta|on)';", html)
+    assert m, "shipped flag is not 'beta' or 'on'"
+    (off / "index.html").write_text(html.replace(m.group(0), "const LANG_FEATURE='off';"), encoding="utf-8")
+    beta = tmp / "app_beta"
+    shutil.copytree(REPO / "app", beta)
+    (beta / "index.html").write_text(html.replace(m.group(0), "const LANG_FEATURE='beta';"), encoding="utf-8")
+    a, b, c = _serve(beta), _serve(off), _serve(REPO / "app")
+    yield {"shipped": "http://127.0.0.1:%d/index.html" % a.server_port, "off": "http://127.0.0.1:%d/index.html" % b.server_port, "live": "http://127.0.0.1:%d/index.html" % c.server_port}
+    a.shutdown(); b.shutdown(); c.shutdown(); shutil.rmtree(tmp, ignore_errors=True)
 
 
 @pytest.fixture(scope="session")
@@ -285,4 +291,17 @@ def test_j_translation_layer(browser, servers):
     if g("#a") != "מלון ליד האגם": P.append("restore %r" % g("#a"))
     if f13errs(errs): P.append("f13 page errors %r" % f13errs(errs))
     ctx.close()
+    assert not P, "\n".join(P)
+
+
+def test_k_flag_on_english_browser_gets_english_hebrew_stays_hebrew(browser, servers):
+    """F13-ON-03: the shipped app (LANG_FEATURE='on'): no #f13beta needed. An English browser gets English/LTR, an Israeli browser stays Hebrew/RTL, and a device that chose Hebrew (the "שפה · Language" row) stays Hebrew."""
+    P = []
+    for loc, pre, want in (("en-GB", "", ["en", "ltr"]), ("he-IL", "", ["he", "rtl"]), ("en-GB", "try{localStorage.setItem('pt:_device:lang','he')}catch(e){}", ["he", "rtl"])):
+        ctx = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block", locale=loc)
+        if pre: ctx.add_init_script(pre)
+        ctx.route("**/*", lambda r: r.continue_() if r.request.url.startswith("http://127.0.0.1") else r.abort())
+        page = ctx.new_page(); page.goto(servers["live"]); page.wait_for_timeout(900)
+        if doc(page) != want: P.append("%s browser%s, flag on: %r (want %r)" % (loc, " + device=he" if pre else "", doc(page), want))
+        ctx.close()
     assert not P, "\n".join(P)

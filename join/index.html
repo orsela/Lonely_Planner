@@ -69,7 +69,7 @@ const MEMBERS_FEATURE='on';
 /* CHANGE 2026-11-16 F07-JOIN-02: new flag (no alpha.7.2 equivalent). 'on' = a member who changed phones can pick "כבר הייתי בטיול" and ask to link this phone (F07). 'off' = alpha.7.2. */
 const RELINK_FEATURE='on';   /* CHANGE 2026-11-16 F07-FLAG-03: was 'off' (F07 conversation 3 done; same version 3.0.0-alpha.16) */
 /* CHANGE 2026-11-24 F13-JOIN-03: new flag (no alpha.16 equivalent). 'on' = Hebrew/English; 'beta' = English only on a device with pt-f13-beta=1 (set by #f13beta in the app); 'off' = alpha.16. flow.js reads it. */
-const LANG_FEATURE='beta';
+const LANG_FEATURE='on';/* CHANGE 2026-11-25 F13-ON-01: was 'beta' (alpha.21.11). English is now on for every trip except Vietnam (always Hebrew/RTL, D3); approved by Or 2026-11-25. Revert: set 'beta' or 'off'. */
 (function(){
 'use strict';
 const SUPABASE_URL='https://zwufpxnioqaweobnvffs.supabase.co';

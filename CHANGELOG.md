@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.21.12 — 2026-11-25
+- F13: LANG_FEATURE 'on' in app, /join/ and /invite/ — English for every trip except Vietnam (always Hebrew/RTL).
+
 ## 3.0.0-alpha.21.11 — 2026-11-25
 - F13: English fixes from the phone check — journal textarea placeholder now translated (textarea attributes were skipped), vault tabs, empty bookings line, budget "planned per person" rows and summary, journal day title, flight chips, schedule title with count; vault and budget edit sheet follow the page direction (LTR in English).
 

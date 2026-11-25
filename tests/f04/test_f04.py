@@ -1818,10 +1818,11 @@ def test_c07_step1_prefill_lang_daycount(env):
     if not has(page, TXT["s1_name_help"]):
         P.append("help %r missing" % TXT["s1_name_help"])
     en = find(page, TXT["lang_en"])
-    if not en or not all(x["disabled"] for x in en):
-        P.append("English not disabled")
-    if not has(page, TXT["soon"]):
-        P.append("'בקרוב' next to English missing")
+    # CHANGE 2026-11-25 F13-ON-04: with LANG_FEATURE='on' the English option is enabled (F13 stage 2: the group's default language), so "disabled + בקרוב" no longer applies; it must exist and be selectable.
+    if not en or any(x["disabled"] for x in en):
+        P.append("English option missing or disabled with F13 on")
+    if has(page, TXT["soon"]):
+        P.append("'בקרוב' still shown next to English with F13 on")
     hv = home_value(page) or ""
     if "ILS" not in hv:
         P.append("home currency default is not ILS (%r)" % hv)

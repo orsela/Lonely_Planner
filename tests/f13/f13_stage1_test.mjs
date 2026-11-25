@@ -39,7 +39,7 @@ test('invite/index.html dictionary', () => {
   for (const m of src.matchAll(/tr\(IS_IOS\?'(\w+)':'(\w+)'\)/g)) { used.add(m[1]); used.add(m[2]); }
   check('invite', D, used);
 });
-test('flags default to beta and the version is on every touched file', () => {
-  for (const f of ['join/index.html', 'invite/index.html']) assert.match(read(f), /const LANG_FEATURE='beta';/, f);
+test('flags are beta or on and the version is on every touched file', () => {
+  for (const f of ['join/index.html', 'invite/index.html']) assert.match(read(f), /const LANG_FEATURE='(beta|on)';/, f);
   for (const f of ['join/flow.js', 'app/js/f07.js', 'join/index.html', 'invite/index.html']) assert.match(read(f), /3\.0\.0-alpha\.18\.6/, f);
 });
