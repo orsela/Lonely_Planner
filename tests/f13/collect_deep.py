@@ -1,6 +1,6 @@
-"""Lonely Planner F13 · dev tool: DEEP crawl — boots the app (fake backend, manager of a trip) in English, then clicks through tabs, the "עוד" list, panels and dialogs and prints the Hebrew texts that have no catalog entry · version 3.0.0-alpha.21.8
+"""Lonely Planner F13 · dev tool: DEEP crawl — boots the app (fake backend, manager of a trip) in English, then clicks through tabs, the "עוד" list, panels and dialogs and prints the Hebrew texts that have no catalog entry · version 3.0.0-alpha.21.9
 CHANGE 2026-11-25 F13-TOOL-02: new file (no previous version). collect_missing.py only visits the main tabs; this one also opens every visible list item / button one level deep (skipping destructive and outbound ones), so it reaches the screens behind them. Not a test; fake backend only.
-Usage: python3 collect_deep.py [out.json] [rounds] [manager|viewer|gate]   (REPO_DIR=… as for the other F13 browser tests)"""
+Usage: python3 collect_deep.py [out.json] [rounds] [manager|viewer|gate|acct]   (REPO_DIR=… as for the other F13 browser tests)"""
 import json, re, sys
 from pathlib import Path
 HERE = Path(__file__).resolve().parent
@@ -23,7 +23,7 @@ def main(out, rounds, scenario="manager"):
             d = env.new_device("G")
         else:
             d = T5.boot_member(env, tid, "M", "דנה", role=("viewer" if scenario == "viewer" else "manager"), pre_ls=None)
-        d.ctx.add_init_script("try{localStorage.setItem('pt-f13-beta','1');localStorage.setItem('pt:_device:lang','en')}catch(e){}")
+        d.ctx.add_init_script("try{localStorage.setItem('pt-f13-beta','1');localStorage.setItem('pt:_device:lang','en')%s}catch(e){}" % (";localStorage.setItem('pt-f22-beta','1')" if scenario == "acct" else ""))   # acct = manager with the F22a account screens (beta device)
         d.ctx.on("page", lambda pg: pg.close())          # external links open new pages: drop them
         pg = d.page
         pg.on("dialog", lambda dlg: dlg.dismiss())

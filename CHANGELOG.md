@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.21.9 — F13-CAT-02 · English for the invite wizard's code screen, step tags and install hint (2026-11-25)
+- app/i18n/en.json: resend timer, the email-subject example, two notes on the code screen, "· home" / "· manager" tags, the browser install hint. No code change. New dev tool tests/f13/collect_wizard.py (wizard + gate crawl).
+
 ## 3.0.0-alpha.21.8 — F13-JOIN-04 / F13-CAT-01 · English tab title on the /join/ error screen; 11 catalog entries found by a runtime crawl (2026-11-25)
 - join/index.html: when flow.js fails to load, the English error screen also sets the English tab title (was Hebrew). New test test_english_error_screen_title (fails without the fix).
 - app/i18n/en.json: + "הגדרות וניהול", "כספת", check-in texts, "מקומות קרובים לפי Google", "הוספת נקודת עניין · יום N", "N מסמכים", "ספרה N" (code boxes).
