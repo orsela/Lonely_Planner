@@ -1,5 +1,9 @@
 # Plan_Travel – CHANGELOG
 
+## 3.0.0-alpha.21.6 — TC-EMPTY · a trip with no days no longer breaks the journal; the "no local copy" toast is offline-only (2026-11-25)
+- Journal save on a trip with 0 days: was a TypeError (currentDayNum), now a toast "אין עדיין ימים בטיול" and nothing is saved.
+- The toast "אין עותק של הטיול במכשיר" (cloud trip without a stored copy) is shown only when the device is offline (online it was misleading).
+
 ## 3.0.0-alpha.21.5 — BUDGET-PP · a saved traveler count below 1 is repaired to the default 10 (2026-11-25)
 - budgetpp.js: was clamped to 1 (a stored 0 would have made the per-person actual 10x too high). Not reachable from the screen (input min 1). Found by the QA pass.
 

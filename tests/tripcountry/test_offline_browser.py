@@ -70,5 +70,21 @@ with sync_playwright() as pw:
         check('4 no horizontal scroll at 390px (empty trip)', not r['hscroll'])
     finally:
         env.close(); srv.stop()
+    # CHANGE 2026-11-25 TC-EMPTY-T-01: 6 = a cloud trip with no stored days, device ONLINE: no "no local copy" toast, journal save does not throw and says there are no days
+    srv = H.f05.F05Server(); env = H.Env(br, srv); flip(env, 'on')
+    try:
+        tid = env.backend.fixture('E', role='manager'); env.backend.set_kv(tid, 'trip', '[]')  # a stored trip with 0 days
+        dev = h10.boot(env, tid, role='manager'); errs = []; dev.page.on('pageerror', lambda e: errs.append(str(e)))
+        dev.page.wait_for_timeout(2200)
+        r = dev.page.evaluate(STATE)
+        check('6 online + stored 0-day trip: 0 days, no Vietnam seed', r['n'] == 0 and not any(w in r['body'] for w in VN_WORDS), r['n'])
+        check('6 online: the "no local copy" toast is NOT shown', 'אין עותק של הטיול במכשיר' not in r['body'])
+        dev.page.evaluate("()=>{document.getElementById('journalText').value='בדיקה';document.getElementById('saveJournal').click()}")
+        dev.page.wait_for_timeout(800)
+        body = dev.page.evaluate('()=>document.body.innerText')
+        check('6 journal save on a 0-day trip: no page error', not errs, errs[:2])
+        check('6 journal save on a 0-day trip: says there are no days', 'אין עדיין ימים בטיול' in body)
+    finally:
+        env.close(); srv.stop()
     br.close()
 print('all passed' if not fails else 'failed: %d' % len(fails)); sys.exit(1 if fails else 0)
