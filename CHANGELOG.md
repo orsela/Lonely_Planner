@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## START-03 · /start/ version 1.1.1 (2026-11-26) — no app version change
+- start/index.html: the "סריקה מהגלריה" button shows the green map-pin icon (inline SVG) instead of the picture emoji.
+
 ## START-02 · /start/ version 1.1.0 (2026-11-26) — no app version change
 - start/index.html: new "סריקה מהגלריה" button under the QR (a phone cannot scan a QR on its own screen). Decodes a chosen image with the browser's BarcodeDetector (Chrome / Edge / Samsung Internet on Android), opens only links under https://orsela.github.io/Lonely_Planner/; other codes, no code, or an unsupported browser show a message. Image stays on the device.
 
