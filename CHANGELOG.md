@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## START-02 · /start/ version 1.1.0 (2026-11-26) — no app version change
+- start/index.html: new "סריקה מהגלריה" button under the QR (a phone cannot scan a QR on its own screen). Decodes a chosen image with the browser's BarcodeDetector (Chrome / Edge / Samsung Internet on Android), opens only links under https://orsela.github.io/Lonely_Planner/; other codes, no code, or an unsupported browser show a message. Image stays on the device.
+
 ## START-01 · /start/ share page, version 1.0.0 (2026-11-26) — no app version change
 - New static public page start/index.html (+ start/og.jpg): a shareable card with three pin-numbered steps, a button and a QR to /request/?lang=<l>. Hebrew + English with a switch, Open Graph tags for WhatsApp previews. No app code touched, no Supabase, no storage; app/sw.js unchanged (outside the PWA scope). Mockup approved by Or 2026-11-26.
 
