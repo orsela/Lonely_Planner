@@ -1,5 +1,8 @@
 # Plan_Travel – CHANGELOG
 
+## START-01 · /start/ share page, version 1.0.0 (2026-11-26) — no app version change
+- New static public page start/index.html (+ start/og.jpg): a shareable card with three pin-numbered steps, a button and a QR to /request/?lang=<l>. Hebrew + English with a switch, Open Graph tags for WhatsApp previews. No app code touched, no Supabase, no storage; app/sw.js unchanged (outside the PWA scope). Mockup approved by Or 2026-11-26.
+
 ## 3.0.0-alpha.21.12 — 2026-11-25
 - F13: LANG_FEATURE 'on' in app, /join/ and /invite/ — English for every trip except Vietnam (always Hebrew/RTL).
 
